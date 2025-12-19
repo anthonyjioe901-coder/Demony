@@ -49,7 +49,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased limit for file uploads
 
 // Import routes
 var authRoutes = require('./routes/auth.js');
@@ -57,6 +57,8 @@ var projectRoutes = require('./routes/projects.js');
 var investmentRoutes = require('./routes/investments.js');
 var portfolioRoutes = require('./routes/portfolio.js');
 var performanceRoutes = require('./routes/performance.js');
+var adminRoutes = require('./routes/admin.js');
+var withdrawalRoutes = require('./routes/withdrawals.js');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -64,6 +66,8 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/performance', performanceRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/withdrawals', withdrawalRoutes);
 
 // Root endpoint
 app.get('/', function(req, res) {
