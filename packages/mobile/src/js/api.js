@@ -96,6 +96,13 @@ Api.prototype.invest = function(data) {
   });
 };
 
+Api.prototype.investWithPaystack = function(data) {
+  return this.request('/investments/pay', {
+    method: 'POST',
+    body: data
+  });
+};
+
 Api.prototype.getMyInvestments = function() {
   return this.request('/investments/my');
 };
@@ -103,6 +110,34 @@ Api.prototype.getMyInvestments = function() {
 // Portfolio
 Api.prototype.getPortfolio = function() {
   return this.request('/portfolio');
+};
+
+// Wallet
+Api.prototype.getWalletBalance = function() {
+  return this.request('/wallet/balance');
+};
+
+Api.prototype.getTransactions = function(params) {
+  var query = params ? '?' + new URLSearchParams(params).toString() : '';
+  return this.request('/wallet/transactions' + query);
+};
+
+Api.prototype.initializeDeposit = function(amount) {
+  return this.request('/wallet/deposit/initialize', {
+    method: 'POST',
+    body: { amount: amount }
+  });
+};
+
+Api.prototype.getBanks = function() {
+  return this.request('/wallet/banks');
+};
+
+Api.prototype.requestWithdrawal = function(data) {
+  return this.request('/wallet/withdraw', {
+    method: 'POST',
+    body: data
+  });
 };
 
 export { Api };

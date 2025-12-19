@@ -9,31 +9,42 @@
 <body>
   <div id="app">
     <nav id="navbar">
-      <div class="logo">
-        <h1>Demony</h1>
+      <div class="nav-left">
+        <div class="logo">
+          <a href="#home" data-page="home">
+            <span class="logo-icon">💎</span>
+            <span class="logo-text">Demony</span>
+          </a>
+        </div>
       </div>
+      
       <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">
         <span></span>
         <span></span>
         <span></span>
       </button>
+      
       <ul class="nav-links" id="nav-links">
-        <li><a href="#" data-page="home">Home</a></li>
-        <li><a href="#" data-page="projects">Projects</a></li>
-        <li><a href="#" data-page="wallet">Wallet</a></li>
-        <li><a href="#" data-page="investments">My Investments</a></li>
-        <li><a href="#" data-page="portfolio">Portfolio</a></li>
+        <li><a href="#home" data-page="home"><span class="nav-icon">🏠</span><span class="nav-text">Home</span></a></li>
+        <li><a href="#projects" data-page="projects"><span class="nav-icon">📊</span><span class="nav-text">Projects</span></a></li>
+        <li><a href="#wallet" data-page="wallet"><span class="nav-icon">💰</span><span class="nav-text">Wallet</span></a></li>
+        <li><a href="#investments" data-page="investments"><span class="nav-icon">📈</span><span class="nav-text">Investments</span></a></li>
+        <li><a href="#portfolio" data-page="portfolio"><span class="nav-icon">💼</span><span class="nav-text">Portfolio</span></a></li>
       </ul>
-      <div class="auth-buttons" id="auth-buttons">
-        <button id="login-btn" class="btn btn-outline">Login</button>
-        <button id="signup-btn" class="btn btn-primary">Sign Up</button>
-      </div>
-      <div class="user-menu" id="user-menu">
-        <div class="user-chip">
-          <div class="user-avatar" aria-hidden="true">👤</div>
-          <span id="user-name">User</span>
+      
+      <div class="nav-right">
+        <button id="theme-toggle" class="btn btn-icon theme-btn" aria-label="Toggle theme">🌙</button>
+        <div class="auth-buttons" id="auth-buttons">
+          <button id="login-btn" class="btn btn-outline">Login</button>
+          <button id="signup-btn" class="btn btn-primary">Sign Up</button>
         </div>
-        <button id="logout-btn" class="btn btn-outline">Logout</button>
+        <div class="user-menu" id="user-menu">
+          <div class="user-chip">
+            <div class="user-avatar" aria-hidden="true">👤</div>
+            <span id="user-name">User</span>
+          </div>
+          <button id="logout-btn" class="btn btn-outline btn-sm">Logout</button>
+        </div>
       </div>
     </nav>
 
@@ -42,7 +53,19 @@
     </main>
 
     <footer id="footer">
-      <p>&copy; 2025 Demony. All rights reserved.</p>
+      <div class="footer-content">
+        <div class="footer-brand">
+          <span class="logo-icon">💎</span>
+          <span>Demony</span>
+        </div>
+        <div class="footer-links">
+          <a href="#terms" data-page="terms">Terms of Service</a>
+          <a href="#privacy" data-page="privacy">Privacy Policy</a>
+          <a href="#risk" data-page="risk">Risk Disclosure</a>
+        </div>
+        <p class="footer-copyright">&copy; 2025 Demony Investment Platform. All rights reserved.</p>
+        <p class="footer-disclaimer">Investment involves risk. Past performance is not indicative of future results.</p>
+      </div>
     </footer>
   </div>
 

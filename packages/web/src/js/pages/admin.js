@@ -11,92 +11,186 @@ function renderAdmin(container, api) {
   var adminApi = api.getAdmin();
   
   var html = 
-    '<section>' +
-      '<h2>Admin Dashboard</h2>' +
-      '<p style="color: var(--text-muted); margin-bottom: 2rem;">Manage users, projects, and finances</p>' +
-      
-      // Stats cards
-      '<div class="card-grid" id="admin-stats" style="margin-bottom: 2rem;">' +
-        '<div style="grid-column: 1/-1; text-align: center; padding: 2rem;">Loading stats...</div>' +
+    '<section style="max-width: 1200px; margin: 0 auto; padding: 1rem;">' +
+      // Header
+      '<div style="margin-bottom: 2rem;">' +
+        '<h2 style="margin: 0; font-size: 1.75rem; font-weight: 700;">Admin Dashboard</h2>' +
       '</div>' +
       
-      // Tabs
-      '<div class="tabs" style="display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; flex-wrap: wrap;">' +
-        '<button class="btn admin-tab active" data-tab="pending-kyc">Pending KYC</button>' +
-        '<button class="btn admin-tab" data-tab="pending-projects">Pending Projects</button>' +
-        '<button class="btn admin-tab" data-tab="pending-withdrawals">Pending Withdrawals</button>' +
-        '<button class="btn admin-tab" data-tab="all-users">All Users</button>' +
-        '<button class="btn admin-tab" data-tab="create-project" style="background: var(--secondary-color);">+ Create Project</button>' +
-        '<button class="btn admin-tab" data-tab="all-projects">All Projects</button>' +
+      // Action Cards - Only shows pending items that need attention
+      '<div id="admin-alerts" style="margin-bottom: 2rem;"></div>' +
+      
+      // Main Actions Grid
+      '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">' +
+        
+        // Create Project Card
+        '<div class="card action-card" data-action="create-project" style="cursor: pointer; padding: 1.5rem; border: 2px solid var(--secondary-color); background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);">' +
+          '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">' +
+            '<div style="width: 48px; height: 48px; border-radius: 12px; background: var(--secondary-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">➕</div>' +
+            '<div>' +
+              '<h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Create Project</h3>' +
+              '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Add new investment project</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        
+        // Users Card
+        '<div class="card action-card" data-action="all-users" style="cursor: pointer; padding: 1.5rem;">' +
+          '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">' +
+            '<div style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">👥</div>' +
+            '<div>' +
+              '<h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Manage Users</h3>' +
+              '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">View all investors</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        
+        // Projects Card
+        '<div class="card action-card" data-action="all-projects" style="cursor: pointer; padding: 1.5rem;">' +
+          '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">' +
+            '<div style="width: 48px; height: 48px; border-radius: 12px; background: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">📊</div>' +
+            '<div>' +
+              '<h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">All Projects</h3>' +
+              '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Manage projects</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        
       '</div>' +
       
-      // Tab content
-      '<div id="admin-content"></div>' +
+      // Content Area
+      '<div id="admin-content" style="margin-top: 2rem;"></div>' +
     '</section>';
   
   container.innerHTML = html;
   
-  // Load stats
-  loadAdminStats(adminApi);
+  // Load alerts (pending items)
+  loadAdminAlerts(adminApi);
   
-  // Tab switching
-  document.querySelectorAll('.admin-tab').forEach(function(tab) {
-    tab.addEventListener('click', function() {
-      document.querySelectorAll('.admin-tab').forEach(function(t) { t.classList.remove('active'); });
-      this.classList.add('active');
-      loadAdminTab(adminApi, this.getAttribute('data-tab'));
+  // Action card click handlers
+  document.querySelectorAll('.action-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var action = this.getAttribute('data-action');
+      loadAdminTab(adminApi, action);
+      // Scroll to content
+      document.getElementById('admin-content').scrollIntoView({ behavior: 'smooth' });
     });
   });
-  
-  // Load initial tab
-  loadAdminTab(adminApi, 'pending-kyc');
 }
 
-function loadAdminStats(adminApi) {
-  var statsContainer = document.getElementById('admin-stats');
+// Load alerts for pending items
+function loadAdminAlerts(adminApi) {
+  var alertsContainer = document.getElementById('admin-alerts');
   
   adminApi.getStats()
     .then(function(stats) {
-      statsContainer.innerHTML = 
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">' + stats.users.total + '</div>' +
-          '<div style="color: var(--text-muted);">Total Users</div>' +
-          '<div style="font-size: 0.875rem; margin-top: 0.5rem;">' + stats.users.pendingKyc + ' pending KYC</div>' +
-        '</div>' +
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: var(--secondary-color);">' + stats.projects.total + '</div>' +
-          '<div style="color: var(--text-muted);">Total Projects</div>' +
-          '<div style="font-size: 0.875rem; margin-top: 0.5rem;">' + stats.projects.pending + ' pending review</div>' +
-        '</div>' +
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: var(--accent-color);">$' + stats.investments.totalAmount.toLocaleString() + '</div>' +
-          '<div style="color: var(--text-muted);">Total Invested</div>' +
-          '<div style="font-size: 0.875rem; margin-top: 0.5rem;">' + stats.investments.total + ' investments</div>' +
-        '</div>' +
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: #ef4444;">$' + stats.withdrawals.pendingAmount.toLocaleString() + '</div>' +
-          '<div style="color: var(--text-muted);">Pending Withdrawals</div>' +
-          '<div style="font-size: 0.875rem; margin-top: 0.5rem;">' + stats.withdrawals.pending + ' requests</div>' +
-        '</div>';
+      var alerts = [];
+      
+      // Only show alerts if there are pending items
+      if (stats.users.pendingKyc > 0) {
+        alerts.push(
+          '<div class="card alert-card" data-action="pending-kyc" style="cursor: pointer; padding: 1rem; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.1); display: flex; justify-content: space-between; align-items: center;">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<span style="font-size: 1.25rem;">📋</span>' +
+              '<div>' +
+                '<strong>' + stats.users.pendingKyc + ' Pending KYC</strong>' +
+                '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Users waiting for verification</p>' +
+              '</div>' +
+            '</div>' +
+            '<button class="btn btn-primary" style="padding: 0.5rem 1rem;">Review</button>' +
+          '</div>'
+        );
+      }
+      
+      if (stats.projects.pending > 0) {
+        alerts.push(
+          '<div class="card alert-card" data-action="pending-projects" style="cursor: pointer; padding: 1rem; border-left: 4px solid var(--primary-color); background: rgba(99, 102, 241, 0.1); display: flex; justify-content: space-between; align-items: center;">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<span style="font-size: 1.25rem;">🏢</span>' +
+              '<div>' +
+                '<strong>' + stats.projects.pending + ' Pending Projects</strong>' +
+                '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Projects awaiting approval</p>' +
+              '</div>' +
+            '</div>' +
+            '<button class="btn btn-primary" style="padding: 0.5rem 1rem;">Review</button>' +
+          '</div>'
+        );
+      }
+      
+      if (stats.withdrawals.pending > 0) {
+        alerts.push(
+          '<div class="card alert-card" data-action="pending-withdrawals" style="cursor: pointer; padding: 1rem; border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.1); display: flex; justify-content: space-between; align-items: center;">' +
+            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+              '<span style="font-size: 1.25rem;">💸</span>' +
+              '<div>' +
+                '<strong>' + stats.withdrawals.pending + ' Pending Withdrawals</strong> <span style="color: #ef4444; font-weight: 600;">($' + stats.withdrawals.pendingAmount.toLocaleString() + ')</span>' +
+                '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Waiting for processing</p>' +
+              '</div>' +
+            '</div>' +
+            '<button class="btn" style="padding: 0.5rem 1rem; background: #ef4444; color: white;">Process</button>' +
+          '</div>'
+        );
+      }
+      
+      if (alerts.length > 0) {
+        alertsContainer.innerHTML = 
+          '<h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-muted);">⚡ Requires Action</h3>' +
+          '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' + alerts.join('') + '</div>';
+        
+        // Add click handlers for alert cards
+        document.querySelectorAll('.alert-card').forEach(function(card) {
+          card.addEventListener('click', function() {
+            var action = this.getAttribute('data-action');
+            loadAdminTab(adminApi, action);
+            document.getElementById('admin-content').scrollIntoView({ behavior: 'smooth' });
+          });
+        });
+      } else {
+        alertsContainer.innerHTML = 
+          '<div class="card" style="padding: 1.5rem; text-align: center; background: rgba(16, 185, 129, 0.1); border: 1px solid var(--secondary-color);">' +
+            '<span style="font-size: 2rem;">✅</span>' +
+            '<p style="margin: 0.5rem 0 0 0; font-weight: 500; color: var(--secondary-color);">All caught up! No pending actions.</p>' +
+          '</div>';
+      }
     })
     .catch(function(err) {
-      statsContainer.innerHTML = '<div style="grid-column: 1/-1; color: #ef4444;">Error loading stats: ' + err.message + '</div>';
+      alertsContainer.innerHTML = '<div style="color: #ef4444;">Error loading alerts: ' + err.message + '</div>';
     });
 }
 
 function loadAdminTab(adminApi, tab) {
   var content = document.getElementById('admin-content');
-  content.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading...</div>';
+  
+  // Section titles
+  var titles = {
+    'pending-kyc': { icon: '📋', title: 'Pending KYC Verifications' },
+    'pending-projects': { icon: '🏢', title: 'Pending Project Approvals' },
+    'pending-withdrawals': { icon: '💸', title: 'Pending Withdrawals' },
+    'all-users': { icon: '👥', title: 'All Users' },
+    'all-projects': { icon: '📊', title: 'All Projects' },
+    'create-project': { icon: '➕', title: 'Create New Project' }
+  };
+  
+  var sectionInfo = titles[tab] || { icon: '📁', title: 'Admin' };
+  
+  content.innerHTML = 
+    '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">' +
+      '<span style="font-size: 1.5rem;">' + sectionInfo.icon + '</span>' +
+      '<h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;">' + sectionInfo.title + '</h3>' +
+    '</div>' +
+    '<div id="tab-content"><div style="text-align: center; padding: 2rem;">Loading...</div></div>';
+  
+  var tabContent = document.getElementById('tab-content');
   
   if (tab === 'pending-kyc') {
     adminApi.getUsers({ kycStatus: 'submitted' })
       .then(function(result) {
         if (result.users.length === 0) {
-          content.innerHTML = '<div class="card" style="padding: 2rem; text-align: center;">No pending KYC verifications</div>';
+          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">✅ No pending KYC verifications</div>';
           return;
         }
         
-        content.innerHTML = result.users.map(function(user) {
+        tabContent.innerHTML = result.users.map(function(user) {
           return '<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
               '<div>' +
@@ -121,11 +215,19 @@ function loadAdminTab(adminApi, tab) {
           btn.addEventListener('click', function() {
             var id = this.getAttribute('data-id');
             if (confirm('Approve KYC for this user?')) {
+              var button = this;
+              button.disabled = true;
+              button.textContent = 'Processing...';
               adminApi.verifyKyc(id, 'approve')
                 .then(function() {
-                  alert('KYC approved!');
+                  alert('✅ KYC approved successfully!');
                   loadAdminTab(adminApi, 'pending-kyc');
                   loadAdminStats(adminApi);
+                })
+                .catch(function(err) {
+                  alert('❌ Error: ' + err.message);
+                  button.disabled = false;
+                  button.textContent = 'Approve';
                 });
             }
           });
@@ -136,10 +238,19 @@ function loadAdminTab(adminApi, tab) {
             var id = this.getAttribute('data-id');
             var reason = prompt('Rejection reason:');
             if (reason) {
+              var button = this;
+              button.disabled = true;
+              button.textContent = 'Processing...';
               adminApi.verifyKyc(id, 'reject', reason)
                 .then(function() {
-                  alert('KYC rejected');
+                  alert('✅ KYC rejected with reason: ' + reason);
                   loadAdminTab(adminApi, 'pending-kyc');
+                  loadAdminStats(adminApi);
+                })
+                .catch(function(err) {
+                  alert('❌ Error: ' + err.message);
+                  button.disabled = false;
+                  button.textContent = 'Reject';
                 });
             }
           });
@@ -151,11 +262,11 @@ function loadAdminTab(adminApi, tab) {
     adminApi.getProjects({ status: 'pending_review' })
       .then(function(result) {
         if (result.projects.length === 0) {
-          content.innerHTML = '<div class="card" style="padding: 2rem; text-align: center;">No pending project reviews</div>';
+          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">✅ No pending project reviews</div>';
           return;
         }
         
-        content.innerHTML = result.projects.map(function(project) {
+        tabContent.innerHTML = result.projects.map(function(project) {
           return '<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
               '<div>' +
@@ -181,11 +292,19 @@ function loadAdminTab(adminApi, tab) {
           btn.addEventListener('click', function() {
             var id = this.getAttribute('data-id');
             if (confirm('Approve this project for funding?')) {
+              var button = this;
+              button.disabled = true;
+              button.textContent = 'Processing...';
               adminApi.reviewProject(id, 'approve', 'Project approved for funding')
                 .then(function() {
-                  alert('Project approved!');
+                  alert('✅ Project approved successfully!');
                   loadAdminTab(adminApi, 'pending-projects');
                   loadAdminStats(adminApi);
+                })
+                .catch(function(err) {
+                  alert('❌ Error: ' + err.message);
+                  button.disabled = false;
+                  button.textContent = 'Approve';
                 });
             }
           });
@@ -196,10 +315,19 @@ function loadAdminTab(adminApi, tab) {
             var id = this.getAttribute('data-id');
             var feedback = prompt('What changes are required?');
             if (feedback) {
+              var button = this;
+              button.disabled = true;
+              button.textContent = 'Processing...';
               adminApi.reviewProject(id, 'request_changes', feedback)
                 .then(function() {
-                  alert('Changes requested');
+                  alert('✅ Changes requested successfully');
                   loadAdminTab(adminApi, 'pending-projects');
+                  loadAdminStats(adminApi);
+                })
+                .catch(function(err) {
+                  alert('❌ Error: ' + err.message);
+                  button.disabled = false;
+                  button.textContent = 'Request Changes';
                 });
             }
           });
@@ -211,11 +339,11 @@ function loadAdminTab(adminApi, tab) {
     adminApi.getWithdrawals({ status: 'pending' })
       .then(function(result) {
         if (result.withdrawals.length === 0) {
-          content.innerHTML = '<div class="card" style="padding: 2rem; text-align: center;">No pending withdrawals</div>';
+          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">✅ No pending withdrawals</div>';
           return;
         }
         
-        content.innerHTML = result.withdrawals.map(function(w) {
+        tabContent.innerHTML = result.withdrawals.map(function(w) {
           return '<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
               '<div>' +
@@ -239,11 +367,19 @@ function loadAdminTab(adminApi, tab) {
             var id = this.getAttribute('data-id');
             var txRef = prompt('Enter transaction reference:');
             if (txRef) {
+              var button = this;
+              button.disabled = true;
+              button.textContent = 'Processing...';
               adminApi.processWithdrawal(id, 'approve', null, txRef)
                 .then(function() {
-                  alert('Withdrawal approved and marked as paid!');
+                  alert('✅ Withdrawal approved and marked as paid!');
                   loadAdminTab(adminApi, 'pending-withdrawals');
                   loadAdminStats(adminApi);
+                })
+                .catch(function(err) {
+                  alert('❌ Error: ' + err.message);
+                  button.disabled = false;
+                  button.textContent = 'Approve & Pay';
                 });
             }
           });
@@ -254,11 +390,19 @@ function loadAdminTab(adminApi, tab) {
             var id = this.getAttribute('data-id');
             var reason = prompt('Rejection reason:');
             if (reason) {
+              var button = this;
+              button.disabled = true;
+              button.textContent = 'Processing...';
               adminApi.processWithdrawal(id, 'reject', reason)
                 .then(function() {
-                  alert('Withdrawal rejected, funds returned to user');
+                  alert('✅ Withdrawal rejected, funds returned to user');
                   loadAdminTab(adminApi, 'pending-withdrawals');
                   loadAdminStats(adminApi);
+                })
+                .catch(function(err) {
+                  alert('❌ Error: ' + err.message);
+                  button.disabled = false;
+                  button.textContent = 'Reject';
                 });
             }
           });
@@ -269,39 +413,52 @@ function loadAdminTab(adminApi, tab) {
   else if (tab === 'all-users') {
     adminApi.getUsers({})
       .then(function(result) {
-        content.innerHTML = 
-          '<table style="width: 100%; border-collapse: collapse;">' +
-            '<thead>' +
-              '<tr style="border-bottom: 1px solid var(--border-color);">' +
-                '<th style="text-align: left; padding: 1rem;">Name</th>' +
-                '<th style="text-align: left; padding: 1rem;">Email</th>' +
-                '<th style="text-align: left; padding: 1rem;">Role</th>' +
-                '<th style="text-align: left; padding: 1rem;">KYC</th>' +
-                '<th style="text-align: left; padding: 1rem;">Status</th>' +
-              '</tr>' +
-            '</thead>' +
-            '<tbody>' +
-              result.users.map(function(user) {
-                return '<tr style="border-bottom: 1px solid var(--border-color);">' +
-                  '<td style="padding: 1rem;">' + user.name + '</td>' +
-                  '<td style="padding: 1rem;">' + user.email + '</td>' +
-                  '<td style="padding: 1rem;"><span class="badge">' + user.role + '</span></td>' +
-                  '<td style="padding: 1rem;"><span class="badge" style="background: ' + 
-                    (user.kyc && user.kyc.status === 'verified' ? 'var(--secondary-color)' : '#6b7280') + ';">' + 
-                    (user.kyc ? user.kyc.status : 'pending') + '</span></td>' +
-                  '<td style="padding: 1rem;">' + (user.isActive ? '✅ Active' : '🚫 Suspended') + '</td>' +
-                '</tr>';
-              }).join('') +
-            '</tbody>' +
-          '</table>';
+        // Filter out admin users from the display
+        var nonAdminUsers = result.users.filter(function(user) {
+          return user.role !== 'admin';
+        });
+        
+        if (nonAdminUsers.length === 0) {
+          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">No users found</div>';
+          return;
+        }
+        
+        tabContent.innerHTML = 
+          '<div style="overflow-x: auto;">' +
+            '<table style="width: 100%; border-collapse: collapse; background: var(--surface-color); border-radius: 0.75rem; overflow: hidden;">' +
+              '<thead>' +
+                '<tr style="background: var(--surface-elevated); border-bottom: 2px solid var(--border-color);">' +
+                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Name</th>' +
+                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Email</th>' +
+                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Role</th>' +
+                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">KYC</th>' +
+                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Status</th>' +
+                '</tr>' +
+              '</thead>' +
+              '<tbody>' +
+                nonAdminUsers.map(function(user) {
+                  return '<tr style="border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background=\'var(--surface-elevated)\'" onmouseout="this.style.background=\'transparent\'">' +
+                    '<td style="padding: 1rem; font-weight: 500;">' + user.name + '</td>' +
+                    '<td style="padding: 1rem; color: var(--text-secondary);">' + user.email + '</td>' +
+                    '<td style="padding: 1rem;"><span class="badge" style="background: ' + (user.role === 'business_owner' ? '#8b5cf6' : 'var(--primary-color)') + ';">' + user.role.replace('_', ' ') + '</span></td>' +
+                    '<td style="padding: 1rem;"><span class="badge" style="background: ' + 
+                      (user.kyc && user.kyc.status === 'verified' ? 'var(--secondary-color)' : user.kyc && user.kyc.status === 'submitted' ? '#f59e0b' : '#6b7280') + ';">' + 
+                      (user.kyc ? user.kyc.status : 'pending') + '</span></td>' +
+                    '<td style="padding: 1rem;">' + (user.isActive !== false ? '<span style="color: var(--secondary-color); font-weight: 600;">✅ Active</span>' : '<span style="color: #ef4444; font-weight: 600;">🚫 Suspended</span>') + '</td>' +
+                  '</tr>';
+                }).join('') +
+              '</tbody>' +
+            '</table>' +
+          '</div>';
+      })
+      .catch(function(err) {
+        tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: #ef4444;">⚠️ Error loading users: ' + err.message + '</div>';
       });
   }
   
   else if (tab === 'create-project') {
-    content.innerHTML = 
-      '<div class="card" style="padding: 2rem; max-width: 800px; margin: 0 auto;">' +
-        '<h3 style="margin-bottom: 1.5rem;">Create Company Project</h3>' +
-        '<p style="color: var(--text-muted); margin-bottom: 1.5rem;">Create a project directly from the company. This will be published immediately.</p>' +
+    tabContent.innerHTML = 
+      '<div class="card" style="padding: 2rem; max-width: 800px;">' +
         '<form id="create-project-form">' +
           '<div style="margin-bottom: 1rem;">' +
             '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Project Name *</label>' +
@@ -408,14 +565,11 @@ function loadAdminTab(adminApi, tab) {
     adminApi.getProjects({ status: 'all' })
       .then(function(result) {
         if (result.projects.length === 0) {
-          content.innerHTML = '<div class="card" style="padding: 2rem; text-align: center;">No projects yet</div>';
+          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">No projects yet. Create your first project!</div>';
           return;
         }
         
-        content.innerHTML = 
-          '<div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">' +
-            '<h3>' + result.projects.length + ' Projects</h3>' +
-          '</div>' +
+        tabContent.innerHTML = 
           result.projects.map(function(project) {
             var statusColor = {
               'pending_review': '#f59e0b',

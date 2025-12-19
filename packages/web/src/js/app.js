@@ -12,6 +12,21 @@ import { renderWallet } from './pages/wallet.js';
 // Initialize API client
 const api = new Api();
 
+// Theme Logic
+const themeToggle = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.setAttribute('data-theme', savedTheme);
+if (themeToggle) {
+  themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+  themeToggle.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+  });
+}
+
 // Initialize Router
 const router = new Router('main-content');
 
@@ -82,15 +97,31 @@ function updateAuthState() {
       if (userName) userName.textContent = user.name;
     }
     
+    // Hide investor-specific links for admin and business owners
+    var investorLinks = document.querySelectorAll('[data-page="projects"], [data-page="wallet"], [data-page="investments"], [data-page="portfolio"]');
+    if (user.role === 'admin' || user.role === 'business_owner') {
+      investorLinks.forEach(function(link) {
+        if (link.parentElement) link.parentElement.style.display = 'none';
+      });
+    } else {
+      investorLinks.forEach(function(link) {
+        if (link.parentElement) link.parentElement.style.display = '';
+      });
+    }
+    
     // Add role-based navigation
     if (navLinks && user.role === 'admin') {
       var adminLi = document.createElement('li');
-      adminLi.innerHTML = '<a href="#" data-page="admin">Admin</a>';
+      adminLi.innerHTML = '<a href="#" data-page="admin">Admin Dashboard</a>';
       navLinks.appendChild(adminLi);
       adminLi.querySelector('a').addEventListener('click', function(e) {
         e.preventDefault();
         router.navigate('admin');
       });
+      // Auto-navigate to admin on login if on home
+      if (window.location.hash === '' || window.location.hash === '#home') {
+        router.navigate('admin');
+      }
     }
     
     if (navLinks && user.role === 'business_owner') {
@@ -105,6 +136,11 @@ function updateAuthState() {
   } else {
     if (authButtons) authButtons.style.display = 'flex';
     if (userMenu) userMenu.style.display = 'none';
+    // Show all investor links when logged out
+    var investorLinks = document.querySelectorAll('[data-page="projects"], [data-page="wallet"], [data-page="investments"], [data-page="portfolio"]');
+    investorLinks.forEach(function(link) {
+      if (link.parentElement) link.parentElement.style.display = '';
+    });
   }
 }
 

@@ -1,20 +1,37 @@
 // Demony Mobile App - Pure JavaScript
 import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
-import { StatusBar } from '@capacitor/status-bar';
 import { Api } from './api.js';
 
 // Initialize Capacitor plugins
 if (Capacitor.isNativePlatform()) {
-  StatusBar.setStyle({ style: 'Dark' });
-  
-  App.addListener('backButton', function(event) {
-    if (event.canGoBack) {
-      window.history.back();
-    } else {
-      App.exitApp();
-    }
-  });
+  // Note: keep plugin imports dynamic so the web/Vite dev build doesn't choke
+  // on Capacitor plugin export shapes.
+  Promise.all([
+    import('@capacitor/app'),
+    import('@capacitor/status-bar')
+  ])
+    .then(function(mods) {
+      var App = mods[0].App;
+      var StatusBar = mods[1].StatusBar;
+      var StatusBarStyle = mods[1].Style;
+
+      if (StatusBar && StatusBarStyle) {
+        StatusBar.setStyle({ style: StatusBarStyle.Dark });
+      }
+
+      if (App) {
+        App.addListener('backButton', function(event) {
+          if (event.canGoBack) {
+            window.history.back();
+          } else {
+            App.exitApp();
+          }
+        });
+      }
+    })
+    .catch(function() {
+      // No-op: running in browser or plugin unavailable.
+    });
 }
 
 // Initialize API
@@ -52,8 +69,8 @@ function renderTab(tabName) {
     case 'projects':
       renderProjects();
       break;
-    case 'investments':
-      renderInvestments();
+    case 'wallet':
+      renderWallet();
       break;
     case 'portfolio':
       renderPortfolio();
@@ -86,35 +103,47 @@ function renderHome() {
   // Load data
   if (api.token) {
     api.getPortfolio().then(function(portfolio) {
-      document.getElementById('home-stats').innerHTML = 
-        '<div class="card stat-card">' +
-          '<div class="value">$' + portfolio.currentValue.toLocaleString() + '</div>' +
-          '<div class="label">Portfolio Value</div>' +
-        '</div>' +
-        '<div class="card stat-card">' +
-          '<div class="value" style="color: var(--secondary-color);">+' + portfolio.returnPercent.toFixed(1) + '%</div>' +
-          '<div class="label">Total Return</div>' +
-        '</div>' +
-        '<div class="card stat-card">' +
-          '<div class="value">' + portfolio.activeInvestments + '</div>' +
-          '<div class="label">Investments</div>' +
-        '</div>';
+      var statsContainer = document.getElementById('home-stats');
+      if (statsContainer) {
+        statsContainer.innerHTML = 
+          '<div class="card stat-card">' +
+            '<div class="value">$' + portfolio.currentValue.toLocaleString() + '</div>' +
+            '<div class="label">Portfolio Value</div>' +
+          '</div>' +
+          '<div class="card stat-card">' +
+            '<div class="value" style="color: var(--secondary-color);">+' + portfolio.returnPercent.toFixed(1) + '%</div>' +
+            '<div class="label">Total Return</div>' +
+          '</div>' +
+          '<div class="card stat-card">' +
+            '<div class="value">' + portfolio.activeInvestments + '</div>' +
+            '<div class="label">Investments</div>' +
+          '</div>';
+      }
     }).catch(function() {
-      document.getElementById('home-stats').innerHTML = '<div>Please login to view stats</div>';
+      var statsContainer = document.getElementById('home-stats');
+      if (statsContainer) {
+        statsContainer.innerHTML = '<div>Please login to view stats</div>';
+      }
     });
   } else {
-    document.getElementById('home-stats').innerHTML = 
-      '<div class="card" style="grid-column: 1/-1; text-align: center;">' +
-        '<p>Login to view your portfolio stats</p>' +
-        '<button class="btn btn-primary" onclick="switchTab(\'profile\')">Login</button>' +
-      '</div>';
+    var statsContainer = document.getElementById('home-stats');
+    if (statsContainer) {
+      statsContainer.innerHTML = 
+        '<div class="card" style="grid-column: 1/-1; text-align: center;">' +
+          '<p>Login to view your portfolio stats</p>' +
+          '<button class="btn btn-primary" onclick="switchTab(\'profile\')">Login</button>' +
+        '</div>';
+    }
   }
   
   api.getProjects({ sort: 'most-funded' }).then(function(response) {
     var projects = response.projects || response;
-    document.getElementById('featured-projects').innerHTML = projects.slice(0, 3).map(function(p) {
-      return createProjectItem(p);
-    }).join('');
+    var container = document.getElementById('featured-projects');
+    if (container) {
+      container.innerHTML = projects.slice(0, 3).map(function(p) {
+        return createProjectItem(p);
+      }).join('');
+    }
   });
 }
 
@@ -132,28 +161,31 @@ function renderProjects() {
     
   api.getProjects().then(function(response) {
     var projects = response.projects || response;
-    document.getElementById('projects-list').innerHTML = projects.map(function(p) {
-      return createProjectItem(p);
-    }).join('');
-    
-    // Add click listeners for investment
-    document.querySelectorAll('.invest-btn').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var id = this.getAttribute('data-id');
-        showInvestModal(id);
+    var list = document.getElementById('projects-list');
+    if (list) {
+      list.innerHTML = projects.map(function(p) {
+        return createProjectItem(p);
+      }).join('');
+      
+      // Add click listeners for investment
+      document.querySelectorAll('.invest-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var id = this.getAttribute('data-id');
+          showInvestModal(id);
+        });
       });
-    });
+    }
   });
 }
 
-// Investments Tab
-function renderInvestments() {
+// Wallet Tab
+function renderWallet() {
   if (!api.token) {
     mainContent.innerHTML = 
-      '<div class="page-header"><h1>My Investments</h1></div>' +
+      '<div class="page-header"><h1>Wallet</h1></div>' +
       '<div class="card" style="text-align: center; padding: 2rem;">' +
-        '<p>Please login to view your investments</p>' +
+        '<p>Please login to access your wallet</p>' +
         '<button class="btn btn-primary" onclick="switchTab(\'profile\')">Login</button>' +
       '</div>';
     return;
@@ -161,55 +193,101 @@ function renderInvestments() {
 
   mainContent.innerHTML = 
     '<div class="page-header">' +
-      '<h1>My Investments</h1>' +
-      '<p>Track your active investments</p>' +
+      '<h1>Wallet</h1>' +
+      '<p>Manage your funds</p>' +
     '</div>' +
     
-    '<div id="investment-summary">Loading...</div>' +
+    '<div id="wallet-balance" class="stats-grid">Loading...</div>' +
+    
+    '<div style="display: flex; gap: 0.75rem; margin: 1rem 0;">' +
+      '<button class="btn btn-primary" style="flex: 1;" id="deposit-btn">Deposit</button>' +
+      '<button class="btn btn-outline" style="flex: 1;" id="withdraw-btn">Withdraw</button>' +
+    '</div>' +
     
     '<div class="card">' +
-      '<h3>Active Investments</h3>' +
-      '<div id="active-investments" class="list-item-container">' +
+      '<h3>Recent Transactions</h3>' +
+      '<div id="transactions-list" class="list-item-container">' +
         'Loading...' +
       '</div>' +
     '</div>';
     
-  api.getPortfolio().then(function(portfolio) {
-    document.getElementById('investment-summary').innerHTML = 
-      '<div class="card">' +
-        '<div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">' +
-          '<div>' +
-            '<div class="label" style="color: var(--text-muted);">Total Invested</div>' +
-            '<div style="font-size: 1.5rem; font-weight: 700;">$' + portfolio.totalInvested.toLocaleString() + '</div>' +
-          '</div>' +
-          '<div style="text-align: right;">' +
-            '<div class="label" style="color: var(--text-muted);">Current Value</div>' +
-            '<div style="font-size: 1.5rem; font-weight: 700; color: var(--secondary-color);">$' + portfolio.currentValue.toLocaleString() + '</div>' +
-          '</div>' +
+  api.getWalletBalance().then(function(data) {
+    var balanceEl = document.getElementById('wallet-balance');
+    if (balanceEl) {
+      balanceEl.innerHTML = 
+        '<div class="card stat-card">' +
+          '<div class="value">GH₵' + data.balance.toLocaleString() + '</div>' +
+          '<div class="label">Available Balance</div>' +
         '</div>' +
-        '<div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>' +
-      '</div>';
+        '<div class="card stat-card">' +
+          '<div class="value">GH₵' + data.totalInvested.toLocaleString() + '</div>' +
+          '<div class="label">Total Invested</div>' +
+        '</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value">GH₵' + data.totalEarnings.toLocaleString() + '</div>' +
+          '<div class="label">Total Earnings</div>' +
+        '</div>';
+    }
+  }).catch(function() {
+    var balanceEl = document.getElementById('wallet-balance');
+    if (balanceEl) {
+      balanceEl.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ef4444;">Error loading balance</div>';
+    }
   });
   
-  api.getMyInvestments().then(function(investments) {
-    if (investments.length === 0) {
-      document.getElementById('active-investments').innerHTML = '<p>No active investments</p>';
+  api.getTransactions({ limit: 10 }).then(function(data) {
+    var txList = document.getElementById('transactions-list');
+    if (!txList) return;
+
+    if (!data.transactions || data.transactions.length === 0) {
+      txList.innerHTML = '<p>No transactions yet</p>';
       return;
     }
     
-    document.getElementById('active-investments').innerHTML = investments.map(function(inv) {
-      var currentValue = parseFloat(inv.amount) * 1.1; // Mock growth
+    txList.innerHTML = data.transactions.map(function(tx) {
+      var isCredit = tx.amount > 0;
+      var icon = { 'deposit': '💰', 'withdrawal': '📤', 'investment': '📊', 'profit': '💵' }[tx.type] || '💳';
       return '<div class="list-item">' +
-        '<div>' +
-          '<div style="font-weight: 600;">' + (inv.project_name || 'Project #' + inv.project_id) + '</div>' +
-          '<div style="font-size: 0.75rem; color: var(--text-muted);">Invested $' + parseFloat(inv.amount).toLocaleString() + '</div>' +
+        '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+          '<div style="font-size: 1.5rem;">' + icon + '</div>' +
+          '<div>' +
+            '<div style="font-weight: 600;">' + tx.type.replace('_', ' ').toUpperCase() + '</div>' +
+            '<div style="font-size: 0.75rem; color: var(--text-muted);">' + new Date(tx.createdAt).toLocaleDateString() + '</div>' +
+          '</div>' +
         '</div>' +
         '<div style="text-align: right;">' +
-          '<div style="font-weight: 600; color: var(--secondary-color);">$' + currentValue.toLocaleString() + '</div>' +
-          '<div style="font-size: 0.75rem; color: var(--text-muted);">+10%</div>' +
+          '<div style="font-weight: 700; color: ' + (isCredit ? 'var(--secondary-color)' : '#ef4444') + ';">' +
+            (isCredit ? '+' : '') + 'GH₵' + Math.abs(tx.amount).toLocaleString() +
+          '</div>' +
+          '<div style="font-size: 0.75rem; color: var(--text-muted);">' + tx.status + '</div>' +
         '</div>' +
       '</div>';
     }).join('');
+  }).catch(function() {
+    var txList = document.getElementById('transactions-list');
+    if (txList) {
+      txList.innerHTML = '<p style="color: #ef4444;">Error loading transactions</p>';
+    }
+  });
+  
+  document.getElementById('deposit-btn').addEventListener('click', function() {
+    var amount = prompt('Enter deposit amount (GH₵):');
+    if (amount && parseFloat(amount) >= 100) {
+      api.initializeDeposit(parseFloat(amount))
+        .then(function(result) {
+          window.open(result.authorization_url, '_blank');
+          alert('Complete payment in the opened window');
+        })
+        .catch(function(err) {
+          alert('Error: ' + err.message);
+        });
+    } else if (amount) {
+      alert('Minimum deposit is GH₵100');
+    }
+  });
+  
+  document.getElementById('withdraw-btn').addEventListener('click', function() {
+    alert('Withdrawal feature coming soon. Contact support for withdrawals.');
   });
 }
 
@@ -234,9 +312,12 @@ function renderPortfolio() {
     '<div id="portfolio-content">Loading...</div>';
     
   api.getPortfolio().then(function(portfolio) {
+    var content = document.getElementById('portfolio-content');
+    if (!content) return;
+
     var colors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
     
-    document.getElementById('portfolio-content').innerHTML = 
+    content.innerHTML = 
       '<div class="card">' +
         '<h3>Portfolio Value</h3>' +
         '<div style="font-size: 2rem; font-weight: 700; color: var(--primary-color); margin: 0.5rem 0;">$' + portfolio.currentValue.toLocaleString() + '</div>' +
@@ -285,6 +366,10 @@ function renderProfile() {
     
     '<div class="card">' +
       '<h3>Settings</h3>' +
+      '<div class="list-item" id="theme-toggle">' +
+        '<span>Dark Mode</span>' +
+        '<span id="theme-icon">🌙</span>' +
+      '</div>' +
       '<div class="list-item">' +
         '<span>Notifications</span>' +
         '<span>→</span>' +
@@ -303,6 +388,18 @@ function renderProfile() {
       '</div>' +
     '</div>';
   
+  // Theme Toggle Logic
+  var currentTheme = localStorage.getItem('theme') || 'light';
+  var themeIcon = document.getElementById('theme-icon');
+  themeIcon.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+  
+  document.getElementById('theme-toggle').addEventListener('click', function() {
+    var newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+  });
+
   if (user) {
     document.getElementById('logout-btn').addEventListener('click', function() {
       api.logout();
@@ -393,18 +490,37 @@ function showInvestModal(projectId) {
   modal.className = 'modal active';
   modal.innerHTML = 
     '<div class="modal-content">' +
-      '<h2>Invest</h2>' +
+      '<h2>Invest in Project</h2>' +
+      '<div id="wallet-info" style="background: var(--surface-secondary); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">Loading...</div>' +
       '<form id="invest-form">' +
         '<div class="form-group">' +
-          '<label for="amount">Amount ($)</label>' +
+          '<label for="amount">Amount (GH₵)</label>' +
           '<input type="number" id="amount" min="100" step="100" required>' +
         '</div>' +
-        '<button type="submit" class="btn btn-primary">Confirm</button>' +
+        '<div class="form-group">' +
+          '<label>Payment Method</label>' +
+          '<select id="payment-method" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--surface-color); color: var(--text-primary);">' +
+            '<option value="wallet">Wallet Balance</option>' +
+            '<option value="paystack">Pay with Paystack</option>' +
+          '</select>' +
+        '</div>' +
+        '<button type="submit" class="btn btn-primary">Invest Now</button>' +
       '</form>' +
       '<button class="btn btn-outline" style="margin-top: 0.75rem;" id="close-invest-modal">Cancel</button>' +
     '</div>';
   
   document.body.appendChild(modal);
+  
+  // Load wallet balance
+  api.getWalletBalance().then(function(data) {
+    document.getElementById('wallet-info').innerHTML = 
+      '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+        '<span style="color: var(--text-muted);">Wallet Balance</span>' +
+        '<span style="font-weight: 700; color: var(--primary-color); font-size: 1.125rem;">GH₵' + data.balance.toLocaleString() + '</span>' +
+      '</div>';
+  }).catch(function() {
+    document.getElementById('wallet-info').innerHTML = '<p style="color: #ef4444; font-size: 0.875rem;">Could not load wallet balance</p>';
+  });
   
   document.getElementById('close-invest-modal').addEventListener('click', function() {
     modal.remove();
@@ -412,21 +528,40 @@ function showInvestModal(projectId) {
   
   document.getElementById('invest-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    var amount = document.getElementById('amount').value;
+    var amount = parseFloat(document.getElementById('amount').value);
+    var method = document.getElementById('payment-method').value;
     
-    api.invest({ projectId: projectId, amount: amount })
-      .then(function() {
-        alert('Investment successful!');
-        modal.remove();
-        renderTab(currentTab); // Refresh current tab
-      })
-      .catch(function(err) {
-        alert('Investment failed: ' + err.message);
-      });
+    if (method === 'wallet') {
+      // Use wallet balance
+      api.invest({ projectId: projectId, amount: amount })
+        .then(function() {
+          alert('Investment successful!');
+          modal.remove();
+          renderTab(currentTab);
+        })
+        .catch(function(err) {
+          alert('Investment failed: ' + err.message);
+        });
+    } else {
+      // Use Paystack
+      api.investWithPaystack({ projectId: projectId, amount: amount })
+        .then(function(result) {
+          window.open(result.authorization_url, '_blank');
+          alert('Complete payment in the opened window');
+          modal.remove();
+        })
+        .catch(function(err) {
+          alert('Payment initialization failed: ' + err.message);
+        });
+    }
   });
 }
 
 // Initialize app
+// Initialize Theme
+var savedTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.setAttribute('data-theme', savedTheme);
+
 renderHome();
 
 console.log('Demony Mobile App initialized');
