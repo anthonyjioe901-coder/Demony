@@ -1,6 +1,6 @@
 // API Client for Demony Backend
 function Api(baseUrl) {
-  this.baseUrl = baseUrl || import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  this.baseUrl = baseUrl || import.meta.env.VITE_API_URL || 'https://demony-api.onrender.com/api';
   this.token = localStorage.getItem('demony_token') || null;
 }
 

@@ -2,7 +2,7 @@
 function Api(baseUrl) {
   // Use local IP for Android emulator (10.0.2.2) or localhost for web
   // In production, this should be the real API URL
-  this.baseUrl = baseUrl || import.meta.env.VITE_API_URL || 'http://10.0.2.2:3001/api';
+  this.baseUrl = baseUrl || import.meta.env.VITE_API_URL || 'https://demony-api.onrender.com/api';
   this.token = localStorage.getItem('demony_token') || null;
 }
 
