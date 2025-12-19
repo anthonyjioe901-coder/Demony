@@ -1,0 +1,23 @@
+{
+  "name": "@demony/backend",
+  "version": "0.1.0",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "build:cpp": "node-gyp rebuild",
+    "build": "npm run build:cpp"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "node-gyp": "^10.0.1",
+    "node-addon-api": "^7.0.0"
+  },
+  "gypfile": true
+}

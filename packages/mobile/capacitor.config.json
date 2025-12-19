@@ -1,0 +1,33 @@
+{
+  "appId": "com.demony.app",
+  "appName": "Demony",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "Dark",
+      "backgroundColor": "#0f172a"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0f172a",
+      "showSpinner": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "dark"
+    }
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": "android/app/demony-release-key.keystore",
+      "keystoreAlias": "demony"
+    }
+  },
+  "ios": {
+    "scheme": "Demony"
+  }
+}

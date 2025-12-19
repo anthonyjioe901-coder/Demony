@@ -1,0 +1,45 @@
+# Fastlane for iOS
+# Install: gem install fastlane
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Push a new beta build to TestFlight"
+  lane :beta do
+    build_app(
+      workspace: "App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store"
+    )
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Deploy to App Store"
+  lane :deploy do
+    build_app(
+      workspace: "App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store"
+    )
+    upload_to_app_store(
+      skip_screenshots: true,
+      skip_metadata: false,
+      force: true
+    )
+  end
+
+  desc "Match certificates and profiles"
+  lane :certificates do
+    match(type: "appstore")
+    match(type: "development")
+  end
+
+  desc "Increment build number"
+  lane :bump do
+    increment_build_number(
+      xcodeproj: "App.xcodeproj"
+    )
+  end
+end

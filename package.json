@@ -1,0 +1,17 @@
+{
+  "name": "demony",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:web": "cd packages/web && npm run dev",
+    "dev:mobile": "cd packages/mobile && npm run dev",
+    "dev:backend": "cd packages/backend && npm run dev",
+    "build:web": "cd packages/web && npm run build",
+    "build:mobile": "cd packages/mobile && npm run build:mobile",
+    "build:backend": "cd packages/backend && npm run build",
+    "build:cpp": "cd packages/backend && npm run build:cpp",
+    "db:setup": "cd packages/database && npm run setup",
+    "db:seed": "cd packages/database && npm run seed",
+    "install:all": "pnpm install"
+  }
+}

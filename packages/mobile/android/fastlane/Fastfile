@@ -1,0 +1,44 @@
+# Fastlane for Android
+# Install: gem install fastlane
+
+default_platform(:android)
+
+platform :android do
+  desc "Build and deploy to Play Store Internal Testing"
+  lane :internal do
+    gradle(
+      task: "bundle",
+      build_type: "Release",
+      project_dir: "."
+    )
+    upload_to_play_store(
+      track: "internal",
+      aab: "app/build/outputs/bundle/release/app-release.aab",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+
+  desc "Deploy to Play Store Production"
+  lane :deploy do
+    gradle(
+      task: "bundle",
+      build_type: "Release",
+      project_dir: "."
+    )
+    upload_to_play_store(
+      track: "production",
+      aab: "app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+
+  desc "Build debug APK"
+  lane :debug do
+    gradle(
+      task: "assemble",
+      build_type: "Debug",
+      project_dir: "."
+    )
+  end
+end
