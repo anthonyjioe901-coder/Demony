@@ -19,6 +19,8 @@ services:
         sync: false  # Set manually in Render dashboard
       - key: JWT_SECRET
         generateValue: true
+      - key: WEB_URL
+        value: https://demony-web.onrender.com
     healthCheckPath: /
 
   # Web Frontend (Static Site)
@@ -37,13 +39,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: demony-api
-          type: web
-          property: host
-
-databases:
-  - name: demony-db
-    plan: free
-    databaseName: demony
-    user: demony
+        value: https://demony-api.onrender.com

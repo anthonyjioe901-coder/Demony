@@ -158,5 +158,5 @@ function showAuthModal(type) {
   });
 }
 
-// Initial navigation
-router.navigate('home');
+// Initial navigation - honor current hash
+router.init('home');

@@ -26,9 +26,21 @@ router.get('/', async function(req, res) {
     
     var total = await database.collection('projects').countDocuments(filter);
     
-    // Transform _id to id for frontend compatibility
+    // Transform _id to id and normalize field names for frontend compatibility
     projects = projects.map(function(p) {
-      return { ...p, id: p._id.toString() };
+      return {
+        id: p._id.toString(),
+        name: p.name,
+        description: p.description,
+        category: p.category,
+        image_url: p.imageUrl || p.image_url,
+        goal_amount: p.goalAmount || p.goal_amount || 0,
+        raised_amount: p.raisedAmount || p.raised_amount || 0,
+        min_investment: p.minInvestment || p.min_investment || 100,
+        target_return: p.targetReturn || p.target_return || '10-15%',
+        end_date: p.endDate || p.end_date,
+        createdAt: p.createdAt
+      };
     });
     
     res.json({
@@ -59,8 +71,20 @@ router.get('/:id', async function(req, res) {
       return res.status(404).json({ error: 'Project not found' });
     }
     
-    project.id = project._id.toString();
-    res.json(project);
+    // Normalize field names for frontend
+    res.json({
+      id: project._id.toString(),
+      name: project.name,
+      description: project.description,
+      category: project.category,
+      image_url: project.imageUrl || project.image_url,
+      goal_amount: project.goalAmount || project.goal_amount || 0,
+      raised_amount: project.raisedAmount || project.raised_amount || 0,
+      min_investment: project.minInvestment || project.min_investment || 100,
+      target_return: project.targetReturn || project.target_return || '10-15%',
+      end_date: project.endDate || project.end_date,
+      createdAt: project.createdAt
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

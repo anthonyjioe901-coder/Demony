@@ -22,6 +22,9 @@ try {
 var allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3002',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://demony-web.onrender.com',
   process.env.WEB_URL,
   process.env.MOBILE_URL
 ].filter(Boolean);
@@ -31,9 +34,15 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
