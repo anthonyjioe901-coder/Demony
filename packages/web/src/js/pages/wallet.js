@@ -2,30 +2,47 @@
 function renderWallet(container, api) {
   var user = api.user;
   if (!user) {
-    container.innerHTML = '<section><h2>Please Login</h2><p>You need to be logged in to access your wallet.</p></section>';
+    container.innerHTML = 
+      '<section>' +
+        '<div class="page-header">' +
+          '<h1>Wallet</h1>' +
+          '<p>Manage your funds</p>' +
+        '</div>' +
+        '<div class="card" style="text-align: center; padding: 2rem;">' +
+          '<p style="margin-bottom: 1rem;">Please login to access your wallet</p>' +
+          '<button class="btn btn-primary" onclick="document.getElementById(\'login-btn\').click()">Login</button>' +
+        '</div>' +
+      '</section>';
     return;
   }
   
   var html = 
     '<section>' +
-      '<h2>My Wallet</h2>' +
-      '<p style="color: var(--text-muted); margin-bottom: 2rem;">Manage your funds for investments</p>' +
-      
-      // Balance Cards
-      '<div class="card-grid" id="wallet-balance" style="margin-bottom: 2rem;">' +
-        '<div style="grid-column: 1/-1; text-align: center; padding: 2rem;">Loading balance...</div>' +
+      '<div class="page-header">' +
+        '<h1>Wallet</h1>' +
+        '<p>Manage your funds</p>' +
       '</div>' +
       
-      // Action Buttons
-      '<div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">' +
-        '<button class="btn btn-primary" id="deposit-btn">+ Deposit Funds</button>' +
-        '<button class="btn btn-outline" id="withdraw-btn">Withdraw</button>' +
+      // Balance Cards - Stats Grid like mobile
+      '<div class="stats-grid" id="wallet-balance">' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: var(--secondary-color) !important;">Loading...</div>' +
+          '<div class="label">Available Balance</div>' +
+        '</div>' +
       '</div>' +
       
-      // Transactions
-      '<h3 style="margin-bottom: 1rem;">Recent Transactions</h3>' +
-      '<div id="transactions-list">' +
-        '<div style="text-align: center; padding: 2rem;">Loading transactions...</div>' +
+      // Action Buttons - Like mobile app
+      '<div class="action-buttons" style="display: flex; gap: 0.75rem; margin: 1.5rem 0;">' +
+        '<button class="btn btn-primary" id="deposit-btn" style="flex: 1;">+ Deposit</button>' +
+        '<button class="btn btn-outline" id="withdraw-btn" style="flex: 1;">Withdraw</button>' +
+      '</div>' +
+      
+      // Transactions Card
+      '<div class="card">' +
+        '<h3>Recent Transactions</h3>' +
+        '<div id="transactions-list">' +
+          '<div style="text-align: center; padding: 1rem; color: var(--text-muted);">Loading...</div>' +
+        '</div>' +
       '</div>' +
     '</section>';
   
@@ -61,32 +78,32 @@ function loadWalletBalance(api) {
   api.getWalletBalance()
     .then(function(data) {
       balanceContainer.innerHTML = 
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2.5rem; font-weight: bold; color: var(--secondary-color);">GH₵' + data.balance.toLocaleString() + '</div>' +
-          '<div style="color: var(--text-muted);">Available Balance</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: var(--secondary-color) !important;">GH₵' + data.balance.toLocaleString() + '</div>' +
+          '<div class="label">Available Balance</div>' +
         '</div>' +
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">GH₵' + data.totalInvested.toLocaleString() + '</div>' +
-          '<div style="color: var(--text-muted);">Total Invested</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: var(--primary-color) !important;">GH₵' + data.totalInvested.toLocaleString() + '</div>' +
+          '<div class="label">Total Invested</div>' +
         '</div>' +
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: var(--accent-color);">GH₵' + data.totalEarnings.toLocaleString() + '</div>' +
-          '<div style="color: var(--text-muted);">Total Earnings</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: #f59e0b !important;">GH₵' + data.totalEarnings.toLocaleString() + '</div>' +
+          '<div class="label">Total Earnings</div>' +
         '</div>';
     })
     .catch(function(err) {
       balanceContainer.innerHTML = 
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2.5rem; font-weight: bold; color: var(--secondary-color);">GH₵0</div>' +
-          '<div style="color: var(--text-muted);">Available Balance</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: var(--secondary-color) !important;">GH₵0</div>' +
+          '<div class="label">Available Balance</div>' +
         '</div>' +
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">GH₵0</div>' +
-          '<div style="color: var(--text-muted);">Total Invested</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: var(--primary-color) !important;">GH₵0</div>' +
+          '<div class="label">Total Invested</div>' +
         '</div>' +
-        '<div class="card" style="padding: 1.5rem; text-align: center;">' +
-          '<div style="font-size: 2rem; font-weight: bold; color: var(--accent-color);">GH₵0</div>' +
-          '<div style="color: var(--text-muted);">Total Earnings</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: #f59e0b !important;">GH₵0</div>' +
+          '<div class="label">Total Earnings</div>' +
         '</div>';
     });
 }
@@ -97,45 +114,35 @@ function loadTransactions(api) {
   api.getTransactions({ limit: 10 })
     .then(function(data) {
       if (!data.transactions || data.transactions.length === 0) {
-        listContainer.innerHTML = '<div class="card" style="padding: 2rem; text-align: center;">No transactions yet</div>';
+        listContainer.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: var(--text-muted);">No transactions yet</div>';
         return;
       }
       
       listContainer.innerHTML = data.transactions.map(function(tx) {
-        var isCredit = tx.amount > 0;
-        var typeLabel = {
-          'deposit': 'Deposit',
-          'withdrawal': 'Withdrawal',
-          'investment': 'Investment',
-          'profit': 'Profit'
-        }[tx.type] || tx.type;
+        var isCredit = tx.type === 'deposit' || tx.type === 'profit';
+        var icon = { 'deposit': '💰', 'withdrawal': '📤', 'investment': '📊', 'profit': '💵' }[tx.type] || '💳';
+        var typeLabel = tx.type.toUpperCase();
+        var statusClass = tx.status === 'success' ? 'success' : (tx.status.includes('pending') ? 'pending' : '');
         
-        var statusColor = {
-          'success': 'var(--secondary-color)',
-          'pending': '#f59e0b',
-          'pending_approval': '#f59e0b',
-          'failed': '#ef4444'
-        }[tx.status] || '#6b7280';
-        
-        return '<div class="card" style="padding: 1rem; margin-bottom: 0.5rem;">' +
-          '<div style="display: flex; justify-content: space-between; align-items: center;">' +
-            '<div>' +
-              '<div style="font-weight: 500;">' + typeLabel + '</div>' +
-              '<div style="font-size: 0.875rem; color: var(--text-muted);">' + tx.description + '</div>' +
-              '<div style="font-size: 0.75rem; color: var(--text-muted);">' + new Date(tx.createdAt).toLocaleString() + '</div>' +
+        return '<div class="transaction-item">' +
+          '<div class="tx-left">' +
+            '<div class="tx-icon">' + icon + '</div>' +
+            '<div class="tx-info">' +
+              '<div class="tx-type">' + typeLabel + '</div>' +
+              '<div class="tx-date">' + new Date(tx.createdAt).toLocaleDateString() + '</div>' +
             '</div>' +
-            '<div style="text-align: right;">' +
-              '<div style="font-size: 1.25rem; font-weight: bold; color: ' + (isCredit ? 'var(--secondary-color)' : '#ef4444') + ';">' +
-                (isCredit ? '+' : '') + 'GH₵' + Math.abs(tx.amount).toLocaleString() +
-              '</div>' +
-              '<span class="badge" style="background: ' + statusColor + ';">' + tx.status + '</span>' +
+          '</div>' +
+          '<div class="tx-right">' +
+            '<div class="tx-amount ' + (isCredit ? 'credit' : 'debit') + '">' +
+              (isCredit ? '+' : '') + 'GH₵' + Math.abs(tx.amount).toLocaleString() +
             '</div>' +
+            '<div class="tx-status ' + statusClass + '">' + tx.status.replace('_', ' ') + '</div>' +
           '</div>' +
         '</div>';
       }).join('');
     })
     .catch(function(err) {
-      listContainer.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: #ef4444;">Error loading transactions</div>';
+      listContainer.innerHTML = '<div style="text-align: center; padding: 1.5rem; color: #ef4444;">Error loading transactions</div>';
     });
 }
 

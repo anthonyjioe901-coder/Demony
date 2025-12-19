@@ -1,37 +1,64 @@
 // Portfolio Page
 function renderPortfolio(container, api) {
   if (!api.token) {
-    container.innerHTML = '<div style="text-align: center; padding: 4rem;"><h2>Please login to view your portfolio</h2></div>';
+    container.innerHTML = 
+      '<section>' +
+        '<div class="page-header">' +
+          '<h1>Portfolio</h1>' +
+          '<p>Your investment overview</p>' +
+        '</div>' +
+        '<div class="card" style="text-align: center; padding: 2rem;">' +
+          '<p style="margin-bottom: 1rem;">Please login to view your portfolio</p>' +
+          '<button class="btn btn-primary" onclick="document.getElementById(\'login-btn\').click()">Login</button>' +
+        '</div>' +
+      '</section>';
     return;
   }
 
   var html = 
     '<section>' +
-      '<h2>Portfolio Overview</h2>' +
-      '<p style="color: var(--text-muted); margin-bottom: 2rem;">Your investment portfolio analysis and performance</p>' +
-      
-      '<div class="card-grid" id="portfolio-stats">' +
-        'Loading stats...' +
+      '<div class="page-header">' +
+        '<h1>Portfolio</h1>' +
+        '<p>Your investment overview</p>' +
       '</div>' +
       
-      '<div class="card" style="margin-top: 2rem;">' +
-        '<h3>Portfolio Allocation</h3>' +
+      // Main Portfolio Value Card
+      '<div id="portfolio-value" class="card" style="margin-bottom: 1.5rem;">' +
+        '<div style="text-align: center; padding: 0.5rem;">' +
+          '<h3 style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;">Portfolio Value</h3>' +
+          '<div style="font-size: 2rem; font-weight: 800; color: var(--primary-color);">Loading...</div>' +
+        '</div>' +
+      '</div>' +
+      
+      // Stats Grid
+      '<div class="stats-grid" id="portfolio-stats" style="margin-bottom: 1.5rem;">' +
+        '<div class="card stat-card">' +
+          '<div class="value">-</div>' +
+          '<div class="label">Total Invested</div>' +
+        '</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value">-</div>' +
+          '<div class="label">Total Return</div>' +
+        '</div>' +
+      '</div>' +
+      
+      // Allocation Card
+      '<div class="card" style="margin-bottom: 1rem;">' +
+        '<h3>Allocation</h3>' +
         '<div id="allocation-chart" style="margin-top: 1rem;">' +
-          'Loading allocation...' +
+          '<div style="text-align: center; color: var(--text-muted);">Loading...</div>' +
         '</div>' +
       '</div>' +
       
-      '<div class="card" style="margin-top: 2rem;">' +
-        '<h3>Performance History</h3>' +
-        '<div id="performance-chart" style="margin-top: 1rem; min-height: 200px;">' +
-          '<canvas id="returns-chart"></canvas>' +
+      // Risk Analysis
+      '<div class="stats-grid" id="risk-stats">' +
+        '<div class="card stat-card">' +
+          '<div class="value">-</div>' +
+          '<div class="label">Risk Level</div>' +
         '</div>' +
-      '</div>' +
-      
-      '<div class="card" style="margin-top: 2rem;">' +
-        '<h3>Risk Analysis</h3>' +
-        '<div id="risk-analysis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; margin-top: 1rem;">' +
-          'Loading risk analysis...' +
+        '<div class="card stat-card">' +
+          '<div class="value">-</div>' +
+          '<div class="label">Diversification</div>' +
         '</div>' +
       '</div>' +
     '</section>';
@@ -44,22 +71,23 @@ function renderPortfolio(container, api) {
 function loadPortfolio(api) {
   api.getPortfolio()
     .then(function(portfolio) {
-      // Stats
+      // Portfolio Value Card
+      document.getElementById('portfolio-value').innerHTML = 
+        '<div style="text-align: center; padding: 0.5rem;">' +
+          '<h3 style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;">Portfolio Value</h3>' +
+          '<div style="font-size: 2rem; font-weight: 800; color: var(--primary-color);">$' + portfolio.currentValue.toLocaleString() + '</div>' +
+          '<div style="color: var(--secondary-color); font-size: 0.9rem; margin-top: 0.25rem;">+$' + portfolio.totalReturn.toLocaleString() + ' (' + portfolio.returnPercent.toFixed(1) + '%) all time</div>' +
+        '</div>';
+      
+      // Stats Grid
       document.getElementById('portfolio-stats').innerHTML = 
-        '<div class="card">' +
-          '<h3>Portfolio Value</h3>' +
-          '<h2 style="color: var(--primary-color); margin: 1rem 0;">$ ' + portfolio.currentValue.toLocaleString() + '</h2>' +
-          '<p style="color: var(--secondary-color);">+' + portfolio.returnPercent.toFixed(1) + '% all time</p>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: var(--secondary-color);">$' + portfolio.totalInvested.toLocaleString() + '</div>' +
+          '<div class="label">Total Invested</div>' +
         '</div>' +
-        '<div class="card">' +
-          '<h3>Total Invested</h3>' +
-          '<h2 style="color: var(--secondary-color); margin: 1rem 0;">$ ' + portfolio.totalInvested.toLocaleString() + '</h2>' +
-          '<p style="color: var(--text-muted);">' + portfolio.activeInvestments + ' active projects</p>' +
-        '</div>' +
-        '<div class="card">' +
-          '<h3>Total Return</h3>' +
-          '<h2 style="color: var(--primary-color); margin: 1rem 0;">$ ' + portfolio.totalReturn.toLocaleString() + '</h2>' +
-          '<p style="color: var(--text-muted);">Realized + Unrealized</p>' +
+        '<div class="card stat-card">' +
+          '<div class="value">' + portfolio.activeInvestments + '</div>' +
+          '<div class="label">Active Investments</div>' +
         '</div>';
         
       // Allocation
@@ -71,91 +99,34 @@ function loadPortfolio(api) {
           }).join('') +
         '</div>';
         
-      // Risk
-      document.getElementById('risk-analysis').innerHTML = 
-        '<div>' +
-          '<p style="color: var(--text-muted);">Risk Level</p>' +
-          '<h3>' + portfolio.riskLevel + '</h3>' +
+      // Risk Stats
+      document.getElementById('risk-stats').innerHTML = 
+        '<div class="card stat-card">' +
+          '<div class="value">' + portfolio.riskLevel + '</div>' +
+          '<div class="label">Risk Level</div>' +
         '</div>' +
-        '<div>' +
-          '<p style="color: var(--text-muted);">Diversification Score</p>' +
-          '<h3>' + portfolio.diversificationScore + '/10</h3>' +
-        '</div>' +
-        '<div>' +
-          '<p style="color: var(--text-muted);">Volatility</p>' +
-          '<h3>Low</h3>' +
+        '<div class="card stat-card">' +
+          '<div class="value">' + portfolio.diversificationScore + '/10</div>' +
+          '<div class="label">Diversification</div>' +
         '</div>';
-        
-      // Chart (Mock implementation for now as we need Chart.js or similar)
-      // In a real app, we would init Chart.js here
-      initPerformanceChart();
     })
     .catch(function(err) {
       console.error(err);
-      document.getElementById('portfolio-stats').innerHTML = 'Error loading portfolio data.';
+      document.getElementById('portfolio-value').innerHTML = 
+        '<div style="text-align: center; padding: 1rem; color: #ef4444;">Error loading portfolio data</div>';
     });
 }
 
 function createAllocationBar(label, percent, color) {
   return '<div>' +
-    '<div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">' +
-      '<span>' + label + '</span>' +
-      '<span>' + percent + '%</span>' +
+    '<div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">' +
+      '<span style="font-weight: 600;">' + label + '</span>' +
+      '<span style="color: var(--text-muted);">' + percent + '%</span>' +
     '</div>' +
-    '<div style="height: 8px; background: var(--border-color); border-radius: 4px;">' +
-      '<div style="height: 100%; width: ' + percent + '%; background: ' + color + '; border-radius: 4px;"></div>' +
+    '<div class="progress-bar" style="height: 8px; background: var(--border-color); border-radius: 999px; overflow: hidden;">' +
+      '<div class="progress-fill" style="height: 100%; width: ' + percent + '%; background: ' + color + '; border-radius: 999px;"></div>' +
     '</div>' +
   '</div>';
-}
-
-function initPerformanceChart() {
-  var canvas = document.getElementById('returns-chart');
-  if (!canvas) return;
-  
-  // Simple canvas-based chart without external library
-  var ctx = canvas.getContext('2d');
-  canvas.width = canvas.parentElement.offsetWidth;
-  canvas.height = 200;
-  
-  var data = [10000, 10500, 11200, 11000, 11800, 12100, 12500, 13100, 13500, 13200, 13600, 13875];
-  var labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  var maxValue = Math.max.apply(null, data);
-  var minValue = Math.min.apply(null, data);
-  var range = maxValue - minValue;
-  
-  var padding = 40;
-  var chartWidth = canvas.width - padding * 2;
-  var chartHeight = canvas.height - padding * 2;
-  
-  // Draw axes
-  ctx.beginPath();
-  ctx.strokeStyle = '#94a3b8';
-  ctx.lineWidth = 1;
-  ctx.moveTo(padding, padding);
-  ctx.lineTo(padding, canvas.height - padding);
-  ctx.lineTo(canvas.width - padding, canvas.height - padding);
-  ctx.stroke();
-  
-  // Draw line
-  ctx.beginPath();
-  ctx.strokeStyle = '#6366f1';
-  ctx.lineWidth = 2;
-  
-  var stepX = chartWidth / (data.length - 1);
-  
-  data.forEach(function(value, index) {
-    var x = padding + index * stepX;
-    var y = canvas.height - padding - ((value - minValue) / range) * chartHeight;
-    
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  
-  ctx.stroke();
 }
 
 export { renderPortfolio };

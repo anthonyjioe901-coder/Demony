@@ -8,6 +8,8 @@ import { renderPortfolio } from './pages/portfolio.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderBusinessDashboard } from './pages/business.js';
 import { renderWallet } from './pages/wallet.js';
+import { renderProfile } from './pages/profile.js';
+import { renderTerms, renderPrivacy, renderRiskDisclosure, renderAgreementModal } from './pages/legal.js';
 
 // Initialize API client
 const api = new Api();
@@ -36,8 +38,13 @@ router.addRoute('projects', function(container) { renderProjects(container, api)
 router.addRoute('investments', function(container) { renderInvestments(container, api); });
 router.addRoute('portfolio', function(container) { renderPortfolio(container, api); });
 router.addRoute('wallet', function(container) { renderWallet(container, api); });
+router.addRoute('profile', function(container) { renderProfile(container, api); });
 router.addRoute('admin', function(container) { renderAdmin(container, api); });
 router.addRoute('business', function(container) { renderBusinessDashboard(container, api); });
+// Legal pages
+router.addRoute('terms', function(container) { renderTerms(container); });
+router.addRoute('privacy', function(container) { renderPrivacy(container); });
+router.addRoute('risk', function(container) { renderRiskDisclosure(container); });
 
 // Expose app globally
 window.DemonyApp = {
@@ -179,13 +186,13 @@ function showAuthModal(type) {
   modal.className = 'modal active';
   modal.id = 'auth-modal';
   
-  var title = type === 'login' ? 'Login' : 'Sign Up';
-  var submitText = type === 'login' ? 'Login' : 'Create Account';
+  var title = type === 'login' ? 'Welcome Back' : 'Create Account';
+  var submitText = type === 'login' ? 'Login' : 'Continue';
   
   var roleSelect = type === 'signup' ? 
     '<div class="form-group">' +
       '<label for="role">I want to</label>' +
-      '<select id="role" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">' +
+      '<select id="role" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--surface-color); color: var(--text-color);">' +
         '<option value="investor">Invest in projects</option>' +
         '<option value="business_owner">Submit my business for funding</option>' +
       '</select>' +
@@ -203,25 +210,37 @@ function showAuthModal(type) {
       '</div>' +
     '</div>' : '';
   
+  var legalNotice = type === 'signup' ?
+    '<p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 1rem; text-align: center;">' +
+      'By signing up, you\'ll be asked to accept our ' +
+      '<a href="#terms" style="color: var(--primary-color);">Terms</a>, ' +
+      '<a href="#privacy" style="color: var(--primary-color);">Privacy Policy</a>, and ' +
+      '<a href="#risk" style="color: var(--primary-color);">Risk Disclosure</a>.' +
+    '</p>' : '';
+  
   modal.innerHTML = 
     '<div class="modal-content">' +
-      '<h2>' + title + '</h2>' +
+      '<div style="text-align: center; margin-bottom: 1.5rem;">' +
+        '<span style="font-size: 2.5rem;">💎</span>' +
+        '<h2 style="margin-top: 0.5rem;">' + title + '</h2>' +
+      '</div>' +
       '<form id="auth-form">' +
-        (type === 'signup' ? '<div class="form-group"><label for="name">Full Name</label><input type="text" id="name" required></div>' : '') +
+        (type === 'signup' ? '<div class="form-group"><label for="name">Full Name</label><input type="text" id="name" required placeholder="John Doe"></div>' : '') +
         '<div class="form-group">' +
           '<label for="email">Email</label>' +
-          '<input type="email" id="email" required>' +
+          '<input type="email" id="email" required placeholder="you@example.com">' +
         '</div>' +
         '<div class="form-group">' +
           '<label for="password">Password</label>' +
-          '<input type="password" id="password" required>' +
+          '<input type="password" id="password" required placeholder="••••••••"' + (type === 'signup' ? ' minlength="8"' : '') + '>' +
         '</div>' +
         roleSelect +
         businessFields +
-        '<div class="form-actions">' +
+        '<div class="form-actions" style="margin-top: 1.5rem;">' +
           '<button type="button" class="btn btn-outline" id="close-modal">Cancel</button>' +
           '<button type="submit" class="btn btn-primary">' + submitText + '</button>' +
         '</div>' +
+        legalNotice +
       '</form>' +
     '</div>';
   
@@ -257,41 +276,155 @@ function showAuthModal(type) {
     var phone = type === 'signup' ? (document.getElementById('phone').value || null) : null;
     var businessName = type === 'signup' ? (document.getElementById('businessName').value || null) : null;
     
-    var promise = type === 'login' 
-      ? api.login({ email: email, password: password })
-      : api.signup({ 
-          name: name, 
-          email: email, 
-          password: password, 
-          role: role,
-          phone: phone,
-          businessName: businessName
+    if (type === 'login') {
+      // Login flow - no agreement needed
+      api.login({ email: email, password: password })
+        .then(function() {
+          modal.remove();
+          updateAuthState();
+          navigateAfterAuth();
+        })
+        .catch(function(err) {
+          alert(err.message);
         });
+    } else {
+      // Signup flow - show agreement modal first
+      var signupData = {
+        name: name,
+        email: email,
+        password: password,
+        role: role,
+        phone: phone,
+        businessName: businessName,
+        agreedToTerms: true,
+        agreedToPrivacy: true,
+        agreedToRisk: true,
+        agreementDate: new Date().toISOString()
+      };
       
-    promise.then(function() {
       modal.remove();
-      updateAuthState();
-      // Navigate based on role
-      var user = api.user;
-      if (user && user.role === 'admin') {
-        router.navigate('admin');
-      } else if (user && user.role === 'business_owner') {
-        router.navigate('business');
-      } else {
-        router.navigate('portfolio');
-      }
-      // Close mobile menu after auth
-      var navLinks = document.getElementById('nav-links');
-      var authButtons = document.getElementById('auth-buttons');
-      var mobileBtn = document.getElementById('mobile-menu-btn');
-      if (navLinks) navLinks.classList.remove('active');
-      if (authButtons) authButtons.classList.remove('active');
-      if (mobileBtn) mobileBtn.classList.remove('active');
-    }).catch(function(err) {
-      alert(err.message);
-    });
+      
+      // Show agreement modal
+      renderAgreementModal(
+        function onAccept() {
+          // User accepted - proceed with signup
+          api.signup(signupData)
+            .then(function() {
+              updateAuthState();
+              navigateAfterAuth();
+              // Show welcome message
+              showWelcomeMessage(name);
+            })
+            .catch(function(err) {
+              alert(err.message);
+            });
+        },
+        function onDecline() {
+          // User declined - show message
+          alert('You must accept the terms to create an account.');
+        }
+      );
+    }
   });
 }
+
+function navigateAfterAuth() {
+  var user = api.user;
+  if (user && user.role === 'admin') {
+    router.navigate('admin');
+  } else if (user && user.role === 'business_owner') {
+    router.navigate('business');
+  } else {
+    router.navigate('portfolio');
+  }
+  // Close mobile menu after auth
+  var navLinks = document.getElementById('nav-links');
+  var authButtons = document.getElementById('auth-buttons');
+  var mobileBtn = document.getElementById('mobile-menu-btn');
+  if (navLinks) navLinks.classList.remove('active');
+  if (authButtons) authButtons.classList.remove('active');
+  if (mobileBtn) mobileBtn.classList.remove('active');
+}
+
+function showWelcomeMessage(name) {
+  var toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.innerHTML = 
+    '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
+      '<span style="font-size: 1.5rem;">🎉</span>' +
+      '<div>' +
+        '<strong>Welcome to Demony, ' + (name || 'Investor') + '!</strong>' +
+        '<p style="margin: 0; font-size: 0.875rem; opacity: 0.9;">Your account has been created successfully.</p>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(toast);
+  
+  setTimeout(function() {
+    toast.classList.add('show');
+  }, 100);
+  
+  setTimeout(function() {
+    toast.classList.remove('show');
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 4000);
+}
+
+// Footer link handlers
+var footerLinks = document.querySelectorAll('.footer-links a');
+footerLinks.forEach(function(link) {
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    var page = this.getAttribute('data-page');
+    if (page) {
+      router.navigate(page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+});
+
+// Mobile Tab Bar handlers
+var mobileTabBar = document.getElementById('mobile-tab-bar');
+if (mobileTabBar) {
+  mobileTabBar.addEventListener('click', function(e) {
+    var target = e.target.closest('.tab-item');
+    if (!target) return;
+    e.preventDefault();
+    var page = target.getAttribute('data-page');
+    if (page) {
+      router.navigate(page);
+    }
+  });
+}
+
+// Update active nav link on route change
+function updateActiveNavLink() {
+  var currentHash = window.location.hash.replace('#', '') || 'home';
+  
+  // Update desktop nav links
+  var navLinks = document.querySelectorAll('.nav-links a');
+  navLinks.forEach(function(link) {
+    var page = link.getAttribute('data-page');
+    if (page === currentHash) {
+      link.classList.add('active');
+    } else {
+      link.classList.remove('active');
+    }
+  });
+  
+  // Update mobile tab bar
+  var tabItems = document.querySelectorAll('.mobile-tab-bar .tab-item');
+  tabItems.forEach(function(tab) {
+    var page = tab.getAttribute('data-page');
+    if (page === currentHash) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+}
+
+window.addEventListener('hashchange', updateActiveNavLink);
+updateActiveNavLink();
 
 // Initial navigation - honor current hash
 router.init('home');

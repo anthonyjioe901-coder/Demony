@@ -85,6 +85,12 @@ Api.prototype.submitKyc = function(data) {
   });
 };
 
+Api.prototype.getKYCStatus = function() {
+  return this.getMe().then(function(user) {
+    return { status: user.kycStatus };
+  });
+};
+
 // Projects
 Api.prototype.getProjects = function(params) {
   var query = params ? '?' + new URLSearchParams(params).toString() : '';
