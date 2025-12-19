@@ -1,4 +1,4 @@
-// Portfolio routes
+// Portfolio routes - MongoDB version
 var express = require('express');
 var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
@@ -9,27 +9,30 @@ router.get('/', authenticateToken, async function(req, res) {
   var userId = req.user.id;
   
   try {
+    var database = await db.getDb();
+    
+    // Get all user investments
+    var investments = await database.collection('investments')
+      .find({ userId: userId })
+      .toArray();
+    
     // Calculate total invested
-    var investedRes = await db.query(
-      'SELECT SUM(amount) as total FROM investments WHERE user_id = $1',
-      [userId]
-    );
-    var totalInvested = parseFloat(investedRes.rows[0].total || 0);
+    var totalInvested = investments.reduce(function(sum, inv) {
+      return sum + (inv.amount || 0);
+    }, 0);
     
-    // Calculate allocation
-    var allocationRes = await db.query(`
-      SELECT p.category, SUM(i.amount) as value
-      FROM investments i
-      JOIN projects p ON i.project_id = p.id
-      WHERE i.user_id = $1
-      GROUP BY p.category
-    `, [userId]);
+    // Calculate allocation by category
+    var categoryMap = {};
+    investments.forEach(function(inv) {
+      var cat = inv.category || 'Other';
+      categoryMap[cat] = (categoryMap[cat] || 0) + inv.amount;
+    });
     
-    var allocation = allocationRes.rows.map(function(row) {
+    var allocation = Object.keys(categoryMap).map(function(cat) {
       return {
-        category: row.category,
-        value: parseFloat(row.value),
-        percent: totalInvested > 0 ? Math.round((parseFloat(row.value) / totalInvested) * 100) : 0
+        category: cat,
+        value: categoryMap[cat],
+        percent: totalInvested > 0 ? Math.round((categoryMap[cat] / totalInvested) * 100) : 0
       };
     });
     
@@ -43,7 +46,7 @@ router.get('/', authenticateToken, async function(req, res) {
       currentValue: currentValue,
       totalReturn: totalReturn,
       returnPercent: totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0,
-      activeInvestments: await getActiveInvestmentsCount(userId),
+      activeInvestments: investments.length,
       allocation: allocation,
       riskLevel: 'Moderate',
       diversificationScore: 8.5
@@ -54,14 +57,8 @@ router.get('/', authenticateToken, async function(req, res) {
   }
 });
 
-async function getActiveInvestmentsCount(userId) {
-  var res = await db.query('SELECT COUNT(*) FROM investments WHERE user_id = $1', [userId]);
-  return parseInt(res.rows[0].count);
-}
-
 // Get portfolio history (Mock for now)
 router.get('/history', authenticateToken, function(req, res) {
-  // Mock history data
   var history = [
     { month: 'Jan', value: 10000 },
     { month: 'Feb', value: 10500 },

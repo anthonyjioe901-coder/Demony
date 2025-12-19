@@ -1,4 +1,4 @@
-// Projects routes
+// Projects routes - MongoDB version
 var express = require('express');
 var db = require('../../../database/src/index');
 var router = express.Router();
@@ -8,30 +8,31 @@ router.get('/', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
     var limit = parseInt(req.query.limit) || 10;
-    var offset = (page - 1) * limit;
+    var skip = (page - 1) * limit;
     var category = req.query.category;
     
-    var query = 'SELECT * FROM projects';
-    var params = [];
-    var countQuery = 'SELECT COUNT(*) FROM projects';
-    var countParams = [];
-    
+    var filter = {};
     if (category) {
-      query += ' WHERE category = $1';
-      params.push(category);
-      countQuery += ' WHERE category = $1';
-      countParams.push(category);
+      filter.category = category;
     }
     
-    query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(limit, offset);
+    var database = await db.getDb();
+    var projects = await database.collection('projects')
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
     
-    var result = await db.query(query, params);
-    var countResult = await db.query(countQuery, countParams);
-    var total = parseInt(countResult.rows[0].count);
+    var total = await database.collection('projects').countDocuments(filter);
+    
+    // Transform _id to id for frontend compatibility
+    projects = projects.map(function(p) {
+      return { ...p, id: p._id.toString() };
+    });
     
     res.json({
-      projects: result.rows,
+      projects: projects,
       pagination: {
         total: total,
         page: page,
@@ -49,13 +50,17 @@ router.get('/', async function(req, res) {
 router.get('/:id', async function(req, res) {
   try {
     var id = req.params.id;
-    var result = await db.query('SELECT * FROM projects WHERE id = $1', [id]);
+    var ObjectId = require('mongodb').ObjectId;
     
-    if (result.rows.length === 0) {
+    var database = await db.getDb();
+    var project = await database.collection('projects').findOne({ _id: new ObjectId(id) });
+    
+    if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
     
-    res.json(result.rows[0]);
+    project.id = project._id.toString();
+    res.json(project);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

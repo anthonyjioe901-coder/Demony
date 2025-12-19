@@ -1,13 +1,14 @@
-// Investments routes
+// Investments routes - MongoDB version
 var express = require('express');
 var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
+var ObjectId = require('mongodb').ObjectId;
 var router = express.Router();
 
 // Create investment
 router.post('/', authenticateToken, async function(req, res) {
   var projectId = req.body.projectId;
-  var amount = req.body.amount;
+  var amount = parseFloat(req.body.amount);
   var userId = req.user.id;
   
   if (!projectId || !amount) {
@@ -19,37 +20,39 @@ router.post('/', authenticateToken, async function(req, res) {
   }
   
   try {
+    var database = await db.getDb();
+    
     // Check project exists
-    var projectRes = await db.query('SELECT * FROM projects WHERE id = $1', [projectId]);
-    if (projectRes.rows.length === 0) {
+    var project = await database.collection('projects').findOne({ _id: new ObjectId(projectId) });
+    if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
     
-    var project = projectRes.rows[0];
-    
-    // Start transaction
-    await db.query('BEGIN');
-    
     // Create investment
-    var investRes = await db.query(
-      'INSERT INTO investments (user_id, project_id, amount) VALUES ($1, $2, $3) RETURNING *',
-      [userId, projectId, amount]
-    );
+    var investment = {
+      userId: userId,
+      projectId: projectId,
+      projectName: project.name,
+      category: project.category,
+      amount: amount,
+      createdAt: new Date()
+    };
+    
+    var result = await database.collection('investments').insertOne(investment);
     
     // Update project raised amount
-    await db.query(
-      'UPDATE projects SET raised_amount = raised_amount + $1 WHERE id = $2',
-      [amount, projectId]
+    await database.collection('projects').updateOne(
+      { _id: new ObjectId(projectId) },
+      { $inc: { raisedAmount: amount } }
     );
     
-    await db.query('COMMIT');
+    investment.id = result.insertedId.toString();
     
     res.json({
       message: 'Investment created successfully',
-      investment: investRes.rows[0]
+      investment: investment
     });
   } catch (err) {
-    await db.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -60,15 +63,17 @@ router.get('/my', authenticateToken, async function(req, res) {
   var userId = req.user.id;
   
   try {
-    var result = await db.query(`
-      SELECT i.*, p.name as project_name, p.category 
-      FROM investments i
-      JOIN projects p ON i.project_id = p.id
-      WHERE i.user_id = $1
-      ORDER BY i.created_at DESC
-    `, [userId]);
+    var database = await db.getDb();
+    var investments = await database.collection('investments')
+      .find({ userId: userId })
+      .sort({ createdAt: -1 })
+      .toArray();
     
-    res.json(result.rows);
+    investments = investments.map(function(inv) {
+      return { ...inv, id: inv._id.toString() };
+    });
+    
+    res.json(investments);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -81,13 +86,18 @@ router.get('/:id', authenticateToken, async function(req, res) {
   var userId = req.user.id;
   
   try {
-    var result = await db.query('SELECT * FROM investments WHERE id = $1 AND user_id = $2', [id, userId]);
+    var database = await db.getDb();
+    var investment = await database.collection('investments').findOne({
+      _id: new ObjectId(id),
+      userId: userId
+    });
     
-    if (result.rows.length === 0) {
+    if (!investment) {
       return res.status(404).json({ error: 'Investment not found' });
     }
     
-    res.json(result.rows[0]);
+    investment.id = investment._id.toString();
+    res.json(investment);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
