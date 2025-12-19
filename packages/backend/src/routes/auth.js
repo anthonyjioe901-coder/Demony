@@ -123,7 +123,8 @@ router.post('/login', async function(req, res) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
     
-    if (!user.isActive) {
+    // Check if account is explicitly suspended (default to active if not set)
+    if (user.isActive === false) {
       return res.status(403).json({ error: 'Account is suspended. Contact support.' });
     }
     
