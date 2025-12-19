@@ -25,7 +25,6 @@ services:
   - type: web
     name: demony-web
     env: static
-    region: oregon
     plan: free
     buildCommand: cd packages/web && npm install && npm run build
     staticPublishPath: packages/web/dist
