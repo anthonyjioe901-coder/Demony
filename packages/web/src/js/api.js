@@ -122,6 +122,17 @@ Api.prototype.invest = function(data) {
   });
 };
 
+Api.prototype.investWithPaystack = function(data) {
+  return this.request('/investments/pay', {
+    method: 'POST',
+    body: data
+  });
+};
+
+Api.prototype.verifyInvestment = function(reference) {
+  return this.request('/investments/verify/' + reference);
+};
+
 Api.prototype.getMyInvestments = function() {
   return this.request('/investments/my');
 };
@@ -131,9 +142,38 @@ Api.prototype.getPortfolio = function() {
   return this.request('/portfolio');
 };
 
-// Withdrawals
+// ==================== WALLET ====================
+
+Api.prototype.getWalletBalance = function() {
+  return this.request('/wallet/balance');
+};
+
+Api.prototype.getTransactions = function(params) {
+  var query = params ? '?' + new URLSearchParams(params).toString() : '';
+  return this.request('/wallet/transactions' + query);
+};
+
+Api.prototype.initializeDeposit = function(amount) {
+  return this.request('/wallet/deposit/initialize', {
+    method: 'POST',
+    body: { amount: amount }
+  });
+};
+
+Api.prototype.verifyDeposit = function(reference) {
+  return this.request('/wallet/deposit/verify/' + reference);
+};
+
+Api.prototype.getBanks = function() {
+  return this.request('/wallet/banks');
+};
+
+Api.prototype.verifyBankAccount = function(accountNumber, bankCode) {
+  return this.request('/wallet/verify-account?account_number=' + accountNumber + '&bank_code=' + bankCode);
+};
+
 Api.prototype.requestWithdrawal = function(data) {
-  return this.request('/withdrawals', {
+  return this.request('/wallet/withdraw', {
     method: 'POST',
     body: data
   });

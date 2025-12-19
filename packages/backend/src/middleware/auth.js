@@ -7,9 +7,15 @@ function authenticateToken(req, res, next) {
 
   if (token == null) return res.sendStatus(401);
 
-  jwt.verify(token, JWT_SECRET, function(err, user) {
+  jwt.verify(token, JWT_SECRET, function(err, decoded) {
     if (err) return res.sendStatus(403);
-    req.user = user;
+    // Normalize userId - support both 'id' and 'userId' in token
+    req.user = {
+      userId: decoded.id || decoded.userId,
+      id: decoded.id || decoded.userId,
+      email: decoded.email,
+      role: decoded.role
+    };
     next();
   });
 }

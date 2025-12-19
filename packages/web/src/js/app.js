@@ -7,6 +7,7 @@ import { renderInvestments } from './pages/investments.js';
 import { renderPortfolio } from './pages/portfolio.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderBusinessDashboard } from './pages/business.js';
+import { renderWallet } from './pages/wallet.js';
 
 // Initialize API client
 const api = new Api();
@@ -19,6 +20,7 @@ router.addRoute('home', function(container) { renderHome(container, api); });
 router.addRoute('projects', function(container) { renderProjects(container, api); });
 router.addRoute('investments', function(container) { renderInvestments(container, api); });
 router.addRoute('portfolio', function(container) { renderPortfolio(container, api); });
+router.addRoute('wallet', function(container) { renderWallet(container, api); });
 router.addRoute('admin', function(container) { renderAdmin(container, api); });
 router.addRoute('business', function(container) { renderBusinessDashboard(container, api); });
 
@@ -28,17 +30,23 @@ window.DemonyApp = {
   api: api
 };
 
-// Navigation event listeners
-document.querySelectorAll('[data-page]').forEach(function(link) {
-  link.addEventListener('click', function(e) {
+// Navigation event listeners (delegated so new links work too)
+var navLinksEl = document.getElementById('nav-links');
+if (navLinksEl) {
+  navLinksEl.addEventListener('click', function(e) {
+    var target = e.target.closest('[data-page]');
+    if (!target) return;
     e.preventDefault();
-    var page = this.getAttribute('data-page');
+    var page = target.getAttribute('data-page');
     router.navigate(page);
     // Close mobile menu after navigation
-    var navLinks = document.getElementById('nav-links');
-    if (navLinks) navLinks.classList.remove('active');
+    navLinksEl.classList.remove('active');
+    var authButtons = document.getElementById('auth-buttons');
+    if (authButtons) authButtons.classList.remove('active');
+    var mobileBtn = document.getElementById('mobile-menu-btn');
+    if (mobileBtn) mobileBtn.classList.remove('active');
   });
-});
+}
 
 // Mobile Menu Toggle
 var mobileMenuBtn = document.getElementById('mobile-menu-btn');
@@ -60,10 +68,10 @@ function updateAuthState() {
   var navLinks = document.getElementById('nav-links');
   
   // Remove old role-based nav items
-  var oldAdminLink = document.querySelector('[data-page="admin"]');
-  var oldBusinessLink = document.querySelector('[data-page="business"]');
-  if (oldAdminLink && oldAdminLink.parentElement) oldAdminLink.parentElement.remove();
-  if (oldBusinessLink && oldBusinessLink.parentElement) oldBusinessLink.parentElement.remove();
+  var removableLinks = document.querySelectorAll('[data-page="admin"], [data-page="business"]');
+  removableLinks.forEach(function(link) {
+    if (link.parentElement) link.parentElement.remove();
+  });
   
   if (user) {
     user = JSON.parse(user);
@@ -236,6 +244,13 @@ function showAuthModal(type) {
       } else {
         router.navigate('portfolio');
       }
+      // Close mobile menu after auth
+      var navLinks = document.getElementById('nav-links');
+      var authButtons = document.getElementById('auth-buttons');
+      var mobileBtn = document.getElementById('mobile-menu-btn');
+      if (navLinks) navLinks.classList.remove('active');
+      if (authButtons) authButtons.classList.remove('active');
+      if (mobileBtn) mobileBtn.classList.remove('active');
     }).catch(function(err) {
       alert(err.message);
     });

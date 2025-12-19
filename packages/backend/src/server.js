@@ -59,6 +59,7 @@ var portfolioRoutes = require('./routes/portfolio.js');
 var performanceRoutes = require('./routes/performance.js');
 var adminRoutes = require('./routes/admin.js');
 var withdrawalRoutes = require('./routes/withdrawals.js');
+var walletRoutes = require('./routes/wallet.js');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -68,6 +69,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // Root endpoint
 app.get('/', function(req, res) {
