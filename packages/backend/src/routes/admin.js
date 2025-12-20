@@ -296,7 +296,7 @@ router.post('/projects', async function(req, res) {
     var name = req.body.name;
     var description = req.body.description;
     var category = req.body.category;
-    var goalAmount = parseFloat(req.body.goalAmount) || 0;
+    var goalAmount = parseFloat(req.body.goalAmount !== undefined ? req.body.goalAmount : req.body.fundingGoal) || 0;
     var minInvestment = parseFloat(req.body.minInvestment) || 100;
     var targetReturn = req.body.targetReturn || '10-15%';
     var duration = req.body.duration || '12 months';
@@ -304,6 +304,9 @@ router.post('/projects', async function(req, res) {
     var imageUrl = req.body.imageUrl || '';
     var documents = req.body.documents || [];
     var featured = req.body.featured || false;
+    var priority = parseInt(req.body.priority !== undefined ? req.body.priority : req.body.featureOrder, 10) || 0;
+    var status = req.body.status || 'active';
+    var tags = Array.isArray(req.body.tags) ? req.body.tags : [];
     
     // Validate required fields
     if (!name || !description || !category || !goalAmount) {
@@ -324,9 +327,11 @@ router.post('/projects', async function(req, res) {
       imageUrl: imageUrl,
       documents: documents,
       featured: featured,
+      priority: priority,
+      tags: tags,
       currentFunding: 0,
       investorCount: 0,
-      status: 'active', // Company projects go live immediately
+      status: status, // Admin decides if active/inactive
       createdBy: 'admin',
       createdByAdmin: req.user.userId,
       isCompanyProject: true, // Flag to identify company-initiated projects
@@ -355,15 +360,29 @@ router.put('/projects/:id', async function(req, res) {
     var allowedFields = [
       'name', 'description', 'category', 'goalAmount', 'minInvestment',
       'targetReturn', 'duration', 'riskLevel', 'imageUrl', 'documents',
-      'status', 'featured', 'isCompanyProject'
+      'status', 'featured', 'isCompanyProject', 'priority', 'tags'
     ];
     
     var updateData = { updatedAt: new Date() };
+
+    // Aliases / mapping for admin convenience
+    if (req.body.fundingGoal !== undefined && req.body.goalAmount === undefined) {
+      req.body.goalAmount = req.body.fundingGoal;
+    }
+    if (req.body.featureOrder !== undefined && req.body.priority === undefined) {
+      req.body.priority = req.body.featureOrder;
+    }
+
     allowedFields.forEach(function(field) {
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
     });
+
+    // Sanitize tags
+    if (updateData.tags !== undefined) {
+      updateData.tags = Array.isArray(updateData.tags) ? updateData.tags : [];
+    }
     
     await database.collection('projects').updateOne(
       { _id: new ObjectId(req.params.id) },
@@ -371,6 +390,23 @@ router.put('/projects/:id', async function(req, res) {
     );
     
     res.json({ message: 'Project updated successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Soft remove a project (admin)
+router.delete('/projects/:id', async function(req, res) {
+  try {
+    var database = await db.getDb();
+
+    await database.collection('projects').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { status: 'removed', removedAt: new Date(), updatedAt: new Date() } }
+    );
+
+    res.json({ message: 'Project removed successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -1,9 +1,9 @@
-// Admin Dashboard Page
+// Admin Dashboard Page - Improved UI/UX
 function renderAdmin(container, api) {
   // Check if user is admin
   var user = api.user;
   if (!user || user.role !== 'admin') {
-    container.innerHTML = '<section><h2>Access Denied</h2><p>Admin privileges required.</p></section>';
+    container.innerHTML = '<section class="admin-denied"><h2>Access Denied</h2><p>Admin privileges required.</p></section>';
     return;
   }
   
@@ -11,55 +11,48 @@ function renderAdmin(container, api) {
   var adminApi = api.getAdmin();
   
   var html = 
-    '<section style="max-width: 1200px; margin: 0 auto; padding: 1rem;">' +
+    '<section class="admin-dashboard">' +
       // Header
-      '<div style="margin-bottom: 2rem;">' +
-        '<h2 style="margin: 0; font-size: 1.75rem; font-weight: 700;">Admin Dashboard</h2>' +
+      '<div class="admin-header">' +
+        '<h1>Admin Dashboard</h1>' +
+        '<p class="admin-subtitle">Manage your platform</p>' +
       '</div>' +
       
       // Action Cards - Only shows pending items that need attention
-      '<div id="admin-alerts" style="margin-bottom: 2rem;"></div>' +
+      '<div id="admin-alerts"></div>' +
       
       // Main Actions Grid
-      '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">' +
-        
+      '<div class="admin-actions-grid">' +
         // Create Project Card
-        '<div class="card action-card" data-action="create-project" style="cursor: pointer; padding: 1.5rem; border: 2px solid var(--secondary-color); background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);">' +
-          '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">' +
-            '<div style="width: 48px; height: 48px; border-radius: 12px; background: var(--secondary-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">➕</div>' +
-            '<div>' +
-              '<h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Create Project</h3>' +
-              '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Add new investment project</p>' +
-            '</div>' +
+        '<div class="admin-action-card create-card" data-action="create-project">' +
+          '<div class="action-icon create-icon">➕</div>' +
+          '<div class="action-info">' +
+            '<h3>Create Project</h3>' +
+            '<p>Add new investment project</p>' +
           '</div>' +
         '</div>' +
         
         // Users Card
-        '<div class="card action-card" data-action="all-users" style="cursor: pointer; padding: 1.5rem;">' +
-          '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">' +
-            '<div style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">👥</div>' +
-            '<div>' +
-              '<h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Manage Users</h3>' +
-              '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">View all investors</p>' +
-            '</div>' +
+        '<div class="admin-action-card" data-action="all-users">' +
+          '<div class="action-icon users-icon">👥</div>' +
+          '<div class="action-info">' +
+            '<h3>Manage Users</h3>' +
+            '<p>View all investors</p>' +
           '</div>' +
         '</div>' +
         
         // Projects Card
-        '<div class="card action-card" data-action="all-projects" style="cursor: pointer; padding: 1.5rem;">' +
-          '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">' +
-            '<div style="width: 48px; height: 48px; border-radius: 12px; background: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">📊</div>' +
-            '<div>' +
-              '<h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">All Projects</h3>' +
-              '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Manage projects</p>' +
-            '</div>' +
+        '<div class="admin-action-card active" data-action="all-projects">' +
+          '<div class="action-icon projects-icon">📊</div>' +
+          '<div class="action-info">' +
+            '<h3>All Projects</h3>' +
+            '<p>Manage projects</p>' +
           '</div>' +
         '</div>' +
-        
       '</div>' +
       
       // Content Area
-      '<div id="admin-content" style="margin-top: 2rem;"></div>' +
+      '<div id="admin-content"></div>' +
     '</section>';
   
   container.innerHTML = html;
@@ -67,13 +60,19 @@ function renderAdmin(container, api) {
   // Load alerts (pending items)
   loadAdminAlerts(adminApi);
   
+  // Default: show all projects
+  loadAdminTab(adminApi, api, 'all-projects');
+  
   // Action card click handlers
-  document.querySelectorAll('.action-card').forEach(function(card) {
+  document.querySelectorAll('.admin-action-card').forEach(function(card) {
     card.addEventListener('click', function() {
       var action = this.getAttribute('data-action');
-      loadAdminTab(adminApi, action);
-      // Scroll to content
-      document.getElementById('admin-content').scrollIntoView({ behavior: 'smooth' });
+      // Remove active from all cards
+      document.querySelectorAll('.admin-action-card').forEach(function(c) {
+        c.classList.remove('active');
+      });
+      this.classList.add('active');
+      loadAdminTab(adminApi, api, action);
     });
   });
 }
@@ -86,82 +85,84 @@ function loadAdminAlerts(adminApi) {
     .then(function(stats) {
       var alerts = [];
       
-      // Only show alerts if there are pending items
       if (stats.users.pendingKyc > 0) {
         alerts.push(
-          '<div class="card alert-card" data-action="pending-kyc" style="cursor: pointer; padding: 1rem; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.1); display: flex; justify-content: space-between; align-items: center;">' +
-            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
-              '<span style="font-size: 1.25rem;">📋</span>' +
-              '<div>' +
+          '<div class="admin-alert kyc-alert" data-action="pending-kyc">' +
+            '<div class="alert-left">' +
+              '<span class="alert-icon">📋</span>' +
+              '<div class="alert-info">' +
                 '<strong>' + stats.users.pendingKyc + ' Pending KYC</strong>' +
-                '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Users waiting for verification</p>' +
+                '<span>Users waiting for verification</span>' +
               '</div>' +
             '</div>' +
-            '<button class="btn btn-primary" style="padding: 0.5rem 1rem;">Review</button>' +
+            '<button class="btn btn-sm">Review</button>' +
           '</div>'
         );
       }
       
       if (stats.projects.pending > 0) {
         alerts.push(
-          '<div class="card alert-card" data-action="pending-projects" style="cursor: pointer; padding: 1rem; border-left: 4px solid var(--primary-color); background: rgba(99, 102, 241, 0.1); display: flex; justify-content: space-between; align-items: center;">' +
-            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
-              '<span style="font-size: 1.25rem;">🏢</span>' +
-              '<div>' +
+          '<div class="admin-alert project-alert" data-action="pending-projects">' +
+            '<div class="alert-left">' +
+              '<span class="alert-icon">🏢</span>' +
+              '<div class="alert-info">' +
                 '<strong>' + stats.projects.pending + ' Pending Projects</strong>' +
-                '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Projects awaiting approval</p>' +
+                '<span>Projects awaiting approval</span>' +
               '</div>' +
             '</div>' +
-            '<button class="btn btn-primary" style="padding: 0.5rem 1rem;">Review</button>' +
+            '<button class="btn btn-sm">Review</button>' +
           '</div>'
         );
       }
       
       if (stats.withdrawals.pending > 0) {
         alerts.push(
-          '<div class="card alert-card" data-action="pending-withdrawals" style="cursor: pointer; padding: 1rem; border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.1); display: flex; justify-content: space-between; align-items: center;">' +
-            '<div style="display: flex; align-items: center; gap: 0.75rem;">' +
-              '<span style="font-size: 1.25rem;">💸</span>' +
-              '<div>' +
-                '<strong>' + stats.withdrawals.pending + ' Pending Withdrawals</strong> <span style="color: #ef4444; font-weight: 600;">($' + stats.withdrawals.pendingAmount.toLocaleString() + ')</span>' +
-                '<p style="margin: 0; font-size: 0.875rem; color: var(--text-muted);">Waiting for processing</p>' +
+          '<div class="admin-alert withdrawal-alert" data-action="pending-withdrawals">' +
+            '<div class="alert-left">' +
+              '<span class="alert-icon">💸</span>' +
+              '<div class="alert-info">' +
+                '<strong>' + stats.withdrawals.pending + ' Withdrawals</strong> <span class="amount">GH₵' + stats.withdrawals.pendingAmount.toLocaleString() + '</span>' +
+                '<span>Waiting for processing</span>' +
               '</div>' +
             '</div>' +
-            '<button class="btn" style="padding: 0.5rem 1rem; background: #ef4444; color: white;">Process</button>' +
+            '<button class="btn btn-sm btn-danger">Process</button>' +
           '</div>'
         );
       }
       
       if (alerts.length > 0) {
         alertsContainer.innerHTML = 
-          '<h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-muted);">⚡ Requires Action</h3>' +
-          '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' + alerts.join('') + '</div>';
+          '<div class="alerts-section">' +
+            '<h3 class="alerts-title">⚡ Requires Action</h3>' +
+            '<div class="alerts-list">' + alerts.join('') + '</div>' +
+          '</div>';
         
-        // Add click handlers for alert cards
-        document.querySelectorAll('.alert-card').forEach(function(card) {
+        document.querySelectorAll('.admin-alert').forEach(function(card) {
           card.addEventListener('click', function() {
             var action = this.getAttribute('data-action');
-            loadAdminTab(adminApi, action);
-            document.getElementById('admin-content').scrollIntoView({ behavior: 'smooth' });
+            loadAdminTab(window.adminApiRef, window.apiRef, action);
           });
         });
       } else {
         alertsContainer.innerHTML = 
-          '<div class="card" style="padding: 1.5rem; text-align: center; background: rgba(16, 185, 129, 0.1); border: 1px solid var(--secondary-color);">' +
-            '<span style="font-size: 2rem;">✅</span>' +
-            '<p style="margin: 0.5rem 0 0 0; font-weight: 500; color: var(--secondary-color);">All caught up! No pending actions.</p>' +
+          '<div class="no-alerts">' +
+            '<span class="check-icon">✅</span>' +
+            '<p>All caught up! No pending actions.</p>' +
           '</div>';
       }
     })
     .catch(function(err) {
-      alertsContainer.innerHTML = '<div style="color: #ef4444;">Error loading alerts: ' + err.message + '</div>';
+      alertsContainer.innerHTML = '<div class="alert-error">Error loading alerts: ' + err.message + '</div>';
     });
 }
 
-function loadAdminTab(adminApi, tab) {
+function loadAdminTab(adminApi, api, tab) {
+  // Store refs for alert click handlers
+  window.adminApiRef = adminApi;
+  window.apiRef = api;
+  
   var content = document.getElementById('admin-content');
   
-  // Section titles
   var titles = {
     'pending-kyc': { icon: '📋', title: 'Pending KYC Verifications' },
     'pending-projects': { icon: '🏢', title: 'Pending Project Approvals' },
@@ -174,277 +175,136 @@ function loadAdminTab(adminApi, tab) {
   var sectionInfo = titles[tab] || { icon: '📁', title: 'Admin' };
   
   content.innerHTML = 
-    '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">' +
-      '<span style="font-size: 1.5rem;">' + sectionInfo.icon + '</span>' +
-      '<h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;">' + sectionInfo.title + '</h3>' +
+    '<div class="admin-section-header">' +
+      '<span class="section-icon">' + sectionInfo.icon + '</span>' +
+      '<h2>' + sectionInfo.title + '</h2>' +
     '</div>' +
-    '<div id="tab-content"><div style="text-align: center; padding: 2rem;">Loading...</div></div>';
+    '<div id="tab-content" class="tab-content"><div class="loading">Loading...</div></div>';
   
   var tabContent = document.getElementById('tab-content');
   
+  // ========== PENDING KYC ==========
   if (tab === 'pending-kyc') {
     adminApi.getUsers({ kycStatus: 'submitted' })
       .then(function(result) {
         if (result.users.length === 0) {
-          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">✅ No pending KYC verifications</div>';
+          tabContent.innerHTML = '<div class="empty-state">✅ No pending KYC verifications</div>';
           return;
         }
         
-        tabContent.innerHTML = result.users.map(function(user) {
-          return '<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">' +
-            '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
-              '<div>' +
-                '<h3 style="margin-bottom: 0.5rem;">' + user.name + '</h3>' +
-                '<p style="color: var(--text-muted); margin-bottom: 0.5rem;">' + user.email + '</p>' +
-                '<span class="badge">' + user.role + '</span>' +
-              '</div>' +
-              '<div style="display: flex; gap: 0.5rem;">' +
-                '<button class="btn btn-primary approve-kyc-btn" data-id="' + user.id + '">Approve</button>' +
-                '<button class="btn btn-outline reject-kyc-btn" data-id="' + user.id + '">Reject</button>' +
-              '</div>' +
+        tabContent.innerHTML = '<div class="admin-list">' + result.users.map(function(user) {
+          return '<div class="admin-list-item">' +
+            '<div class="item-main">' +
+              '<h4>' + user.name + '</h4>' +
+              '<p>' + user.email + '</p>' +
+              '<span class="badge">' + user.role + '</span>' +
             '</div>' +
-            (user.kyc && user.kyc.idDocument ? 
-              '<div style="margin-top: 1rem;">' +
-                '<p style="font-size: 0.875rem; color: var(--text-muted);">ID Document submitted</p>' +
-              '</div>' : '') +
+            '<div class="item-actions">' +
+              '<button class="btn btn-sm btn-primary approve-kyc-btn" data-id="' + user.id + '">Approve</button>' +
+              '<button class="btn btn-sm btn-outline reject-kyc-btn" data-id="' + user.id + '">Reject</button>' +
+            '</div>' +
           '</div>';
-        }).join('');
+        }).join('') + '</div>';
         
-        // Add event listeners
-        document.querySelectorAll('.approve-kyc-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            if (confirm('Approve KYC for this user?')) {
-              var button = this;
-              button.disabled = true;
-              button.textContent = 'Processing...';
-              adminApi.verifyKyc(id, 'approve')
-                .then(function() {
-                  alert('✅ KYC approved successfully!');
-                  loadAdminTab(adminApi, 'pending-kyc');
-                  loadAdminStats(adminApi);
-                })
-                .catch(function(err) {
-                  alert('❌ Error: ' + err.message);
-                  button.disabled = false;
-                  button.textContent = 'Approve';
-                });
-            }
-          });
-        });
-        
-        document.querySelectorAll('.reject-kyc-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var reason = prompt('Rejection reason:');
-            if (reason) {
-              var button = this;
-              button.disabled = true;
-              button.textContent = 'Processing...';
-              adminApi.verifyKyc(id, 'reject', reason)
-                .then(function() {
-                  alert('✅ KYC rejected with reason: ' + reason);
-                  loadAdminTab(adminApi, 'pending-kyc');
-                  loadAdminStats(adminApi);
-                })
-                .catch(function(err) {
-                  alert('❌ Error: ' + err.message);
-                  button.disabled = false;
-                  button.textContent = 'Reject';
-                });
-            }
-          });
-        });
+        attachKYCHandlers(adminApi, api);
       });
   }
   
+  // ========== PENDING PROJECTS ==========
   else if (tab === 'pending-projects') {
     adminApi.getProjects({ status: 'pending_review' })
       .then(function(result) {
         if (result.projects.length === 0) {
-          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">✅ No pending project reviews</div>';
+          tabContent.innerHTML = '<div class="empty-state">✅ No pending project reviews</div>';
           return;
         }
         
-        tabContent.innerHTML = result.projects.map(function(project) {
-          return '<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">' +
-            '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
-              '<div>' +
-                '<h3 style="margin-bottom: 0.5rem;">' + project.name + '</h3>' +
-                '<p style="color: var(--text-muted); margin-bottom: 0.5rem;">' + project.description.substring(0, 100) + '...</p>' +
-                '<div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">' +
-                  '<span class="badge">' + project.category + '</span>' +
-                  '<span class="badge" style="background: var(--secondary-color);">Goal: $' + project.goalAmount.toLocaleString() + '</span>' +
-                  '<span class="badge" style="background: var(--accent-color);">Return: ' + project.targetReturn + '</span>' +
-                '</div>' +
-              '</div>' +
-              '<div style="display: flex; gap: 0.5rem; flex-direction: column;">' +
-                '<button class="btn btn-primary approve-project-btn" data-id="' + project.id + '">Approve</button>' +
-                '<button class="btn btn-outline request-changes-btn" data-id="' + project.id + '">Request Changes</button>' +
-                '<button class="btn" style="background: #ef4444;" data-id="' + project.id + '" class="reject-project-btn">Reject</button>' +
+        tabContent.innerHTML = '<div class="admin-list">' + result.projects.map(function(project) {
+          return '<div class="admin-list-item">' +
+            '<div class="item-main">' +
+              '<h4>' + project.name + '</h4>' +
+              '<p>' + project.description.substring(0, 100) + '...</p>' +
+              '<div class="badges">' +
+                '<span class="badge">' + project.category + '</span>' +
+                '<span class="badge badge-success">Goal: GH₵' + (project.goalAmount || 0).toLocaleString() + '</span>' +
               '</div>' +
             '</div>' +
+            '<div class="item-actions">' +
+              '<button class="btn btn-sm btn-primary approve-project-btn" data-id="' + project.id + '">Approve</button>' +
+              '<button class="btn btn-sm btn-outline request-changes-btn" data-id="' + project.id + '">Request Changes</button>' +
+            '</div>' +
           '</div>';
-        }).join('');
+        }).join('') + '</div>';
         
-        // Event listeners
-        document.querySelectorAll('.approve-project-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            if (confirm('Approve this project for funding?')) {
-              var button = this;
-              button.disabled = true;
-              button.textContent = 'Processing...';
-              adminApi.reviewProject(id, 'approve', 'Project approved for funding')
-                .then(function() {
-                  alert('✅ Project approved successfully!');
-                  loadAdminTab(adminApi, 'pending-projects');
-                  loadAdminStats(adminApi);
-                })
-                .catch(function(err) {
-                  alert('❌ Error: ' + err.message);
-                  button.disabled = false;
-                  button.textContent = 'Approve';
-                });
-            }
-          });
-        });
-        
-        document.querySelectorAll('.request-changes-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var feedback = prompt('What changes are required?');
-            if (feedback) {
-              var button = this;
-              button.disabled = true;
-              button.textContent = 'Processing...';
-              adminApi.reviewProject(id, 'request_changes', feedback)
-                .then(function() {
-                  alert('✅ Changes requested successfully');
-                  loadAdminTab(adminApi, 'pending-projects');
-                  loadAdminStats(adminApi);
-                })
-                .catch(function(err) {
-                  alert('❌ Error: ' + err.message);
-                  button.disabled = false;
-                  button.textContent = 'Request Changes';
-                });
-            }
-          });
-        });
+        attachProjectReviewHandlers(adminApi, api);
       });
   }
   
+  // ========== PENDING WITHDRAWALS ==========
   else if (tab === 'pending-withdrawals') {
     adminApi.getWithdrawals({ status: 'pending' })
       .then(function(result) {
         if (result.withdrawals.length === 0) {
-          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">✅ No pending withdrawals</div>';
+          tabContent.innerHTML = '<div class="empty-state">✅ No pending withdrawals</div>';
           return;
         }
         
-        tabContent.innerHTML = result.withdrawals.map(function(w) {
-          return '<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">' +
-            '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
-              '<div>' +
-                '<h3 style="margin-bottom: 0.5rem;">$' + w.amount.toLocaleString() + '</h3>' +
-                '<p style="color: var(--text-muted); margin-bottom: 0.5rem;">' + (w.user ? w.user.name + ' (' + w.user.email + ')' : 'User ' + w.userId) + '</p>' +
-                '<div style="display: flex; gap: 0.5rem;">' +
-                  '<span class="badge">' + w.method + '</span>' +
-                  '<span style="font-size: 0.875rem; color: var(--text-muted);">' + new Date(w.createdAt).toLocaleDateString() + '</span>' +
-                '</div>' +
-              '</div>' +
-              '<div style="display: flex; gap: 0.5rem;">' +
-                '<button class="btn btn-primary approve-withdrawal-btn" data-id="' + w.id + '">Approve & Pay</button>' +
-                '<button class="btn btn-outline reject-withdrawal-btn" data-id="' + w.id + '">Reject</button>' +
+        tabContent.innerHTML = '<div class="admin-list">' + result.withdrawals.map(function(w) {
+          return '<div class="admin-list-item">' +
+            '<div class="item-main">' +
+              '<h4>GH₵' + w.amount.toLocaleString() + '</h4>' +
+              '<p>' + (w.user ? w.user.name + ' (' + w.user.email + ')' : 'User ' + w.userId) + '</p>' +
+              '<div class="badges">' +
+                '<span class="badge">' + w.method + '</span>' +
+                '<span class="date">' + new Date(w.createdAt).toLocaleDateString() + '</span>' +
               '</div>' +
             '</div>' +
+            '<div class="item-actions">' +
+              '<button class="btn btn-sm btn-primary approve-withdrawal-btn" data-id="' + w.id + '">Approve & Pay</button>' +
+              '<button class="btn btn-sm btn-outline reject-withdrawal-btn" data-id="' + w.id + '">Reject</button>' +
+            '</div>' +
           '</div>';
-        }).join('');
+        }).join('') + '</div>';
         
-        document.querySelectorAll('.approve-withdrawal-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var txRef = prompt('Enter transaction reference:');
-            if (txRef) {
-              var button = this;
-              button.disabled = true;
-              button.textContent = 'Processing...';
-              adminApi.processWithdrawal(id, 'approve', null, txRef)
-                .then(function() {
-                  alert('✅ Withdrawal approved and marked as paid!');
-                  loadAdminTab(adminApi, 'pending-withdrawals');
-                  loadAdminStats(adminApi);
-                })
-                .catch(function(err) {
-                  alert('❌ Error: ' + err.message);
-                  button.disabled = false;
-                  button.textContent = 'Approve & Pay';
-                });
-            }
-          });
-        });
-        
-        document.querySelectorAll('.reject-withdrawal-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var reason = prompt('Rejection reason:');
-            if (reason) {
-              var button = this;
-              button.disabled = true;
-              button.textContent = 'Processing...';
-              adminApi.processWithdrawal(id, 'reject', reason)
-                .then(function() {
-                  alert('✅ Withdrawal rejected, funds returned to user');
-                  loadAdminTab(adminApi, 'pending-withdrawals');
-                  loadAdminStats(adminApi);
-                })
-                .catch(function(err) {
-                  alert('❌ Error: ' + err.message);
-                  button.disabled = false;
-                  button.textContent = 'Reject';
-                });
-            }
-          });
-        });
+        attachWithdrawalHandlers(adminApi, api);
       });
   }
   
+  // ========== ALL USERS ==========
   else if (tab === 'all-users') {
     adminApi.getUsers({})
       .then(function(result) {
-        // Filter out admin users from the display
         var nonAdminUsers = result.users.filter(function(user) {
           return user.role !== 'admin';
         });
         
         if (nonAdminUsers.length === 0) {
-          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">No users found</div>';
+          tabContent.innerHTML = '<div class="empty-state">No users found</div>';
           return;
         }
         
         tabContent.innerHTML = 
-          '<div style="overflow-x: auto;">' +
-            '<table style="width: 100%; border-collapse: collapse; background: var(--surface-color); border-radius: 0.75rem; overflow: hidden;">' +
+          '<div class="admin-table-wrapper">' +
+            '<table class="admin-table">' +
               '<thead>' +
-                '<tr style="background: var(--surface-elevated); border-bottom: 2px solid var(--border-color);">' +
-                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Name</th>' +
-                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Email</th>' +
-                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Role</th>' +
-                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">KYC</th>' +
-                  '<th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px;">Status</th>' +
+                '<tr>' +
+                  '<th>Name</th>' +
+                  '<th>Email</th>' +
+                  '<th>Role</th>' +
+                  '<th>KYC</th>' +
+                  '<th>Status</th>' +
                 '</tr>' +
               '</thead>' +
               '<tbody>' +
                 nonAdminUsers.map(function(user) {
-                  return '<tr style="border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background=\'var(--surface-elevated)\'" onmouseout="this.style.background=\'transparent\'">' +
-                    '<td style="padding: 1rem; font-weight: 500;">' + user.name + '</td>' +
-                    '<td style="padding: 1rem; color: var(--text-secondary);">' + user.email + '</td>' +
-                    '<td style="padding: 1rem;"><span class="badge" style="background: ' + (user.role === 'business_owner' ? '#8b5cf6' : 'var(--primary-color)') + ';">' + user.role.replace('_', ' ') + '</span></td>' +
-                    '<td style="padding: 1rem;"><span class="badge" style="background: ' + 
-                      (user.kyc && user.kyc.status === 'verified' ? 'var(--secondary-color)' : user.kyc && user.kyc.status === 'submitted' ? '#f59e0b' : '#6b7280') + ';">' + 
-                      (user.kyc ? user.kyc.status : 'pending') + '</span></td>' +
-                    '<td style="padding: 1rem;">' + (user.isActive !== false ? '<span style="color: var(--secondary-color); font-weight: 600;">✅ Active</span>' : '<span style="color: #ef4444; font-weight: 600;">🚫 Suspended</span>') + '</td>' +
+                  var kycStatus = user.kyc ? user.kyc.status : 'pending';
+                  var kycClass = kycStatus === 'verified' ? 'badge-success' : kycStatus === 'submitted' ? 'badge-warning' : '';
+                  return '<tr>' +
+                    '<td><strong>' + user.name + '</strong></td>' +
+                    '<td>' + user.email + '</td>' +
+                    '<td><span class="badge ' + (user.role === 'business_owner' ? 'badge-purple' : '') + '">' + user.role.replace('_', ' ') + '</span></td>' +
+                    '<td><span class="badge ' + kycClass + '">' + kycStatus + '</span></td>' +
+                    '<td>' + (user.isActive !== false ? '<span class="status-active">✅ Active</span>' : '<span class="status-suspended">🚫 Suspended</span>') + '</td>' +
                   '</tr>';
                 }).join('') +
               '</tbody>' +
@@ -452,81 +312,132 @@ function loadAdminTab(adminApi, tab) {
           '</div>';
       })
       .catch(function(err) {
-        tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: #ef4444;">⚠️ Error loading users: ' + err.message + '</div>';
+        tabContent.innerHTML = '<div class="error-state">⚠️ Error loading users: ' + err.message + '</div>';
       });
   }
   
+  // ========== CREATE PROJECT ==========
   else if (tab === 'create-project') {
     tabContent.innerHTML = 
-      '<div class="card" style="padding: 2rem; max-width: 800px;">' +
+      '<div class="create-project-form">' +
         '<form id="create-project-form">' +
-          '<div style="margin-bottom: 1rem;">' +
-            '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Project Name *</label>' +
-            '<input type="text" name="name" required class="input" style="width: 100%;">' +
-          '</div>' +
-          '<div style="margin-bottom: 1rem;">' +
-            '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Category *</label>' +
-            '<select name="category" required class="input" style="width: 100%;">' +
-              '<option value="">Select Category</option>' +
-              '<option value="technology">Technology</option>' +
-              '<option value="real_estate">Real Estate</option>' +
-              '<option value="agriculture">Agriculture</option>' +
-              '<option value="healthcare">Healthcare</option>' +
-              '<option value="renewable_energy">Renewable Energy</option>' +
-              '<option value="retail">Retail</option>' +
-              '<option value="manufacturing">Manufacturing</option>' +
-              '<option value="finance">Finance</option>' +
-              '<option value="other">Other</option>' +
-            '</select>' +
-          '</div>' +
-          '<div style="margin-bottom: 1rem;">' +
-            '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Description *</label>' +
-            '<textarea name="description" required class="input" style="width: 100%; min-height: 120px;" placeholder="Detailed description of the project..."></textarea>' +
-          '</div>' +
-          '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">' +
-            '<div>' +
-              '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Funding Goal ($) *</label>' +
-              '<input type="number" name="goalAmount" required min="1000" class="input" style="width: 100%;" placeholder="100000">' +
-            '</div>' +
-            '<div>' +
-              '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Min Investment ($)</label>' +
-              '<input type="number" name="minInvestment" value="100" min="10" class="input" style="width: 100%;">' +
+          // Image Upload Section
+          '<div class="form-section">' +
+            '<h3>Project Image</h3>' +
+            '<div class="image-upload-area" id="image-upload-area">' +
+              '<div id="image-preview" class="image-preview">' +
+                '<span class="upload-icon">📷</span>' +
+                '<p>Click to upload or drag & drop</p>' +
+                '<span class="upload-hint">PNG, JPG up to 5MB</span>' +
+              '</div>' +
+              '<input type="file" id="image-input" accept="image/*" style="display: none;">' +
+              '<input type="hidden" name="imageUrl" id="image-url-input">' +
             '</div>' +
           '</div>' +
-          '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">' +
-            '<div>' +
-              '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Target Return</label>' +
-              '<input type="text" name="targetReturn" value="10-15%" class="input" style="width: 100%;" placeholder="e.g. 10-15%">' +
+          
+          // Basic Info Section
+          '<div class="form-section">' +
+            '<h3>Basic Information</h3>' +
+            '<div class="form-row">' +
+              '<div class="form-group full">' +
+                '<label>Project Name <span class="required">*</span></label>' +
+                '<input type="text" name="name" required class="input" placeholder="e.g. Pure Water Selling Business">' +
+              '</div>' +
             '</div>' +
-            '<div>' +
-              '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Duration</label>' +
-              '<input type="text" name="duration" value="12 months" class="input" style="width: 100%;" placeholder="e.g. 12 months">' +
+            '<div class="form-row">' +
+              '<div class="form-group">' +
+                '<label>Category <span class="required">*</span></label>' +
+                '<select name="category" required class="input">' +
+                  '<option value="">Select Category</option>' +
+                  '<option value="Technology">Technology</option>' +
+                  '<option value="Real Estate">Real Estate</option>' +
+                  '<option value="Agriculture">Agriculture</option>' +
+                  '<option value="Healthcare">Healthcare</option>' +
+                  '<option value="Renewable Energy">Renewable Energy</option>' +
+                  '<option value="Retail">Retail</option>' +
+                  '<option value="Manufacturing">Manufacturing</option>' +
+                  '<option value="Financial Services">Financial Services</option>' +
+                  '<option value="Food & Beverage">Food & Beverage</option>' +
+                  '<option value="Telecommunications">Telecommunications</option>' +
+                  '<option value="Other">Other</option>' +
+                '</select>' +
+              '</div>' +
+              '<div class="form-group">' +
+                '<label>Risk Level</label>' +
+                '<select name="riskLevel" class="input">' +
+                  '<option value="low">Low Risk</option>' +
+                  '<option value="medium" selected>Medium Risk</option>' +
+                  '<option value="high">High Risk</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="form-group full">' +
+              '<label>Description <span class="required">*</span></label>' +
+              '<textarea name="description" required class="input" rows="4" placeholder="Detailed description of the project, business plan, and how funds will be used..."></textarea>' +
+            '</div>' +
+            '<div class="form-group full">' +
+              '<label>Tags <span style="color: var(--text-muted); font-weight: 400;">(comma-separated)</span></label>' +
+              '<input type="text" name="tags" class="input" placeholder="e.g. women-owned, agriculture, export">' +
             '</div>' +
           '</div>' +
-          '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">' +
-            '<div>' +
-              '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Risk Level</label>' +
-              '<select name="riskLevel" class="input" style="width: 100%;">' +
-                '<option value="low">Low</option>' +
-                '<option value="medium" selected>Medium</option>' +
-                '<option value="high">High</option>' +
-              '</select>' +
+          
+          // Financial Info Section
+          '<div class="form-section">' +
+            '<h3>Financial Details</h3>' +
+            '<div class="form-row">' +
+              '<div class="form-group">' +
+                '<label>Funding Goal (GH₵) <span class="required">*</span></label>' +
+                '<input type="number" name="goalAmount" required min="100" class="input" placeholder="1000">' +
+              '</div>' +
+              '<div class="form-group">' +
+                '<label>Min Investment (GH₵)</label>' +
+                '<input type="number" name="minInvestment" value="100" min="10" class="input">' +
+              '</div>' +
             '</div>' +
-            '<div>' +
-              '<label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Image URL</label>' +
-              '<input type="url" name="imageUrl" class="input" style="width: 100%;" placeholder="https://...">' +
+            '<div class="form-row">' +
+              '<div class="form-group">' +
+                '<label>Target Return</label>' +
+                '<input type="text" name="targetReturn" value="10-15%" class="input" placeholder="e.g. 10-15%">' +
+              '</div>' +
+              '<div class="form-group">' +
+                '<label>Duration</label>' +
+                '<input type="text" name="duration" value="30 days" class="input" placeholder="e.g. 30 days">' +
+              '</div>' +
+            '</div>' +
+            '<div class="form-row">' +
+              '<div class="form-group">' +
+                '<label>Priority</label>' +
+                '<input type="number" name="priority" value="0" class="input" placeholder="Higher shows first">' +
+              '</div>' +
+              '<div class="form-group">' +
+                '<label>Status</label>' +
+                '<select name="status" class="input">' +
+                  '<option value="active" selected>Active (visible to users)</option>' +
+                  '<option value="inactive">Inactive (hidden from users)</option>' +
+                '</select>' +
+              '</div>' +
             '</div>' +
           '</div>' +
-          '<div style="margin-bottom: 1.5rem;">' +
-            '<label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">' +
-              '<input type="checkbox" name="featured">' +
-              '<span>Featured Project (show prominently on homepage)</span>' +
-            '</label>' +
+          
+          // Options Section
+          '<div class="form-section">' +
+            '<div class="checkbox-group">' +
+              '<label class="checkbox-label">' +
+                '<input type="checkbox" name="featured">' +
+                '<span class="checkmark"></span>' +
+                '<span>⭐ Featured Project (show prominently on homepage)</span>' +
+              '</label>' +
+            '</div>' +
           '</div>' +
-          '<button type="submit" class="btn btn-primary" style="width: 100%;">Create & Publish Project</button>' +
+          
+          '<button type="submit" class="btn btn-primary btn-lg btn-full">Create & Publish Project</button>' +
         '</form>' +
       '</div>';
     
+    // Setup image upload handlers
+    setupImageUpload(api);
+    
+    // Form submission
     document.getElementById('create-project-form').addEventListener('submit', function(e) {
       e.preventDefault();
       var form = e.target;
@@ -541,106 +452,566 @@ function loadAdminTab(adminApi, tab) {
         goalAmount: parseFloat(form.goalAmount.value),
         minInvestment: parseFloat(form.minInvestment.value) || 100,
         targetReturn: form.targetReturn.value || '10-15%',
-        duration: form.duration.value || '12 months',
+        duration: form.duration.value || '30 days',
         riskLevel: form.riskLevel.value,
-        imageUrl: form.imageUrl.value || '',
-        featured: form.featured.checked
+        imageUrl: document.getElementById('image-url-input').value || '',
+        featured: form.featured.checked,
+        priority: parseInt(form.priority.value, 10) || 0,
+        status: form.status.value,
+        tags: parseTags(form.tags.value)
       };
       
       adminApi.createProject(data)
         .then(function(result) {
-          alert('Project created and published successfully!');
-          loadAdminTab(adminApi, 'all-projects');
-          loadAdminStats(adminApi);
+          alert('✅ Project created and published successfully!');
+          loadAdminTab(adminApi, api, 'all-projects');
+          loadAdminAlerts(adminApi);
         })
         .catch(function(err) {
-          alert('Error: ' + err.message);
+          alert('❌ Error: ' + err.message);
           submitBtn.disabled = false;
           submitBtn.textContent = 'Create & Publish Project';
         });
     });
   }
   
+  // ========== ALL PROJECTS ==========
   else if (tab === 'all-projects') {
-    adminApi.getProjects({ status: 'all' })
+    // Don't pass status filter to get ALL projects
+    adminApi.getProjects({})
       .then(function(result) {
         if (result.projects.length === 0) {
-          tabContent.innerHTML = '<div class="card" style="padding: 2rem; text-align: center; color: var(--text-muted);">No projects yet. Create your first project!</div>';
+          tabContent.innerHTML = '<div class="empty-state">No projects yet. Create your first project!</div>';
           return;
         }
+
+        // Keep a lookup map for edit actions
+        window.__adminProjectsById = {};
+        result.projects.forEach(function(p) {
+          window.__adminProjectsById[p.id] = p;
+        });
         
-        tabContent.innerHTML = 
+        tabContent.innerHTML = '<div class="projects-grid">' + 
           result.projects.map(function(project) {
-            var statusColor = {
-              'pending_review': '#f59e0b',
-              'active': 'var(--secondary-color)',
-              'funded': 'var(--primary-color)',
-              'completed': '#10b981',
-              'rejected': '#ef4444',
-              'changes_requested': '#8b5cf6'
-            }[project.status] || '#6b7280';
+            var statusColors = {
+              'pending_review': 'badge-warning',
+              'active': 'badge-success',
+              'inactive': 'badge-outline',
+              'funded': 'badge-primary',
+              'completed': 'badge-success',
+              'rejected': 'badge-danger',
+              'changes_requested': 'badge-purple',
+              'removed': 'badge-danger'
+            };
+            var statusClass = statusColors[project.status] || '';
+            var progress = project.goalAmount > 0 ? Math.min(100, ((project.currentFunding || 0) / project.goalAmount) * 100) : 0;
             
-            return '<div class="card" style="padding: 1.5rem; margin-bottom: 1rem;">' +
-              '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
-                '<div style="flex: 1;">' +
-                  '<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">' +
-                    '<h3 style="margin: 0;">' + project.name + '</h3>' +
-                    (project.isCompanyProject ? '<span class="badge" style="background: var(--primary-color);">Company</span>' : '') +
-                    (project.featured ? '<span class="badge" style="background: #f59e0b;">Featured</span>' : '') +
+            // Use imageUrl or fallback
+            var imageUrl = project.imageUrl || project.image_url || project.dataUrl || 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400';
+            
+            return '<div class="project-card-admin">' +
+              '<div class="project-image" style="background-image: url(\'' + imageUrl + '\');">' +
+                (project.featured ? '<span class="featured-badge">⭐ Featured</span>' : '') +
+              '</div>' +
+              '<div class="project-content">' +
+                '<div class="project-header">' +
+                  '<h4>' + project.name + '</h4>' +
+                  '<span class="badge ' + statusClass + '">' + (project.status || 'active').replace('_', ' ') + '</span>' +
+                '</div>' +
+                '<p class="project-desc">' + (project.description || '').substring(0, 80) + '...</p>' +
+                '<div class="project-meta">' +
+                  '<span class="badge">' + (project.category || 'Other') + '</span>' +
+                  '<span class="badge badge-outline">' + (project.riskLevel || 'medium') + ' risk</span>' +
+                  '<span class="badge badge-outline">Priority: ' + (project.priority || 0) + '</span>' +
+                '</div>' +
+                '<div class="project-funding">' +
+                  '<div class="funding-info">' +
+                    '<span>GH₵' + (project.currentFunding || 0).toLocaleString() + '</span>' +
+                    '<span>of GH₵' + (project.goalAmount || 0).toLocaleString() + '</span>' +
                   '</div>' +
-                  '<p style="color: var(--text-muted); margin-bottom: 0.5rem;">' + project.description.substring(0, 100) + '...</p>' +
-                  '<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">' +
-                    '<span class="badge">' + project.category + '</span>' +
-                    '<span class="badge" style="background: ' + statusColor + ';">' + project.status.replace('_', ' ') + '</span>' +
-                  '</div>' +
-                  '<div style="font-size: 0.875rem; color: var(--text-muted);">' +
-                    'Goal: $' + project.goalAmount.toLocaleString() + ' | ' +
-                    'Funded: $' + (project.currentFunding || 0).toLocaleString() + ' | ' +
-                    'Investors: ' + (project.investorCount || 0) +
+                  '<div class="progress-bar"><div class="progress-fill" style="width: ' + progress + '%;"></div></div>' +
+                  '<div class="funding-stats">' +
+                    '<span>' + (project.investorCount || 0) + ' investors</span>' +
+                    '<span>' + (project.targetReturn || '10-15%') + ' return</span>' +
                   '</div>' +
                 '</div>' +
-                '<div style="display: flex; gap: 0.5rem; flex-direction: column;">' +
+                '<div class="project-actions">' +
+                  '<button class="btn btn-sm btn-outline edit-project-btn" data-id="' + project.id + '">✏️ Edit</button>' +
+                  '<button class="btn btn-sm btn-outline toggle-status-btn" data-id="' + project.id + '" data-status="' + (project.status || 'active') + '">' +
+                    ((project.status || 'active') === 'active' ? '🚫 Inactivate' : '✅ Activate') +
+                  '</button>' +
+                  '<button class="btn btn-sm btn-danger remove-project-btn" data-id="' + project.id + '">🗑 Remove</button>' +
                   (project.status === 'active' ? 
-                    '<button class="btn btn-outline distribute-btn" data-id="' + project.id + '">Distribute Profits</button>' : '') +
-                  '<button class="btn btn-outline toggle-featured-btn" data-id="' + project.id + '" data-featured="' + project.featured + '">' + 
-                    (project.featured ? 'Unfeature' : 'Feature') + 
+                    '<button class="btn btn-sm btn-outline distribute-btn" data-id="' + project.id + '">💰 Distribute</button>' : '') +
+                  '<button class="btn btn-sm ' + (project.featured ? 'btn-warning' : 'btn-outline') + ' toggle-featured-btn" data-id="' + project.id + '" data-featured="' + project.featured + '">' + 
+                    (project.featured ? '⭐ Unfeature' : '☆ Feature') + 
                   '</button>' +
                 '</div>' +
               '</div>' +
             '</div>';
-          }).join('');
+          }).join('') + '</div>';
         
-        // Distribute profits button
-        document.querySelectorAll('.distribute-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var amount = prompt('Enter profit amount to distribute ($):');
-            if (amount && parseFloat(amount) > 0) {
-              var description = prompt('Description for this distribution:') || 'Profit distribution';
-              adminApi.distributeProfits(id, parseFloat(amount), description)
-                .then(function(result) {
-                  alert('Distributed $' + amount + ' to ' + result.distributions.length + ' investors!');
-                })
-                .catch(function(err) {
-                  alert('Error: ' + err.message);
-                });
-            }
-          });
-        });
-        
-        // Toggle featured button
-        document.querySelectorAll('.toggle-featured-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var isFeatured = this.getAttribute('data-featured') === 'true';
-            adminApi.updateProject(id, { featured: !isFeatured })
-              .then(function() {
-                loadAdminTab(adminApi, 'all-projects');
-              });
-          });
-        });
+        attachProjectListHandlers(adminApi, api);
+      })
+      .catch(function(err) {
+        tabContent.innerHTML = '<div class="error-state">⚠️ Error loading projects: ' + err.message + '</div>';
       });
   }
+}
+
+function parseTags(tagsText) {
+  if (!tagsText) return [];
+  return tagsText
+    .split(',')
+    .map(function(t) { return t.trim(); })
+    .filter(Boolean);
+}
+
+function openEditProjectModal(project, adminApi, api) {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+
+  var tagsText = Array.isArray(project.tags) ? project.tags.join(', ') : '';
+  var imageUrl = project.imageUrl || project.image_url || project.dataUrl || '';
+  var status = project.status || 'active';
+  var priority = project.priority || 0;
+
+  modal.innerHTML =
+    '<div class="modal-content modal-lg">' +
+      '<h2>Edit Project</h2>' +
+      '<form id="edit-project-form">' +
+        '<div class="form-section">' +
+          '<h3>Image</h3>' +
+          '<div class="image-upload-area" id="edit-image-upload-area">' +
+            '<div id="edit-image-preview" class="image-preview' + (imageUrl ? ' has-image' : '') + '">' +
+              (imageUrl ? ('<img src="' + imageUrl + '" alt="Preview">') : ('<span class="upload-icon">📷</span><p>Click to upload or drag & drop</p><span class="upload-hint">PNG, JPG up to 5MB</span>')) +
+            '</div>' +
+            '<input type="file" id="edit-image-input" accept="image/*" style="display: none;">' +
+            '<input type="hidden" id="edit-image-url-input" value="' + imageUrl + '">' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="form-section">' +
+          '<h3>Details</h3>' +
+          '<div class="form-row">' +
+            '<div class="form-group full">' +
+              '<label>Name <span class="required">*</span></label>' +
+              '<input type="text" name="name" required class="input" value="' + (project.name || '') + '">' +
+            '</div>' +
+          '</div>' +
+          '<div class="form-row">' +
+            '<div class="form-group">' +
+              '<label>Category <span class="required">*</span></label>' +
+              '<input type="text" name="category" required class="input" value="' + (project.category || '') + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label>Risk Level</label>' +
+              '<select name="riskLevel" class="input">' +
+                '<option value="low"' + ((project.riskLevel || 'medium') === 'low' ? ' selected' : '') + '>Low</option>' +
+                '<option value="medium"' + ((project.riskLevel || 'medium') === 'medium' ? ' selected' : '') + '>Medium</option>' +
+                '<option value="high"' + ((project.riskLevel || 'medium') === 'high' ? ' selected' : '') + '>High</option>' +
+              '</select>' +
+            '</div>' +
+          '</div>' +
+          '<div class="form-group full">' +
+            '<label>Description</label>' +
+            '<textarea name="description" class="input" rows="4">' + (project.description || '') + '</textarea>' +
+          '</div>' +
+          '<div class="form-group full">' +
+            '<label>Tags <span style="color: var(--text-muted); font-weight: 400;">(comma-separated)</span></label>' +
+            '<input type="text" name="tags" class="input" value="' + tagsText + '">' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="form-section">' +
+          '<h3>Funding & Visibility</h3>' +
+          '<div class="form-row">' +
+            '<div class="form-group">' +
+              '<label>Goal Amount (GH₵)</label>' +
+              '<input type="number" name="goalAmount" class="input" value="' + (project.goalAmount || 0) + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label>Min Investment (GH₵)</label>' +
+              '<input type="number" name="minInvestment" class="input" value="' + (project.minInvestment || 100) + '">' +
+            '</div>' +
+          '</div>' +
+          '<div class="form-row">' +
+            '<div class="form-group">' +
+              '<label>Target Return</label>' +
+              '<input type="text" name="targetReturn" class="input" value="' + (project.targetReturn || '10-15%') + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label>Duration</label>' +
+              '<input type="text" name="duration" class="input" value="' + (project.duration || '') + '">' +
+            '</div>' +
+          '</div>' +
+          '<div class="form-row">' +
+            '<div class="form-group">' +
+              '<label>Priority</label>' +
+              '<input type="number" name="priority" class="input" value="' + priority + '">' +
+            '</div>' +
+            '<div class="form-group">' +
+              '<label>Status</label>' +
+              '<select name="status" class="input">' +
+                '<option value="active"' + (status === 'active' ? ' selected' : '') + '>Active</option>' +
+                '<option value="inactive"' + (status === 'inactive' ? ' selected' : '') + '>Inactive</option>' +
+                '<option value="pending_review"' + (status === 'pending_review' ? ' selected' : '') + '>Pending review</option>' +
+                '<option value="changes_requested"' + (status === 'changes_requested' ? ' selected' : '') + '>Changes requested</option>' +
+                '<option value="funded"' + (status === 'funded' ? ' selected' : '') + '>Funded</option>' +
+                '<option value="completed"' + (status === 'completed' ? ' selected' : '') + '>Completed</option>' +
+                '<option value="rejected"' + (status === 'rejected' ? ' selected' : '') + '>Rejected</option>' +
+              '</select>' +
+            '</div>' +
+          '</div>' +
+          '<div class="checkbox-group">' +
+            '<label class="checkbox-label">' +
+              '<input type="checkbox" name="featured"' + (project.featured ? ' checked' : '') + '>' +
+              '<span>⭐ Featured</span>' +
+            '</label>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="form-actions">' +
+          '<button type="button" class="btn btn-outline" id="cancel-edit-project">Cancel</button>' +
+          '<button type="submit" class="btn btn-primary" id="save-edit-project">Save Changes</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+
+  var uploadArea = modal.querySelector('#edit-image-upload-area');
+  var imageInput = modal.querySelector('#edit-image-input');
+  var imagePreview = modal.querySelector('#edit-image-preview');
+  var imageUrlInput = modal.querySelector('#edit-image-url-input');
+
+  uploadArea.addEventListener('click', function() { imageInput.click(); });
+  uploadArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  });
+  uploadArea.addEventListener('dragleave', function() { uploadArea.classList.remove('dragover'); });
+  uploadArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    var file = e.dataTransfer.files[0];
+    if (file && file.type && file.type.startsWith('image/')) {
+      handleImageFile(file, api, imagePreview, imageUrlInput);
+    }
+  });
+  imageInput.addEventListener('change', function() {
+    var file = this.files[0];
+    if (file) {
+      handleImageFile(file, api, imagePreview, imageUrlInput);
+    }
+  });
+
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) modal.remove();
+  });
+  modal.querySelector('#cancel-edit-project').addEventListener('click', function() {
+    modal.remove();
+  });
+
+  modal.querySelector('#edit-project-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var form = e.target;
+    var saveBtn = modal.querySelector('#save-edit-project');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    var update = {
+      name: form.name.value,
+      category: form.category.value,
+      description: form.description.value,
+      goalAmount: parseFloat(form.goalAmount.value) || 0,
+      minInvestment: parseFloat(form.minInvestment.value) || 100,
+      targetReturn: form.targetReturn.value,
+      duration: form.duration.value,
+      riskLevel: form.riskLevel.value,
+      imageUrl: imageUrlInput.value || '',
+      featured: form.featured.checked,
+      priority: parseInt(form.priority.value, 10) || 0,
+      status: form.status.value,
+      tags: parseTags(form.tags.value)
+    };
+
+    adminApi.updateProject(project.id, update)
+      .then(function() {
+        modal.remove();
+        loadAdminTab(adminApi, api, 'all-projects');
+        loadAdminAlerts(adminApi);
+      })
+      .catch(function(err) {
+        alert('❌ Error: ' + err.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+      });
+  });
+}
+
+// ========== IMAGE UPLOAD HANDLER ==========
+function setupImageUpload(api) {
+  var uploadArea = document.getElementById('image-upload-area');
+  var imageInput = document.getElementById('image-input');
+  var imagePreview = document.getElementById('image-preview');
+  var imageUrlInput = document.getElementById('image-url-input');
+  
+  uploadArea.addEventListener('click', function() {
+    imageInput.click();
+  });
+  
+  uploadArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+  });
+  
+  uploadArea.addEventListener('dragleave', function() {
+    uploadArea.classList.remove('dragover');
+  });
+  
+  uploadArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    var file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      handleImageFile(file, api, imagePreview, imageUrlInput);
+    }
+  });
+  
+  imageInput.addEventListener('change', function() {
+    var file = this.files[0];
+    if (file) {
+      handleImageFile(file, api, imagePreview, imageUrlInput);
+    }
+  });
+}
+
+function handleImageFile(file, api, imagePreview, imageUrlInput) {
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Image too large. Max 5MB.');
+    return;
+  }
+  
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64 = e.target.result;
+    
+    // Show preview immediately
+    imagePreview.innerHTML = '<img src="' + base64 + '" alt="Preview">';
+    imagePreview.classList.add('has-image');
+    
+    // Upload to server
+    api.uploadImage(base64, file.name)
+      .then(function(result) {
+        // Use dataUrl for display (works on Render)
+        imageUrlInput.value = result.dataUrl || result.url;
+      })
+      .catch(function(err) {
+        // Still use the base64 as fallback
+        imageUrlInput.value = base64;
+        console.warn('Upload failed, using base64:', err);
+      });
+  };
+  reader.readAsDataURL(file);
+}
+
+// ========== EVENT HANDLERS ==========
+function attachKYCHandlers(adminApi, api) {
+  document.querySelectorAll('.approve-kyc-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      if (confirm('Approve KYC for this user?')) {
+        var button = this;
+        button.disabled = true;
+        button.textContent = '...';
+        adminApi.verifyKyc(id, 'approve')
+          .then(function() {
+            alert('✅ KYC approved!');
+            loadAdminTab(adminApi, api, 'pending-kyc');
+            loadAdminAlerts(adminApi);
+          })
+          .catch(function(err) {
+            alert('❌ Error: ' + err.message);
+            button.disabled = false;
+            button.textContent = 'Approve';
+          });
+      }
+    });
+  });
+  
+  document.querySelectorAll('.reject-kyc-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var reason = prompt('Rejection reason:');
+      if (reason) {
+        var button = this;
+        button.disabled = true;
+        adminApi.verifyKyc(id, 'reject', reason)
+          .then(function() {
+            alert('✅ KYC rejected');
+            loadAdminTab(adminApi, api, 'pending-kyc');
+            loadAdminAlerts(adminApi);
+          })
+          .catch(function(err) {
+            alert('❌ Error: ' + err.message);
+            button.disabled = false;
+          });
+      }
+    });
+  });
+}
+
+function attachProjectReviewHandlers(adminApi, api) {
+  document.querySelectorAll('.approve-project-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      if (confirm('Approve this project?')) {
+        var button = this;
+        button.disabled = true;
+        adminApi.reviewProject(id, 'approve', 'Approved')
+          .then(function() {
+            alert('✅ Project approved!');
+            loadAdminTab(adminApi, api, 'pending-projects');
+            loadAdminAlerts(adminApi);
+          })
+          .catch(function(err) {
+            alert('❌ Error: ' + err.message);
+            button.disabled = false;
+          });
+      }
+    });
+  });
+  
+  document.querySelectorAll('.request-changes-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var feedback = prompt('What changes are required?');
+      if (feedback) {
+        adminApi.reviewProject(id, 'request_changes', feedback)
+          .then(function() {
+            alert('✅ Changes requested');
+            loadAdminTab(adminApi, api, 'pending-projects');
+          })
+          .catch(function(err) { alert('❌ Error: ' + err.message); });
+      }
+    });
+  });
+}
+
+function attachWithdrawalHandlers(adminApi, api) {
+  document.querySelectorAll('.approve-withdrawal-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var txRef = prompt('Enter transaction reference:');
+      if (txRef) {
+        var button = this;
+        button.disabled = true;
+        adminApi.processWithdrawal(id, 'approve', null, txRef)
+          .then(function() {
+            alert('✅ Withdrawal approved!');
+            loadAdminTab(adminApi, api, 'pending-withdrawals');
+            loadAdminAlerts(adminApi);
+          })
+          .catch(function(err) {
+            alert('❌ Error: ' + err.message);
+            button.disabled = false;
+          });
+      }
+    });
+  });
+  
+  document.querySelectorAll('.reject-withdrawal-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var reason = prompt('Rejection reason:');
+      if (reason) {
+        adminApi.processWithdrawal(id, 'reject', reason)
+          .then(function() {
+            alert('✅ Withdrawal rejected');
+            loadAdminTab(adminApi, api, 'pending-withdrawals');
+            loadAdminAlerts(adminApi);
+          })
+          .catch(function(err) { alert('❌ Error: ' + err.message); });
+      }
+    });
+  });
+}
+
+function attachProjectListHandlers(adminApi, api) {
+  document.querySelectorAll('.distribute-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var amount = prompt('Enter profit amount to distribute (GH₵):');
+      if (amount && parseFloat(amount) > 0) {
+        var description = prompt('Description:') || 'Profit distribution';
+        adminApi.distributeProfits(id, parseFloat(amount), description)
+          .then(function(result) {
+            alert('✅ Distributed GH₵' + amount + ' to ' + result.distributions.length + ' investors!');
+          })
+          .catch(function(err) { alert('❌ Error: ' + err.message); });
+      }
+    });
+  });
+  
+  document.querySelectorAll('.toggle-featured-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var isFeatured = this.getAttribute('data-featured') === 'true';
+      adminApi.updateProject(id, { featured: !isFeatured })
+        .then(function() {
+          loadAdminTab(adminApi, api, 'all-projects');
+        });
+    });
+  });
+
+  document.querySelectorAll('.edit-project-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var project = (window.__adminProjectsById && window.__adminProjectsById[id]) || null;
+      if (!project) {
+        alert('Project data not found. Please refresh.');
+        return;
+      }
+      openEditProjectModal(project, adminApi, api);
+    });
+  });
+
+  document.querySelectorAll('.toggle-status-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var status = this.getAttribute('data-status') || 'active';
+      var nextStatus = status === 'active' ? 'inactive' : 'active';
+      var confirmMsg = nextStatus === 'inactive'
+        ? 'Inactivate this project? It will be hidden from users and investments will be blocked.'
+        : 'Activate this project? It will be visible to users and open for investments.';
+      if (!confirm(confirmMsg)) return;
+
+      adminApi.updateProject(id, { status: nextStatus })
+        .then(function() {
+          loadAdminTab(adminApi, api, 'all-projects');
+          loadAdminAlerts(adminApi);
+        })
+        .catch(function(err) {
+          alert('❌ Error: ' + err.message);
+        });
+    });
+  });
+
+  document.querySelectorAll('.remove-project-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      if (!confirm('Remove this project? This is a soft remove (status set to removed).')) return;
+      adminApi.removeProject(id)
+        .then(function() {
+          loadAdminTab(adminApi, api, 'all-projects');
+          loadAdminAlerts(adminApi);
+        })
+        .catch(function(err) {
+          alert('❌ Error: ' + err.message);
+        });
+    });
+  });
 }
 
 export { renderAdmin };

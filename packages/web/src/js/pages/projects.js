@@ -52,12 +52,16 @@ function loadProjects(api) {
       }
       
       projectsList.innerHTML = projects.map(function(project) {
-        var percent = Math.round((project.raised_amount / project.goal_amount) * 100);
+        var goal = Number(project.goal_amount) || 0;
+        var raised = Number(project.raised_amount) || 0;
+        var percent = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
         var daysLeft = 30;
+
+        var imageUrl = project.image_url || 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800';
         
         return '<div class="card project-card">' +
-          '<div class="project-image" style="height: 200px; background: #1e293b; display: flex; align-items: center; justify-content: center; font-size: 3rem;">' +
-            (project.image_url || '🏢') +
+          '<div class="project-image" style="height: 200px;">' +
+            '<img src="' + imageUrl + '" alt="' + (project.name || 'Project') + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800' + '\'' + ';">' +
           '</div>' +
           '<div class="project-content" style="padding: 1.5rem;">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">' +
@@ -70,13 +74,13 @@ function loadProjects(api) {
               '<div class="progress-fill" style="width: ' + percent + '%;"></div>' +
             '</div>' +
             '<div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; font-size: 0.875rem;">' +
-              '<span>$' + parseFloat(project.raised_amount).toLocaleString() + ' raised</span>' +
+              '<span>$' + raised.toLocaleString() + ' raised</span>' +
               '<span>' + percent + '%</span>' +
             '</div>' +
             '<div style="display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; border-top: 1px solid var(--border-color);">' +
               '<div>' +
                 '<div style="font-size: 0.75rem; color: var(--text-muted);">Target Return</div>' +
-                '<div style="font-weight: 600; color: var(--secondary-color);">10-15%</div>' +
+                '<div style="font-weight: 600; color: var(--secondary-color);">' + (project.target_return || '10-15%') + '</div>' +
               '</div>' +
               '<button class="btn btn-primary invest-btn" data-id="' + project.id + '">Invest</button>' +
             '</div>' +

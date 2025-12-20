@@ -78,6 +78,13 @@ Api.prototype.getMe = function() {
   return this.request('/auth/me');
 };
 
+// Upload image
+Api.prototype.uploadImage = function(imageBase64, filename) {
+  return this.request('/upload/image', {
+    method: 'POST',
+    body: { image: imageBase64, filename: filename }
+  });
+};
 Api.prototype.submitKyc = function(data) {
   return this.request('/auth/kyc/submit', {
     method: 'POST',
@@ -253,6 +260,12 @@ Api.prototype.getAdmin = function() {
       return self.request('/admin/projects/' + id, {
         method: 'PUT',
         body: data
+      });
+    },
+
+    removeProject: function(id) {
+      return self.request('/admin/projects/' + id, {
+        method: 'DELETE'
       });
     },
     

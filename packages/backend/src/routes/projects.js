@@ -12,9 +12,9 @@ function normalizeProject(p) {
     name: p.name,
     description: p.description,
     category: p.category,
-    image_url: p.imageUrl || p.image_url,
-    goal_amount: p.goalAmount || p.goal_amount || 0,
-    raised_amount: p.raisedAmount || p.raised_amount || 0,
+    image_url: p.imageUrl || p.image_url || p.dataUrl || '',
+    goal_amount: p.goalAmount || p.goal_amount || p.fundingGoal || 0,
+    raised_amount: p.raisedAmount || p.raised_amount || p.currentFunding || p.current_funding || 0,
     min_investment: p.minInvestment || p.min_investment || 100,
     target_return: p.targetReturn || p.target_return || '10-15%',
     duration: p.duration,
@@ -24,6 +24,8 @@ function normalizeProject(p) {
     owner_id: p.ownerId,
     owner_name: p.ownerName,
     featured: p.featured || false,
+    priority: p.priority || p.featureOrder || 0,
+    tags: Array.isArray(p.tags) ? p.tags : [],
     investor_count: p.investorCount || 0,
     total_profit_distributed: p.totalProfitDistributed || 0,
     createdAt: p.createdAt
@@ -47,7 +49,8 @@ router.get('/', async function(req, res) {
     var database = await db.getDb();
     var projects = await database.collection('projects')
       .find(filter)
-      .sort({ featured: -1, createdAt: -1 })
+      // Higher priority first, then featured, then newest
+      .sort({ priority: -1, featured: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .toArray();
