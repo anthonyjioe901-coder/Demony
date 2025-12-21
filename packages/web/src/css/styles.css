@@ -473,6 +473,8 @@ body {
   border-radius: 1rem;
   width: 100%;
   max-width: 400px;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal-content.modal-lg {

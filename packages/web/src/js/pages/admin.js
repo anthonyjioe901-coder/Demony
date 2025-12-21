@@ -543,6 +543,7 @@ function loadAdminTab(adminApi, api, tab) {
                   '<button class="btn btn-sm btn-danger remove-project-btn" data-id="' + project.id + '">🗑 Remove</button>' +
                   (project.status === 'active' ? 
                     '<button class="btn btn-sm btn-outline distribute-btn" data-id="' + project.id + '">💰 Distribute</button>' : '') +
+                  '<button class="btn btn-sm btn-outline post-update-btn" data-id="' + project.id + '" data-name="' + project.name + '">📢 Post Update</button>' +
                   '<button class="btn btn-sm ' + (project.featured ? 'btn-warning' : 'btn-outline') + ' toggle-featured-btn" data-id="' + project.id + '" data-featured="' + project.featured + '">' + 
                     (project.featured ? '⭐ Unfeature' : '☆ Feature') + 
                   '</button>' +
@@ -1011,6 +1012,86 @@ function attachProjectListHandlers(adminApi, api) {
           alert('❌ Error: ' + err.message);
         });
     });
+  });
+  
+  // Post Update handlers
+  document.querySelectorAll('.post-update-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var name = this.getAttribute('data-name');
+      showPostUpdateModal(id, name, adminApi, api);
+    });
+  });
+}
+
+// Post Update Modal for Admin
+function showPostUpdateModal(projectId, projectName, adminApi, api) {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 500px;">' +
+      '<h2>📢 Post Update to Investors</h2>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1rem;">Project: <strong>' + projectName + '</strong></p>' +
+      
+      '<form id="post-update-form">' +
+        '<div class="form-group">' +
+          '<label>Update Type</label>' +
+          '<select id="update-type" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">' +
+            '<option value="info">ℹ️ Information</option>' +
+            '<option value="profit">💰 Profit Distribution</option>' +
+            '<option value="milestone">🎯 Milestone Achieved</option>' +
+            '<option value="warning">⚠️ Important Notice</option>' +
+          '</select>' +
+        '</div>' +
+        
+        '<div class="form-group">' +
+          '<label>Title</label>' +
+          '<input type="text" id="update-title" required placeholder="e.g., Profit Distribution for December" style="width: 100%;">' +
+        '</div>' +
+        
+        '<div class="form-group">' +
+          '<label>Message</label>' +
+          '<textarea id="update-message" required rows="4" placeholder="Write your update message here..." style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;"></textarea>' +
+        '</div>' +
+        
+        '<div style="background: #fef3c7; border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.85rem;">' +
+          '<strong>💡 Note:</strong> This update will be visible to all investors who have invested in this project.' +
+        '</div>' +
+        
+        '<div style="display: flex; gap: 1rem;">' +
+          '<button type="button" class="btn btn-outline" id="close-update-modal" style="flex: 1;">Cancel</button>' +
+          '<button type="submit" class="btn btn-primary" id="submit-update-btn" style="flex: 1;">📢 Post Update</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  document.getElementById('close-update-modal').addEventListener('click', function() {
+    modal.remove();
+  });
+  
+  document.getElementById('post-update-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    var type = document.getElementById('update-type').value;
+    var title = document.getElementById('update-title').value;
+    var message = document.getElementById('update-message').value;
+    var submitBtn = document.getElementById('submit-update-btn');
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Posting...';
+    
+    adminApi.postProjectUpdate(projectId, title, message, type)
+      .then(function() {
+        alert('✅ Update posted successfully! Investors can now see this in their project details.');
+        modal.remove();
+      })
+      .catch(function(err) {
+        alert('❌ Error: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '📢 Post Update';
+      });
   });
 }
 

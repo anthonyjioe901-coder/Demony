@@ -617,6 +617,94 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
   }
 });
 
+// ==================== PROJECT UPDATES (FOR INVESTORS) ====================
+
+// Add update/announcement to project (visible only to investors)
+router.post('/projects/:id/updates', async function(req, res) {
+  var title = req.body.title;
+  var message = req.body.message;
+  var updateType = req.body.type || 'info'; // info, profit, milestone, warning
+  var isPublic = req.body.isPublic || false; // If true, visible to all; if false, only investors
+  
+  if (!title || !message) {
+    return res.status(400).json({ error: 'Title and message are required' });
+  }
+  
+  try {
+    var database = await db.getDb();
+    
+    var project = await database.collection('projects').findOne({
+      _id: new ObjectId(req.params.id)
+    });
+    
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    
+    var update = {
+      projectId: req.params.id,
+      projectName: project.name,
+      title: title,
+      message: message,
+      type: updateType,
+      isPublic: isPublic,
+      postedBy: req.user.id,
+      postedByName: 'Admin',
+      createdAt: new Date()
+    };
+    
+    await database.collection('project_updates').insertOne(update);
+    
+    // Also update the project's lastUpdateAt
+    await database.collection('projects').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { lastUpdateAt: new Date() } }
+    );
+    
+    res.json({
+      message: 'Update posted successfully',
+      update: update
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get all updates for a project (admin view)
+router.get('/projects/:id/updates', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    
+    var updates = await database.collection('project_updates')
+      .find({ projectId: req.params.id })
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    res.json({ updates: updates });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete a project update
+router.delete('/projects/:id/updates/:updateId', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    
+    await database.collection('project_updates').deleteOne({
+      _id: new ObjectId(req.params.updateId),
+      projectId: req.params.id
+    });
+    
+    res.json({ message: 'Update deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ==================== FINANCIAL REPORTS ====================
 
 router.get('/reports/financial', async function(req, res) {

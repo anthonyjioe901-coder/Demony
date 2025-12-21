@@ -150,6 +150,24 @@ Api.prototype.getMyInvestments = function() {
   return this.request('/investments/my');
 };
 
+// Get profit history for an investment
+Api.prototype.getProfitHistory = function(investmentId) {
+  return this.request('/investments/' + investmentId + '/profit-history');
+};
+
+// Get project updates and details (for investors only)
+Api.prototype.getProjectUpdates = function(investmentId) {
+  return this.request('/investments/' + investmentId + '/project-updates');
+};
+
+// Calculate projected returns (informational only)
+Api.prototype.calculateReturns = function(projectId, amount, durationMonths) {
+  return this.request('/projects/' + projectId + '/calculate-returns', {
+    method: 'POST',
+    body: { amount: amount, durationMonths: durationMonths }
+  });
+};
+
 // Portfolio
 Api.prototype.getPortfolio = function() {
   return this.request('/portfolio');
@@ -287,6 +305,24 @@ Api.prototype.getAdmin = function() {
       return self.request('/admin/projects/' + projectId + '/distribute-profits', {
         method: 'POST',
         body: { profitAmount: profitAmount, description: description }
+      });
+    },
+    
+    // Project Updates (for investors)
+    postProjectUpdate: function(projectId, title, message, type) {
+      return self.request('/admin/projects/' + projectId + '/updates', {
+        method: 'POST',
+        body: { title: title, message: message, type: type || 'info' }
+      });
+    },
+    
+    getProjectUpdates: function(projectId) {
+      return self.request('/admin/projects/' + projectId + '/updates');
+    },
+    
+    deleteProjectUpdate: function(projectId, updateId) {
+      return self.request('/admin/projects/' + projectId + '/updates/' + updateId, {
+        method: 'DELETE'
       });
     },
     

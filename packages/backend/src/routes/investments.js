@@ -11,12 +11,29 @@ router.post('/', authenticateToken, async function(req, res) {
   var amount = parseFloat(req.body.amount);
   var userId = req.user.userId || req.user.id;
   
+  // Risk acknowledgment fields (required)
+  var termsAccepted = req.body.termsAccepted;
+  var riskAcknowledged = req.body.riskAcknowledged;
+  var lockInAcknowledged = req.body.lockInAcknowledged;
+  
   if (!projectId || !amount) {
     return res.status(400).json({ error: 'Project ID and amount are required' });
   }
   
   if (amount < 100) {
     return res.status(400).json({ error: 'Minimum investment is 100' });
+  }
+  
+  // Require risk acknowledgments
+  if (!termsAccepted || !riskAcknowledged || !lockInAcknowledged) {
+    return res.status(400).json({ 
+      error: 'You must acknowledge all investment risks before proceeding',
+      required: {
+        termsAccepted: 'Accept investment terms and conditions',
+        riskAcknowledged: 'Acknowledge that profits are not guaranteed',
+        lockInAcknowledged: 'Acknowledge that principal is locked for the project duration'
+      }
+    });
   }
   
   try {
@@ -52,11 +69,16 @@ router.post('/', authenticateToken, async function(req, res) {
       });
     }
     
+    // Get project lock-in period
+    var lockInPeriodMonths = project.lockInPeriodMonths || project.duration || 12;
+    var lockInEndDate = new Date();
+    lockInEndDate.setMonth(lockInEndDate.getMonth() + lockInPeriodMonths);
+    
     // Calculate ownership percentage
     var goalAmount = project.goalAmount || 100000;
     var ownershipPercent = (amount / goalAmount) * 100;
     
-    // Create investment
+    // Create investment with enhanced tracking
     var investment = {
       userId: userId,
       projectId: projectId,
@@ -66,11 +88,41 @@ router.post('/', authenticateToken, async function(req, res) {
       ownershipPercent: ownershipPercent,
       status: 'active',
       earnings: 0,
+      
+      // Lock-in tracking
+      lockInPeriodMonths: lockInPeriodMonths,
+      lockInEndDate: lockInEndDate,
+      principalLocked: true,
+      
+      // Terms acceptance record
+      termsAcceptance: {
+        termsAccepted: true,
+        riskAcknowledged: true,
+        lockInAcknowledged: true,
+        acceptedAt: new Date(),
+        ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown',
+        termsVersion: '1.0'
+      },
+      
       createdAt: new Date(),
       updatedAt: new Date()
     };
     
     var result = await database.collection('investments').insertOne(investment);
+    
+    // Also record in separate collection for audit trail
+    await database.collection('investment_terms_acceptance').insertOne({
+      userId: userId,
+      investmentId: result.insertedId.toString(),
+      projectId: projectId,
+      amount: amount,
+      termsVersion: '1.0',
+      termsAccepted: true,
+      riskAcknowledged: true,
+      lockInAcknowledged: true,
+      ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown',
+      acceptedAt: new Date()
+    });
     
     // Deduct from wallet
     await database.collection('users').updateOne(
@@ -112,9 +164,17 @@ router.post('/', authenticateToken, async function(req, res) {
         projectName: investment.projectName,
         amount: investment.amount,
         ownershipPercent: investment.ownershipPercent.toFixed(2),
-        status: investment.status
+        status: investment.status,
+        lockInPeriodMonths: investment.lockInPeriodMonths,
+        lockInEndDate: investment.lockInEndDate,
+        principalLocked: true,
+        profitsWithdrawable: true
       },
-      newWalletBalance: walletBalance - amount
+      newWalletBalance: walletBalance - amount,
+      importantNotice: {
+        message: 'Your investment is now active. Your principal is locked until ' + lockInEndDate.toLocaleDateString() + '. Profits (when distributed) can be withdrawn anytime.',
+        lockInEndDate: lockInEndDate
+      }
     });
   } catch (err) {
     console.error(err);
@@ -314,8 +374,25 @@ router.get('/my', authenticateToken, async function(req, res) {
       .sort({ createdAt: -1 })
       .toArray();
     
+    // Get all profit distributions for this user to calculate earnings per investment
+    var allDistributions = await database.collection('profit_distributions')
+      .find({ userId: userId })
+      .toArray();
+    
+    // Create a map of investmentId -> total earnings
+    var earningsMap = {};
+    allDistributions.forEach(function(dist) {
+      var invId = dist.investmentId;
+      earningsMap[invId] = (earningsMap[invId] || 0) + dist.amount;
+    });
+    
     investments = investments.map(function(inv) {
-      return { ...inv, id: inv._id.toString() };
+      var invId = inv._id.toString();
+      return { 
+        ...inv, 
+        id: invId,
+        earnings: earningsMap[invId] || 0 // Actual earnings from profit distributions
+      };
     });
     
     res.json(investments);
@@ -343,6 +420,223 @@ router.get('/:id', authenticateToken, async function(req, res) {
     
     investment.id = investment._id.toString();
     res.json(investment);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== PROFIT HISTORY ====================
+
+// Get profit distribution history for an investment
+router.get('/:id/profit-history', authenticateToken, async function(req, res) {
+  var id = req.params.id;
+  var userId = req.user.id;
+  
+  try {
+    var database = await db.getDb();
+    
+    // Verify investment belongs to user
+    var investment = await database.collection('investments').findOne({
+      _id: new ObjectId(id),
+      userId: userId
+    });
+    
+    if (!investment) {
+      return res.status(404).json({ error: 'Investment not found' });
+    }
+    
+    // Get all profit distributions for this investment
+    var distributions = await database.collection('profit_distributions')
+      .find({ investmentId: id })
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    // Calculate totals
+    var totalEarned = distributions.reduce(function(sum, d) {
+      return sum + d.amount;
+    }, 0);
+    
+    res.json({
+      investmentId: id,
+      projectId: investment.projectId,
+      projectName: investment.projectName,
+      principalAmount: investment.amount,
+      totalEarned: totalEarned,
+      distributionCount: distributions.length,
+      distributions: distributions.map(function(d) {
+        return {
+          id: d._id.toString(),
+          amount: d.amount,
+          sharePercent: d.sharePercent,
+          description: d.description,
+          createdAt: d.createdAt
+        };
+      })
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== TERMS ACCEPTANCE ====================
+
+// Accept investment terms and risk disclosure
+router.post('/:investmentId/accept-terms', authenticateToken, async function(req, res) {
+  var investmentId = req.params.investmentId;
+  var userId = req.user.id;
+  var riskDisclosureAccepted = req.body.riskDisclosureAccepted;
+  var lockInAcknowledged = req.body.lockInAcknowledged;
+  var profitNotGuaranteedAcknowledged = req.body.profitNotGuaranteedAcknowledged;
+  
+  if (!riskDisclosureAccepted || !lockInAcknowledged || !profitNotGuaranteedAcknowledged) {
+    return res.status(400).json({ 
+      error: 'All risk acknowledgments are required',
+      required: ['riskDisclosureAccepted', 'lockInAcknowledged', 'profitNotGuaranteedAcknowledged']
+    });
+  }
+  
+  try {
+    var database = await db.getDb();
+    
+    // Get client IP address
+    var ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    
+    var acceptance = {
+      userId: userId,
+      investmentId: investmentId,
+      termsVersion: '1.0',
+      riskDisclosureAccepted: true,
+      lockInAcknowledged: true,
+      profitNotGuaranteedAcknowledged: true,
+      ipAddress: ipAddress,
+      acceptedAt: new Date()
+    };
+    
+    await database.collection('investment_terms_acceptance').insertOne(acceptance);
+    
+    res.json({
+      message: 'Terms accepted successfully',
+      acceptedAt: acceptance.acceptedAt
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== PROJECT UPDATES (FOR INVESTORS) ====================
+
+// Get project updates for an investment (only if user has invested in this project)
+router.get('/:id/project-updates', authenticateToken, async function(req, res) {
+  var investmentId = req.params.id;
+  var userId = req.user.id;
+  
+  try {
+    var database = await db.getDb();
+    
+    // Verify user has invested in this project
+    var investment = await database.collection('investments').findOne({
+      _id: new ObjectId(investmentId),
+      userId: userId
+    });
+    
+    if (!investment) {
+      return res.status(404).json({ error: 'Investment not found' });
+    }
+    
+    // Get project details with admin-only info
+    var project = await database.collection('projects').findOne({
+      _id: new ObjectId(investment.projectId)
+    });
+    
+    // Get project updates (investor-only updates)
+    var updates = await database.collection('project_updates')
+      .find({ projectId: investment.projectId })
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    // Get profit distribution history for this project
+    var distributions = await database.collection('profit_distributions')
+      .find({ projectId: investment.projectId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .toArray();
+    
+    // Calculate total project stats
+    var allProjectDistributions = await database.collection('profit_distributions')
+      .find({ projectId: investment.projectId })
+      .toArray();
+    
+    var totalProjectProfit = allProjectDistributions.reduce(function(sum, d) {
+      return sum + d.amount;
+    }, 0);
+    
+    res.json({
+      investmentId: investmentId,
+      projectId: investment.projectId,
+      projectName: investment.projectName,
+      
+      // Project details (for investors only)
+      projectDetails: {
+        name: project.name,
+        description: project.description,
+        category: project.category,
+        status: project.status,
+        targetReturn: project.targetReturn,
+        riskLevel: project.riskLevel || 'medium',
+        profitDistributionFrequency: project.profitDistributionFrequency || 'as_realized',
+        lockInPeriodMonths: project.lockInPeriodMonths || project.duration || 12,
+        profitSharingRatio: project.profitSharingRatio || { investor: 60, platform: 40 },
+        totalFunding: project.currentFunding || project.raisedAmount || 0,
+        investorCount: project.investorCount || 0,
+        totalProfitDistributed: project.totalProfitDistributed || 0,
+        lastDistributionAt: project.lastDistributionAt,
+        lastUpdateAt: project.lastUpdateAt
+      },
+      
+      // Your investment info
+      yourInvestment: {
+        amount: investment.amount,
+        ownershipPercent: investment.ownershipPercent,
+        investedAt: investment.createdAt,
+        lockInEndDate: investment.lockInEndDate,
+        status: investment.status
+      },
+      
+      // Project stats
+      projectStats: {
+        totalProfitDistributed: totalProjectProfit,
+        distributionCount: allProjectDistributions.length,
+        yourSharePercent: investment.amount / (project.currentFunding || investment.amount) * 100
+      },
+      
+      // Admin updates for investors
+      updates: updates.map(function(u) {
+        return {
+          id: u._id.toString(),
+          title: u.title,
+          message: u.message,
+          type: u.type,
+          createdAt: u.createdAt
+        };
+      }),
+      
+      // Recent profit distributions (project-wide)
+      recentDistributions: distributions.map(function(d) {
+        return {
+          totalAmount: d.amount / d.sharePercent, // Total distributed to all investors
+          date: d.createdAt,
+          description: d.description
+        };
+      }).filter(function(d, i, arr) {
+        // Remove duplicates (same date)
+        return i === arr.findIndex(function(x) {
+          return x.date.getTime() === d.date.getTime();
+        });
+      })
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

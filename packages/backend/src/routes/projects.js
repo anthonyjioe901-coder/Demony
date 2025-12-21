@@ -28,7 +28,19 @@ function normalizeProject(p) {
     tags: Array.isArray(p.tags) ? p.tags : [],
     investor_count: p.investorCount || 0,
     total_profit_distributed: p.totalProfitDistributed || 0,
-    createdAt: p.createdAt
+    createdAt: p.createdAt,
+    
+    // Investment Terms (Phase 1)
+    profit_distribution_frequency: p.profitDistributionFrequency || 'as_realized',
+    lock_in_period_months: p.lockInPeriodMonths || p.duration || 12,
+    profit_sharing_ratio: p.profitSharingRatio || { investor: 60, platform: 40 },
+    early_withdrawal_penalty: p.earlyWithdrawalPenalty || null,
+    principal_locked: true, // Principal is always locked until project closes
+    profits_withdrawable: true, // Profits can be withdrawn anytime
+    
+    // Risk Information
+    risk_factors: p.riskFactors || ['Market conditions may affect returns', 'Principal is locked for project duration'],
+    risk_disclaimer: 'Profits are not guaranteed. Returns depend on actual project performance.'
   };
 }
 
@@ -85,6 +97,109 @@ router.get('/:id', async function(req, res) {
     }
     
     res.json(normalizeProject(project));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== ROI CALCULATOR ====================
+
+// Calculate projected returns (informational only - profits are not guaranteed)
+router.post('/:id/calculate-returns', async function(req, res) {
+  try {
+    var id = req.params.id;
+    var amount = parseFloat(req.body.amount);
+    var durationMonths = parseInt(req.body.durationMonths);
+    
+    if (!amount || amount < 100) {
+      return res.status(400).json({ error: 'Amount must be at least 100' });
+    }
+    
+    var database = await db.getDb();
+    var project = await database.collection('projects').findOne({ _id: new ObjectId(id) });
+    
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    
+    // Parse target return (e.g., "10-15%" -> min: 10, max: 15)
+    var targetReturn = project.targetReturn || '10-15%';
+    var returnMatch = targetReturn.match(/(\d+)(?:\s*-\s*(\d+))?/);
+    var minReturnPercent = returnMatch ? parseFloat(returnMatch[1]) : 10;
+    var maxReturnPercent = returnMatch && returnMatch[2] ? parseFloat(returnMatch[2]) : minReturnPercent;
+    var avgReturnPercent = (minReturnPercent + maxReturnPercent) / 2;
+    
+    // Use project duration if not specified
+    var duration = durationMonths || project.duration || 12;
+    var lockInPeriod = project.lockInPeriodMonths || project.duration || 12;
+    
+    // Profit sharing ratio (default 60/40)
+    var profitSharing = project.profitSharingRatio || { investor: 60, platform: 40 };
+    var investorShare = profitSharing.investor / 100;
+    
+    // Calculate total investment in project
+    var totalProjectInvestment = project.raisedAmount || project.currentFunding || 0;
+    var projectedOwnership = totalProjectInvestment > 0 
+      ? (amount / (totalProjectInvestment + amount)) * 100 
+      : 100;
+    
+    // Calculate PROJECTED returns (not guaranteed)
+    // These are estimates based on target return, actual returns depend on project performance
+    var annualReturnRate = avgReturnPercent / 100;
+    var projectedAnnualProfit = amount * annualReturnRate;
+    var projectedMonthlyProfit = projectedAnnualProfit / 12;
+    var projectedTotalProfit = projectedAnnualProfit * (duration / 12);
+    
+    // Apply investor share (platform takes their cut)
+    var investorAnnualProfit = projectedAnnualProfit * investorShare;
+    var investorMonthlyProfit = projectedMonthlyProfit * investorShare;
+    var investorTotalProfit = projectedTotalProfit * investorShare;
+    
+    res.json({
+      disclaimer: 'IMPORTANT: These are PROJECTED returns only. Actual profits depend on project performance and are NOT guaranteed. You may receive more, less, or nothing.',
+      
+      investment: {
+        amount: amount,
+        durationMonths: duration,
+        lockInPeriodMonths: lockInPeriod,
+        principalLocked: true,
+        profitsWithdrawable: true
+      },
+      
+      projectTerms: {
+        targetReturnRange: targetReturn,
+        profitDistributionFrequency: project.profitDistributionFrequency || 'as_realized',
+        profitSharingRatio: profitSharing,
+        riskLevel: project.riskLevel || 'medium'
+      },
+      
+      projectedReturns: {
+        note: 'Based on average target return of ' + avgReturnPercent + '% annually',
+        annualProfit: Math.round(investorAnnualProfit * 100) / 100,
+        monthlyProfit: Math.round(investorMonthlyProfit * 100) / 100,
+        totalProfit: Math.round(investorTotalProfit * 100) / 100,
+        totalValue: Math.round((amount + investorTotalProfit) * 100) / 100
+      },
+      
+      returnScenarios: {
+        pessimistic: {
+          returnRate: minReturnPercent + '%',
+          totalProfit: Math.round(amount * (minReturnPercent / 100) * investorShare * (duration / 12) * 100) / 100
+        },
+        optimistic: {
+          returnRate: maxReturnPercent + '%',
+          totalProfit: Math.round(amount * (maxReturnPercent / 100) * investorShare * (duration / 12) * 100) / 100
+        },
+        worstCase: {
+          returnRate: '0%',
+          totalProfit: 0,
+          note: 'If the project generates no profit, you receive no returns but your principal remains invested'
+        }
+      },
+      
+      ownershipEstimate: Math.round(projectedOwnership * 100) / 100
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

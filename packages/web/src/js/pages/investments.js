@@ -9,8 +9,18 @@ function renderInvestments(container, api) {
     '<section>' +
       '<h2>My Investments</h2>' +
       '<p style="color: var(--text-muted); margin-bottom: 2rem;">Track your active investments and returns</p>' +
+      
+      // Important Notice
+      '<div style="background: linear-gradient(135deg, #dbeafe, #bfdbfe); border: 1px solid #3b82f6; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">' +
+        '<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">' +
+          '<span style="font-size: 1.25rem;">ℹ️</span>' +
+          '<strong style="color: #1e40af;">How Profits Work</strong>' +
+        '</div>' +
+        '<p style="font-size: 0.85rem; color: #1e3a8a; margin: 0;">Profits are distributed when the project owner reports earnings. Your share is calculated as: <strong>(Your Investment ÷ Total Investment) × Total Profit</strong>. Profits can be withdrawn anytime, but your principal is locked until the project ends.</p>' +
+      '</div>' +
+      
       '<div id="portfolio-summary">Loading summary...</div>' +
-      '<h3 style="margin-bottom: 1rem;">Active Investments</h3>' +
+      '<h3 style="margin: 2rem 0 1rem 0;">Active Investments</h3>' +
       '<div id="investments-list">Loading investments...</div>' +
     '</section>';
   
@@ -26,22 +36,26 @@ function loadInvestments(api) {
     .then(function(portfolio) {
       summaryContainer.innerHTML = 
         '<div class="card" style="margin-bottom: 2rem;">' +
-          '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">' +
-            '<div>' +
-              '<p style="color: var(--text-muted);">Total Invested</p>' +
-              '<h2 style="color: var(--primary-color);">$' + portfolio.totalInvested.toLocaleString() + '</h2>' +
+          '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem;">' +
+            '<div style="text-align: center;">' +
+              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Total Invested</p>' +
+              '<h2 style="color: var(--primary-color); margin: 0;">$' + portfolio.totalInvested.toLocaleString() + '</h2>' +
+              '<p style="font-size: 0.75rem; color: #ef4444; margin: 0.25rem 0 0 0;">🔒 Locked</p>' +
             '</div>' +
-            '<div>' +
-              '<p style="color: var(--text-muted);">Current Value</p>' +
-              '<h2 style="color: var(--secondary-color);">$' + portfolio.currentValue.toLocaleString() + '</h2>' +
+            '<div style="text-align: center;">' +
+              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Total Earnings</p>' +
+              '<h2 style="color: var(--secondary-color); margin: 0;">$' + portfolio.totalReturn.toLocaleString() + '</h2>' +
+              '<p style="font-size: 0.75rem; color: #10b981; margin: 0.25rem 0 0 0;">✓ Withdrawable</p>' +
             '</div>' +
-            '<div>' +
-              '<p style="color: var(--text-muted);">Total Return</p>' +
-              '<h2 style="color: var(--secondary-color);">+$' + portfolio.totalReturn.toLocaleString() + ' (' + portfolio.returnPercent.toFixed(1) + '%)</h2>' +
+            '<div style="text-align: center;">' +
+              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Portfolio Value</p>' +
+              '<h2 style="margin: 0;">$' + portfolio.currentValue.toLocaleString() + '</h2>' +
+              '<p style="font-size: 0.75rem; color: var(--secondary-color); margin: 0.25rem 0 0 0;">+' + portfolio.returnPercent.toFixed(1) + '%</p>' +
             '</div>' +
-            '<div>' +
-              '<p style="color: var(--text-muted);">Active Investments</p>' +
-              '<h2>' + portfolio.activeInvestments + '</h2>' +
+            '<div style="text-align: center;">' +
+              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Investments</p>' +
+              '<h2 style="margin: 0;">' + portfolio.activeInvestments + '</h2>' +
+              '<p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">Active</p>' +
             '</div>' +
           '</div>' +
         '</div>';
@@ -53,37 +67,274 @@ function loadInvestments(api) {
   api.getMyInvestments()
     .then(function(investments) {
       if (investments.length === 0) {
-        investmentsList.innerHTML = '<div class="card">No active investments found.</div>';
+        investmentsList.innerHTML = 
+          '<div class="card" style="text-align: center; padding: 2rem;">' +
+            '<p style="margin-bottom: 1rem;">No active investments found.</p>' +
+            '<a href="#/projects" class="btn btn-primary">Browse Projects</a>' +
+          '</div>';
         return;
       }
       
       investmentsList.innerHTML = investments.map(function(inv) {
-        var currentValue = parseFloat(inv.amount) * 1.1;
-        var returnPercent = 10;
+        var amount = parseFloat(inv.amount) || 0;
+        var earnings = parseFloat(inv.earnings) || 0;
+        var currentValue = amount + earnings;
+        var returnPercent = amount > 0 ? ((earnings / amount) * 100).toFixed(1) : 0;
+        
+        // Lock-in status
+        var lockInEndDate = inv.lockInEndDate ? new Date(inv.lockInEndDate) : null;
+        var now = new Date();
+        var isLocked = lockInEndDate ? now < lockInEndDate : true;
+        var daysRemaining = lockInEndDate ? Math.ceil((lockInEndDate - now) / (1000 * 60 * 60 * 24)) : 'N/A';
+        var lockInPeriod = inv.lockInPeriodMonths || 12;
         
         return '<div class="card investment-item" style="margin-bottom: 1rem;">' +
-          '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">' +
+          '<div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">' +
             '<div>' +
-              '<h3 style="margin-bottom: 0.25rem;">' + (inv.project_name || 'Project #' + inv.project_id) + '</h3>' +
+              '<h3 style="margin-bottom: 0.25rem;">' + (inv.projectName || inv.project_name || 'Project #' + inv.projectId) + '</h3>' +
               '<span class="badge">' + (inv.category || 'General') + '</span>' +
             '</div>' +
             '<div style="text-align: right;">' +
-              '<div style="font-size: 1.25rem; font-weight: 600;">$' + parseFloat(inv.amount).toLocaleString() + '</div>' +
-              '<div style="color: var(--text-muted);">Invested</div>' +
+              '<span class="badge" style="background: ' + (isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)') + '; color: ' + (isLocked ? '#ef4444' : '#10b981') + ';">' +
+                (isLocked ? '🔒 Locked' : '✓ Unlocked') +
+              '</span>' +
             '</div>' +
-            '<div style="text-align: right;">' +
-              '<div style="font-size: 1.25rem; font-weight: 600; color: var(--secondary-color);">$' + currentValue.toLocaleString() + '</div>' +
-              '<div style="color: var(--secondary-color);">+' + returnPercent + '% Return</div>' +
+          '</div>' +
+          
+          // Investment Stats Grid
+          '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1rem;">' +
+            '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
+              '<div style="font-size: 0.75rem; color: var(--text-muted);">Principal</div>' +
+              '<div style="font-size: 1.1rem; font-weight: 600;">$' + amount.toLocaleString() + '</div>' +
+              '<div style="font-size: 0.7rem; color: #ef4444;">🔒 Locked</div>' +
             '</div>' +
-            '<div>' +
-              '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Active</span>' +
+            '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
+              '<div style="font-size: 0.75rem; color: var(--text-muted);">Earnings</div>' +
+              '<div style="font-size: 1.1rem; font-weight: 600; color: var(--secondary-color);">$' + earnings.toLocaleString() + '</div>' +
+              '<div style="font-size: 0.7rem; color: #10b981;">✓ Withdrawable</div>' +
             '</div>' +
+            '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
+              '<div style="font-size: 0.75rem; color: var(--text-muted);">Total Value</div>' +
+              '<div style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color);">$' + currentValue.toLocaleString() + '</div>' +
+              '<div style="font-size: 0.7rem; color: var(--secondary-color);">+' + returnPercent + '%</div>' +
+            '</div>' +
+            '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
+              '<div style="font-size: 0.75rem; color: var(--text-muted);">Lock-in Ends</div>' +
+              '<div style="font-size: 1.1rem; font-weight: 600;">' + (lockInEndDate ? lockInEndDate.toLocaleDateString() : 'TBD') + '</div>' +
+              '<div style="font-size: 0.7rem; color: var(--text-muted);">' + (isLocked && daysRemaining !== 'N/A' ? daysRemaining + ' days left' : '') + '</div>' +
+            '</div>' +
+          '</div>' +
+          
+          // Actions
+          '<div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">' +
+            '<button class="btn btn-outline btn-sm view-details-btn" data-id="' + inv._id + '" style="font-size: 0.85rem;">📋 Project Details</button>' +
+            '<button class="btn btn-outline btn-sm view-history-btn" data-id="' + inv._id + '" style="font-size: 0.85rem;">📊 Profit History</button>' +
+            (earnings > 0 ? '<a href="#/wallet" class="btn btn-primary btn-sm" style="font-size: 0.85rem;">💰 Withdraw Profits</a>' : '') +
           '</div>' +
         '</div>';
       }).join('');
+      
+      // Attach project details handlers
+      document.querySelectorAll('.view-details-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var investmentId = this.getAttribute('data-id');
+          showProjectDetailsModal(investmentId, api);
+        });
+      });
+      
+      // Attach profit history handlers
+      document.querySelectorAll('.view-history-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var investmentId = this.getAttribute('data-id');
+          showProfitHistoryModal(investmentId, api);
+        });
+      });
     })
     .catch(function(err) {
       investmentsList.innerHTML = '<div style="color: #ef4444;">Error loading investments: ' + err.message + '</div>';
+    });
+}
+
+// Project Details Modal (for investors only)
+function showProjectDetailsModal(investmentId, api) {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">' +
+      '<h2>📋 Project Details</h2>' +
+      '<div id="project-details-content" style="min-height: 200px;">' +
+        '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Loading...</div>' +
+      '</div>' +
+      '<button class="btn btn-outline" id="close-details-modal" style="width: 100%; margin-top: 1rem;">Close</button>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  document.getElementById('close-details-modal').addEventListener('click', function() {
+    modal.remove();
+  });
+  
+  api.getProjectUpdates(investmentId)
+    .then(function(data) {
+      var content = document.getElementById('project-details-content');
+      var p = data.projectDetails;
+      var inv = data.yourInvestment;
+      var stats = data.projectStats;
+      
+      // Format profit sharing
+      var profitSharing = p.profitSharingRatio || { investor: 60, platform: 40 };
+      
+      // Risk level color
+      var riskColor = { 'low': '#10b981', 'medium': '#f59e0b', 'high': '#ef4444' }[p.riskLevel] || '#f59e0b';
+      
+      content.innerHTML = 
+        // Project Info Card
+        '<div style="background: linear-gradient(135deg, #dbeafe, #bfdbfe); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+          '<h3 style="margin: 0 0 0.5rem 0; color: #1e40af;">' + p.name + '</h3>' +
+          '<span class="badge" style="background: rgba(30, 64, 175, 0.2); color: #1e40af;">' + p.category + '</span>' +
+          '<span class="badge" style="background: rgba(30, 64, 175, 0.2); color: #1e40af; margin-left: 0.5rem;">' + p.status + '</span>' +
+        '</div>' +
+        
+        // Your Investment Summary
+        '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+          '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">💼 Your Investment</h4>' +
+          '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">' +
+            '<div>Principal: <strong>$' + inv.amount.toLocaleString() + '</strong></div>' +
+            '<div>Ownership: <strong>' + (inv.ownershipPercent || stats.yourSharePercent).toFixed(2) + '%</strong></div>' +
+            '<div>Invested: <strong>' + new Date(inv.investedAt).toLocaleDateString() + '</strong></div>' +
+            '<div>Lock-in Ends: <strong>' + (inv.lockInEndDate ? new Date(inv.lockInEndDate).toLocaleDateString() : 'TBD') + '</strong></div>' +
+          '</div>' +
+        '</div>' +
+        
+        // Investment Terms
+        '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+          '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">📜 Investment Terms</h4>' +
+          '<div style="display: grid; gap: 0.5rem; font-size: 0.85rem;">' +
+            '<div style="display: flex; justify-content: space-between;"><span>Target Return:</span><strong>' + (p.targetReturn || '10-15%') + '</strong></div>' +
+            '<div style="display: flex; justify-content: space-between;"><span>Risk Level:</span><strong style="color: ' + riskColor + ';">' + (p.riskLevel || 'medium').toUpperCase() + '</strong></div>' +
+            '<div style="display: flex; justify-content: space-between;"><span>Your Profit Share:</span><strong>' + profitSharing.investor + '%</strong></div>' +
+            '<div style="display: flex; justify-content: space-between;"><span>Platform Fee:</span><strong>' + profitSharing.platform + '%</strong></div>' +
+            '<div style="display: flex; justify-content: space-between;"><span>Lock-in Period:</span><strong>' + p.lockInPeriodMonths + ' months</strong></div>' +
+            '<div style="display: flex; justify-content: space-between;"><span>Profit Distribution:</span><strong>' + formatFrequency(p.profitDistributionFrequency) + '</strong></div>' +
+          '</div>' +
+        '</div>' +
+        
+        // Project Stats
+        '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+          '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">📊 Project Stats</h4>' +
+          '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">' +
+            '<div>Total Funding: <strong>$' + p.totalFunding.toLocaleString() + '</strong></div>' +
+            '<div>Investors: <strong>' + p.investorCount + '</strong></div>' +
+            '<div>Total Profit Distributed: <strong style="color: var(--secondary-color);">$' + stats.totalProfitDistributed.toLocaleString() + '</strong></div>' +
+            '<div>Distributions: <strong>' + stats.distributionCount + '</strong></div>' +
+          '</div>' +
+          (p.lastDistributionAt ? '<div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">Last distribution: ' + new Date(p.lastDistributionAt).toLocaleDateString() + '</div>' : '') +
+        '</div>' +
+        
+        // Admin Updates Section
+        '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">' +
+          '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">📢 Project Updates</h4>' +
+          (data.updates.length === 0 
+            ? '<p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">No updates posted yet.</p>'
+            : '<div style="max-height: 200px; overflow-y: auto;">' +
+                data.updates.map(function(u) {
+                  var typeIcon = { 'info': 'ℹ️', 'profit': '💰', 'milestone': '🎯', 'warning': '⚠️' }[u.type] || 'ℹ️';
+                  var typeBg = { 'info': '#dbeafe', 'profit': '#d1fae5', 'milestone': '#fef3c7', 'warning': '#fef2f2' }[u.type] || '#dbeafe';
+                  return '<div style="background: ' + typeBg + '; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem;">' +
+                    '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">' +
+                      '<strong style="font-size: 0.85rem;">' + typeIcon + ' ' + u.title + '</strong>' +
+                      '<span style="font-size: 0.75rem; color: var(--text-muted);">' + new Date(u.createdAt).toLocaleDateString() + '</span>' +
+                    '</div>' +
+                    '<p style="margin: 0; font-size: 0.8rem;">' + u.message + '</p>' +
+                  '</div>';
+                }).join('') +
+              '</div>'
+          ) +
+        '</div>' +
+        
+        // Important Notice
+        '<div style="background: #fef3c7; border-radius: 8px; padding: 0.75rem; margin-top: 1rem; font-size: 0.8rem;">' +
+          '<strong>💡 How profits work:</strong> When the admin distributes project profits, your share is automatically calculated based on your ownership percentage and credited to your wallet.' +
+        '</div>';
+    })
+    .catch(function(err) {
+      document.getElementById('project-details-content').innerHTML = 
+        '<div style="text-align: center; padding: 2rem; color: #ef4444;">Error loading project details: ' + err.message + '</div>';
+    });
+}
+
+// Helper to format frequency
+function formatFrequency(freq) {
+  var map = {
+    'monthly': 'Monthly',
+    'quarterly': 'Quarterly', 
+    'annually': 'Annually',
+    'as_realized': 'As Profits Realized'
+  };
+  return map[freq] || 'As Profits Realized';
+}
+
+// Profit History Modal
+function showProfitHistoryModal(investmentId, api) {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 500px;">' +
+      '<h2>📊 Profit History</h2>' +
+      '<div id="profit-history-content" style="min-height: 200px;">' +
+        '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Loading...</div>' +
+      '</div>' +
+      '<button class="btn btn-outline" id="close-history-modal" style="width: 100%; margin-top: 1rem;">Close</button>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  document.getElementById('close-history-modal').addEventListener('click', function() {
+    modal.remove();
+  });
+  
+  api.getProfitHistory(investmentId)
+    .then(function(data) {
+      var content = document.getElementById('profit-history-content');
+      
+      if (data.distributions.length === 0) {
+        content.innerHTML = 
+          '<div style="text-align: center; padding: 2rem;">' +
+            '<div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>' +
+            '<h3>No Profits Yet</h3>' +
+            '<p style="color: var(--text-muted);">Profits will appear here once the project owner distributes earnings.</p>' +
+            '<p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 1rem;">Your share will be calculated as:<br><strong>(Your Investment ÷ Total Investment) × Total Profit</strong></p>' +
+          '</div>';
+        return;
+      }
+      
+      content.innerHTML = 
+        // Summary
+        '<div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; text-align: center;">' +
+          '<div style="font-size: 0.85rem; color: #065f46;">Total Earnings from ' + data.projectName + '</div>' +
+          '<div style="font-size: 1.75rem; font-weight: 700; color: #047857;">$' + data.totalEarned.toLocaleString() + '</div>' +
+          '<div style="font-size: 0.8rem; color: #065f46;">' + data.distributionCount + ' distribution(s)</div>' +
+        '</div>' +
+        
+        // Distribution List
+        '<div style="max-height: 300px; overflow-y: auto;">' +
+          data.distributions.map(function(d) {
+            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border-color);">' +
+              '<div>' +
+                '<div style="font-weight: 500;">$' + d.amount.toFixed(2) + '</div>' +
+                '<div style="font-size: 0.75rem; color: var(--text-muted);">' + (d.description || 'Profit distribution') + '</div>' +
+              '</div>' +
+              '<div style="text-align: right;">' +
+                '<div style="font-size: 0.85rem; color: var(--secondary-color);">' + (d.sharePercent * 100).toFixed(2) + '% share</div>' +
+                '<div style="font-size: 0.75rem; color: var(--text-muted);">' + new Date(d.createdAt).toLocaleDateString() + '</div>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>';
+    })
+    .catch(function(err) {
+      document.getElementById('profit-history-content').innerHTML = 
+        '<div style="text-align: center; padding: 2rem; color: #ef4444;">Error loading profit history: ' + err.message + '</div>';
     });
 }
 

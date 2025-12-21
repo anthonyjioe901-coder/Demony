@@ -21,6 +21,15 @@ router.get('/', authenticateToken, async function(req, res) {
       return sum + (inv.amount || 0);
     }, 0);
     
+    // Get actual earnings from profit distributions
+    var profitDistributions = await database.collection('profit_distributions')
+      .find({ userId: userId })
+      .toArray();
+    
+    var totalEarnings = profitDistributions.reduce(function(sum, dist) {
+      return sum + (dist.amount || 0);
+    }, 0);
+    
     // Calculate allocation by category
     var categoryMap = {};
     investments.forEach(function(inv) {
@@ -36,20 +45,27 @@ router.get('/', authenticateToken, async function(req, res) {
       };
     });
     
-    // Mock returns for now
-    var currentValue = totalInvested * 1.11; // +11% mock
-    var totalReturn = currentValue - totalInvested;
+    // Calculate current value (principal + earnings)
+    var currentValue = totalInvested + totalEarnings;
     
     res.json({
       userId: userId,
       totalInvested: totalInvested,
+      totalEarnings: totalEarnings, // Actual profits earned
       currentValue: currentValue,
-      totalReturn: totalReturn,
-      returnPercent: totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0,
+      totalReturn: totalEarnings, // Same as earnings since principal is separate
+      returnPercent: totalInvested > 0 ? (totalEarnings / totalInvested) * 100 : 0,
       activeInvestments: investments.length,
       allocation: allocation,
       riskLevel: 'Moderate',
-      diversificationScore: 8.5
+      diversificationScore: Math.min(10, Math.max(1, allocation.length * 2)),
+      
+      // Additional clarity for users
+      summary: {
+        principalLocked: totalInvested,
+        profitsWithdrawable: totalEarnings,
+        note: 'Principal is locked until project completion. Profits can be withdrawn anytime.'
+      }
     });
   } catch (err) {
     console.error(err);
