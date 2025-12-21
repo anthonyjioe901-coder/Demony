@@ -525,10 +525,10 @@ router.post('/withdrawals/:id/process', async function(req, res) {
 
 // Distribute profits for a project
 router.post('/projects/:id/distribute-profits', async function(req, res) {
-  var profitAmount = parseFloat(req.body.profitAmount);
+  var grossProfitAmount = parseFloat(req.body.profitAmount);
   var description = req.body.description || 'Profit distribution';
   
-  if (!profitAmount || profitAmount <= 0) {
+  if (!grossProfitAmount || grossProfitAmount <= 0) {
     return res.status(400).json({ error: 'Valid profit amount required' });
   }
   
@@ -544,6 +544,14 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
       return res.status(404).json({ error: 'Project not found' });
     }
     
+    // Get profit sharing ratio (default 80% to investors, 20% platform)
+    var profitSharingRatio = project.profitSharingRatio || { investor: 80, platform: 20 };
+    var investorSharePercent = profitSharingRatio.investor / 100;
+    
+    // Calculate investor portion of gross profit
+    var investorProfitPool = grossProfitAmount * investorSharePercent;
+    var platformFee = grossProfitAmount - investorProfitPool;
+    
     // Get all investments for this project
     var investments = await database.collection('investments')
       .find({ projectId: req.params.id })
@@ -558,13 +566,13 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
       return sum + inv.amount;
     }, 0);
     
-    // Distribute profits proportionally
+    // Distribute investor profit pool proportionally
     var distributions = [];
     
     for (var i = 0; i < investments.length; i++) {
       var inv = investments[i];
       var sharePercent = inv.amount / totalInvested;
-      var profitShare = profitAmount * sharePercent;
+      var profitShare = investorProfitPool * sharePercent; // Share of INVESTOR pool, not gross
       
       // Add to user wallet
       await database.collection('users').updateOne(
@@ -584,6 +592,8 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
         investmentId: inv._id.toString(),
         amount: profitShare,
         sharePercent: sharePercent,
+        grossProfit: grossProfitAmount,
+        investorSharePercent: profitSharingRatio.investor,
         description: description,
         createdAt: new Date()
       };
@@ -594,18 +604,21 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
     // Save all distributions
     await database.collection('profit_distributions').insertMany(distributions);
     
-    // Update project total distributed
+    // Update project total distributed (track investor portion actually paid out)
     await database.collection('projects').updateOne(
       { _id: new ObjectId(req.params.id) },
       {
-        $inc: { totalProfitDistributed: profitAmount },
+        $inc: { totalProfitDistributed: investorProfitPool },
         $set: { lastDistributionAt: new Date() }
       }
     );
     
     res.json({
       message: 'Profits distributed successfully',
-      totalDistributed: profitAmount,
+      grossProfit: grossProfitAmount,
+      investorShare: profitSharingRatio.investor + '%',
+      platformFee: platformFee,
+      totalDistributedToInvestors: investorProfitPool,
       investorCount: investments.length,
       distributions: distributions.map(function(d) {
         return { userId: d.userId, amount: d.amount, sharePercent: d.sharePercent };

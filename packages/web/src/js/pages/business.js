@@ -98,8 +98,8 @@ function loadMyProjects(api) {
                     '<div class="progress-fill" style="width: ' + percent + '%;"></div>' +
                   '</div>' +
                   '<div style="display: flex; justify-content: space-between; font-size: 0.875rem;">' +
-                    '<span>$' + project.raised_amount.toLocaleString() + ' raised</span>' +
-                    '<span>' + percent + '% of $' + project.goal_amount.toLocaleString() + '</span>' +
+                    '<span>GH₵' + project.raised_amount.toLocaleString() + ' raised</span>' +
+                    '<span>' + percent + '% of GH₵' + project.goal_amount.toLocaleString() + '</span>' +
                   '</div>' +
                 '</div>' : '') +
               
@@ -166,11 +166,11 @@ function showSubmitProjectModal(api, existingProject) {
         
         '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">' +
           '<div class="form-group">' +
-            '<label for="goal-amount">Funding Goal ($) *</label>' +
+            '<label for="goal-amount">Funding Goal (GH₵) *</label>' +
             '<input type="number" id="goal-amount" min="1000" step="100" required value="' + (isEdit ? existingProject.goal_amount : '') + '">' +
           '</div>' +
           '<div class="form-group">' +
-            '<label for="min-investment">Min Investment ($)</label>' +
+            '<label for="min-investment">Min Investment (GH₵)</label>' +
             '<input type="number" id="min-investment" min="100" step="50" value="' + (isEdit ? existingProject.min_investment : '100') + '">' +
           '</div>' +
         '</div>' +

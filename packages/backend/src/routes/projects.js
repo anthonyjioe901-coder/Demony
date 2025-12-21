@@ -33,7 +33,7 @@ function normalizeProject(p) {
     // Investment Terms (Phase 1)
     profit_distribution_frequency: p.profitDistributionFrequency || 'as_realized',
     lock_in_period_months: p.lockInPeriodMonths || p.duration || 12,
-    profit_sharing_ratio: p.profitSharingRatio || { investor: 60, platform: 40 },
+    profit_sharing_ratio: p.profitSharingRatio || { investor: 80, platform: 20 },
     early_withdrawal_penalty: p.earlyWithdrawalPenalty || null,
     principal_locked: true, // Principal is always locked until project closes
     profits_withdrawable: true, // Profits can be withdrawn anytime
@@ -134,8 +134,8 @@ router.post('/:id/calculate-returns', async function(req, res) {
     var duration = durationMonths || project.duration || 12;
     var lockInPeriod = project.lockInPeriodMonths || project.duration || 12;
     
-    // Profit sharing ratio (default 60/40)
-    var profitSharing = project.profitSharingRatio || { investor: 60, platform: 40 };
+    // Profit sharing ratio (default 80/20)
+    var profitSharing = project.profitSharingRatio || { investor: 80, platform: 20 };
     var investorShare = profitSharing.investor / 100;
     
     // Calculate total investment in project

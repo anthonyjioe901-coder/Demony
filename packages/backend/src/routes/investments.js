@@ -588,7 +588,7 @@ router.get('/:id/project-updates', authenticateToken, async function(req, res) {
         riskLevel: project.riskLevel || 'medium',
         profitDistributionFrequency: project.profitDistributionFrequency || 'as_realized',
         lockInPeriodMonths: project.lockInPeriodMonths || project.duration || 12,
-        profitSharingRatio: project.profitSharingRatio || { investor: 60, platform: 40 },
+        profitSharingRatio: project.profitSharingRatio || { investor: 80, platform: 20 },
         totalFunding: project.currentFunding || project.raisedAmount || 0,
         investorCount: project.investorCount || 0,
         totalProfitDistributed: project.totalProfitDistributed || 0,

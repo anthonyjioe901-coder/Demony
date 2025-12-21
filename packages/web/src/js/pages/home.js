@@ -10,7 +10,7 @@ function renderHome(container, api) {
     '<section>' +
       '<div class="stats-grid">' +
         '<div class="card stat-card">' +
-          '<div class="value" style="color: var(--secondary-color);">$2.5M+</div>' +
+          '<div class="value" style="color: var(--secondary-color);">GH₵2.5M+</div>' +
           '<div class="label">Total Invested</div>' +
         '</div>' +
         '<div class="card stat-card">' +
@@ -82,7 +82,7 @@ function renderHome(container, api) {
             '<div class="category" style="color: var(--text-muted); font-size: 0.75rem;">' + (project.category || 'General') + '</div>' +
           '</div>' +
           '<div class="progress" style="text-align: right; min-width: 80px;">' +
-            '<div class="amount" style="font-weight: 800; font-size: 0.9rem;">$' + parseFloat(project.raised_amount || 0).toLocaleString() + '</div>' +
+            '<div class="amount" style="font-weight: 800; font-size: 0.9rem;">GH₵' + parseFloat(project.raised_amount || 0).toLocaleString() + '</div>' +
             '<div class="percent" style="color: var(--text-muted); font-size: 0.7rem;">' + percent + '% funded</div>' +
           '</div>' +
         '</div>';

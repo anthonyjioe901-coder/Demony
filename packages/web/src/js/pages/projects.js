@@ -55,23 +55,30 @@ function loadProjects(api) {
         var goal = Number(project.goal_amount) || 0;
         var raised = Number(project.raised_amount) || 0;
         var percent = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
-        var daysLeft = 30;
+        
+        // Calculate project age
+        var createdDate = project.createdAt ? new Date(project.createdAt) : new Date();
+        var now = new Date();
+        var ageInDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+        var ageDisplay = ageInDays === 0 ? 'Today' : ageInDays === 1 ? '1 day ago' : ageInDays + ' days ago';
 
         var imageUrl = project.image_url || 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800';
         
         // Get investment terms
-        var lockInPeriod = project.lock_in_period_months || 12;
-        var profitFrequency = project.profit_distribution_frequency || 'as_realized';
-        var profitSharing = project.profit_sharing_ratio || { investor: 60, platform: 40 };
+        var profitFrequency = project.profit_distribution_frequency || 'monthly';
+        var profitSharing = project.profit_sharing_ratio || { investor: 80, platform: 20 };
         var riskLevel = project.risk_level || 'medium';
+        var investorCount = project.investor_count || 0;
         
         // Format profit frequency for display
         var frequencyDisplay = {
+          'daily': 'Daily',
+          'weekly': 'Weekly',
           'monthly': 'Monthly',
           'quarterly': 'Quarterly',
           'annually': 'Annually',
-          'as_realized': 'As Profits Realized'
-        }[profitFrequency] || 'As Profits Realized';
+          'as_realized': 'As Realized'
+        }[profitFrequency] || 'Monthly';
         
         // Risk level color
         var riskColor = {
@@ -87,7 +94,7 @@ function loadProjects(api) {
           '<div class="project-content" style="padding: 1.5rem;">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">' +
               '<span class="badge">' + (project.category || 'General') + '</span>' +
-              '<span style="color: var(--text-muted); font-size: 0.875rem;">' + daysLeft + ' days left</span>' +
+              '<span style="color: var(--text-muted); font-size: 0.875rem;">📅 ' + ageDisplay + '</span>' +
             '</div>' +
             '<h3>' + project.name + '</h3>' +
             '<p style="color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;">' + (project.description || '').substring(0, 100) + '...</p>' +
@@ -95,14 +102,13 @@ function loadProjects(api) {
             // Investment Terms Box
             '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem;">' +
               '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">' +
-                '<div>💰 Min: $' + (project.min_investment || 100) + '</div>' +
-                '<div>📊 Target: ' + (project.target_return || '10-15%') + '</div>' +
-                '<div>🔒 Lock-in: ' + lockInPeriod + ' months</div>' +
-                '<div>📅 Profits: ' + frequencyDisplay + '</div>' +
+                '<div>💰 Min: GH₵' + (project.min_investment || 100) + '</div>' +
+                '<div>📆 Profits: ' + frequencyDisplay + '</div>' +
+                '<div>👥 Investors: ' + investorCount + '</div>' +
+                '<div>💼 Share: ' + profitSharing.investor + '%</div>' +
               '</div>' +
               '<div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">' +
                 '<span>⚠️ Risk: <strong style="color: ' + riskColor + ';">' + riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + '</strong></span>' +
-                '<span>💼 Investor Share: ' + profitSharing.investor + '%</span>' +
               '</div>' +
             '</div>' +
             
@@ -110,7 +116,7 @@ function loadProjects(api) {
               '<div class="progress-fill" style="width: ' + percent + '%;"></div>' +
             '</div>' +
             '<div style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.875rem;">' +
-              '<span>$' + raised.toLocaleString() + ' raised</span>' +
+              '<span>GH₵' + raised.toLocaleString() + ' raised</span>' +
               '<span>' + percent + '%</span>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem;">' +
@@ -151,7 +157,7 @@ function showInvestModal(projectId, api) {
   // First fetch project details
   api.getProject(projectId).then(function(project) {
     var lockInPeriod = project.lock_in_period_months || 12;
-    var profitSharing = project.profit_sharing_ratio || { investor: 60, platform: 40 };
+    var profitSharing = project.profit_sharing_ratio || { investor: 80, platform: 20 };
     var riskLevel = project.risk_level || 'medium';
     var minInvestment = project.min_investment || 100;
     
@@ -179,15 +185,15 @@ function showInvestModal(projectId, api) {
             '<div style="display: flex; justify-content: space-between;"><span>💰 Your Profit Share:</span><strong>' + profitSharing.investor + '%</strong></div>' +
             '<div style="display: flex; justify-content: space-between;"><span>🏢 Platform Fee:</span><strong>' + profitSharing.platform + '%</strong></div>' +
             '<div style="display: flex; justify-content: space-between;"><span>📤 Profit Withdrawal:</span><strong>Anytime</strong></div>' +
-            '<div style="display: flex; justify-content: space-between;"><span>💵 Min Investment:</span><strong>$' + minInvestment + '</strong></div>' +
+              '<div style="display: flex; justify-content: space-between;"><span>💵 Min Investment:</span><strong>GH₵' + minInvestment + '</strong></div>' +
           '</div>' +
         '</div>' +
         
         '<form id="invest-form">' +
           '<div class="form-group">' +
-            '<label for="amount">Investment Amount ($)</label>' +
+            '<label for="amount">Investment Amount (GH₵)</label>' +
             '<input type="number" id="amount" min="' + minInvestment + '" step="100" required style="font-size: 1.25rem; padding: 0.75rem;">' +
-            '<small style="color: var(--text-muted);">Minimum investment: $' + minInvestment + '</small>' +
+            '<small style="color: var(--text-muted);">Minimum investment: GH₵' + minInvestment + '</small>' +
           '</div>' +
           
           // Projected Returns Preview
@@ -209,7 +215,7 @@ function showInvestModal(projectId, api) {
               '</label>' +
               '<label style="display: flex; gap: 0.5rem; cursor: pointer;">' +
                 '<input type="checkbox" id="lockin-check" required style="margin-top: 2px;">' +
-                '<span>I understand my principal ($<span id="amount-display">0</span>) will be <strong>LOCKED for ' + lockInPeriod + ' months</strong></span>' +
+                '<span>I understand my principal (GH₵<span id="amount-display">0</span>) will be <strong>LOCKED for ' + lockInPeriod + ' months</strong></span>' +
               '</label>' +
             '</div>' +
           '</div>' +
@@ -247,8 +253,8 @@ function showInvestModal(projectId, api) {
           returnPreview.innerHTML = 
             '<h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem;">📊 Projected Returns (Not Guaranteed)</h4>' +
             '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">' +
-              '<div>Monthly: <strong style="color: var(--secondary-color);">$' + result.projectedReturns.monthlyProfit.toLocaleString() + '</strong></div>' +
-              '<div>Annual: <strong style="color: var(--secondary-color);">$' + result.projectedReturns.annualProfit.toLocaleString() + '</strong></div>' +
+              '<div>Monthly: <strong style="color: var(--secondary-color);">GH₵' + result.projectedReturns.monthlyProfit.toLocaleString() + '</strong></div>' +
+              '<div>Annual: <strong style="color: var(--secondary-color);">GH₵' + result.projectedReturns.annualProfit.toLocaleString() + '</strong></div>' +
             '</div>' +
             '<p style="color: #ef4444; font-size: 0.75rem; margin: 0.5rem 0 0 0;">⚠️ ' + result.disclaimer.substring(0, 80) + '...</p>';
         }).catch(function() {
@@ -292,7 +298,7 @@ function showInvestModal(projectId, api) {
             '<div class="modal-content" style="max-width: 400px; text-align: center;">' +
               '<div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>' +
               '<h2 style="color: var(--secondary-color);">Investment Successful!</h2>' +
-              '<p>You invested <strong>$' + parseFloat(amount).toLocaleString() + '</strong> in ' + project.name + '</p>' +
+              '<p>You invested <strong>GH₵' + parseFloat(amount).toLocaleString() + '</strong> in ' + project.name + '</p>' +
               '<div style="background: #fef3c7; border-radius: 8px; padding: 1rem; margin: 1rem 0; text-align: left;">' +
                 '<p style="margin: 0; font-size: 0.85rem;"><strong>🔒 Remember:</strong> Your principal is locked until ' + new Date(result.investment.lockInEndDate).toLocaleDateString() + '. Profits can be withdrawn anytime.</p>' +
               '</div>' +
@@ -329,7 +335,7 @@ function showCalculatorModal(projectId, api) {
         '</div>' +
         
         '<div class="form-group">' +
-          '<label for="calc-amount">Investment Amount ($)</label>' +
+          '<label for="calc-amount">Investment Amount (GH₵)</label>' +
           '<input type="number" id="calc-amount" min="100" step="100" value="1000">' +
         '</div>' +
         
@@ -351,7 +357,7 @@ function showCalculatorModal(projectId, api) {
     function calculateAndDisplay() {
       var amount = parseFloat(calcAmount.value) || 0;
       if (amount < 100) {
-        calcResults.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Minimum amount is $100</div>';
+        calcResults.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Minimum amount is GH₵100</div>';
         return;
       }
       
@@ -367,19 +373,19 @@ function showCalculatorModal(projectId, api) {
             '<div style="display: grid; gap: 0.75rem;">' +
               '<div style="display: flex; justify-content: space-between; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
                 '<span>Monthly Profit:</span>' +
-                '<strong style="color: var(--secondary-color);">$' + r.monthlyProfit.toLocaleString() + '</strong>' +
+                '<strong style="color: var(--secondary-color);">GH₵' + r.monthlyProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="display: flex; justify-content: space-between; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
                 '<span>Annual Profit:</span>' +
-                '<strong style="color: var(--secondary-color);">$' + r.annualProfit.toLocaleString() + '</strong>' +
+                '<strong style="color: var(--secondary-color);">GH₵' + r.annualProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="display: flex; justify-content: space-between; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
                 '<span>Total (' + result.investment.durationMonths + ' mo):</span>' +
-                '<strong style="color: var(--secondary-color);">$' + r.totalProfit.toLocaleString() + '</strong>' +
+                '<strong style="color: var(--secondary-color);">GH₵' + r.totalProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="display: flex; justify-content: space-between;">' +
                 '<span>Total Value:</span>' +
-                '<strong style="color: var(--primary-color); font-size: 1.1rem;">$' + r.totalValue.toLocaleString() + '</strong>' +
+                '<strong style="color: var(--primary-color); font-size: 1.1rem;">GH₵' + r.totalValue.toLocaleString() + '</strong>' +
               '</div>' +
             '</div>' +
             
@@ -387,15 +393,15 @@ function showCalculatorModal(projectId, api) {
             '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; font-size: 0.8rem; text-align: center;">' +
               '<div style="background: #fef2f2; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #991b1b;">Pessimistic</div>' +
-                '<strong>$' + scenarios.pessimistic.totalProfit.toLocaleString() + '</strong>' +
+                '<strong>GH₵' + scenarios.pessimistic.totalProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="background: #f0fdf4; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #166534;">Optimistic</div>' +
-                '<strong>$' + scenarios.optimistic.totalProfit.toLocaleString() + '</strong>' +
+                '<strong>GH₵' + scenarios.optimistic.totalProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="background: #fef3c7; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #92400e;">Worst Case</div>' +
-                '<strong>$0</strong>' +
+                '<strong>GH₵0</strong>' +
               '</div>' +
             '</div>' +
             

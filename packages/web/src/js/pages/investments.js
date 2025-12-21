@@ -39,17 +39,17 @@ function loadInvestments(api) {
           '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem;">' +
             '<div style="text-align: center;">' +
               '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Total Invested</p>' +
-              '<h2 style="color: var(--primary-color); margin: 0;">$' + portfolio.totalInvested.toLocaleString() + '</h2>' +
+              '<h2 style="color: var(--primary-color); margin: 0;">GH₵' + portfolio.totalInvested.toLocaleString() + '</h2>' +
               '<p style="font-size: 0.75rem; color: #ef4444; margin: 0.25rem 0 0 0;">🔒 Locked</p>' +
             '</div>' +
             '<div style="text-align: center;">' +
               '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Total Earnings</p>' +
-              '<h2 style="color: var(--secondary-color); margin: 0;">$' + portfolio.totalReturn.toLocaleString() + '</h2>' +
+              '<h2 style="color: var(--secondary-color); margin: 0;">GH₵' + portfolio.totalReturn.toLocaleString() + '</h2>' +
               '<p style="font-size: 0.75rem; color: #10b981; margin: 0.25rem 0 0 0;">✓ Withdrawable</p>' +
             '</div>' +
             '<div style="text-align: center;">' +
               '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Portfolio Value</p>' +
-              '<h2 style="margin: 0;">$' + portfolio.currentValue.toLocaleString() + '</h2>' +
+              '<h2 style="margin: 0;">GH₵' + portfolio.currentValue.toLocaleString() + '</h2>' +
               '<p style="font-size: 0.75rem; color: var(--secondary-color); margin: 0.25rem 0 0 0;">+' + portfolio.returnPercent.toFixed(1) + '%</p>' +
             '</div>' +
             '<div style="text-align: center;">' +
@@ -105,17 +105,17 @@ function loadInvestments(api) {
           '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1rem;">' +
             '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
               '<div style="font-size: 0.75rem; color: var(--text-muted);">Principal</div>' +
-              '<div style="font-size: 1.1rem; font-weight: 600;">$' + amount.toLocaleString() + '</div>' +
+              '<div style="font-size: 1.1rem; font-weight: 600;">GH₵' + amount.toLocaleString() + '</div>' +
               '<div style="font-size: 0.7rem; color: #ef4444;">🔒 Locked</div>' +
             '</div>' +
             '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
               '<div style="font-size: 0.75rem; color: var(--text-muted);">Earnings</div>' +
-              '<div style="font-size: 1.1rem; font-weight: 600; color: var(--secondary-color);">$' + earnings.toLocaleString() + '</div>' +
+              '<div style="font-size: 1.1rem; font-weight: 600; color: var(--secondary-color);">GH₵' + earnings.toLocaleString() + '</div>' +
               '<div style="font-size: 0.7rem; color: #10b981;">✓ Withdrawable</div>' +
             '</div>' +
             '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
               '<div style="font-size: 0.75rem; color: var(--text-muted);">Total Value</div>' +
-              '<div style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color);">$' + currentValue.toLocaleString() + '</div>' +
+              '<div style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color);">GH₵' + currentValue.toLocaleString() + '</div>' +
               '<div style="font-size: 0.7rem; color: var(--secondary-color);">+' + returnPercent + '%</div>' +
             '</div>' +
             '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; text-align: center;">' +
@@ -182,7 +182,7 @@ function showProjectDetailsModal(investmentId, api) {
       var stats = data.projectStats;
       
       // Format profit sharing
-      var profitSharing = p.profitSharingRatio || { investor: 60, platform: 40 };
+      var profitSharing = p.profitSharingRatio || { investor: 80, platform: 20 };
       
       // Risk level color
       var riskColor = { 'low': '#10b981', 'medium': '#f59e0b', 'high': '#ef4444' }[p.riskLevel] || '#f59e0b';
@@ -199,7 +199,7 @@ function showProjectDetailsModal(investmentId, api) {
         '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
           '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">💼 Your Investment</h4>' +
           '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">' +
-            '<div>Principal: <strong>$' + inv.amount.toLocaleString() + '</strong></div>' +
+            '<div>Principal: <strong>GH₵' + inv.amount.toLocaleString() + '</strong></div>' +
             '<div>Ownership: <strong>' + (inv.ownershipPercent || stats.yourSharePercent).toFixed(2) + '%</strong></div>' +
             '<div>Invested: <strong>' + new Date(inv.investedAt).toLocaleDateString() + '</strong></div>' +
             '<div>Lock-in Ends: <strong>' + (inv.lockInEndDate ? new Date(inv.lockInEndDate).toLocaleDateString() : 'TBD') + '</strong></div>' +
@@ -223,9 +223,9 @@ function showProjectDetailsModal(investmentId, api) {
         '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
           '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">📊 Project Stats</h4>' +
           '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">' +
-            '<div>Total Funding: <strong>$' + p.totalFunding.toLocaleString() + '</strong></div>' +
+            '<div>Total Funding: <strong>GH₵' + p.totalFunding.toLocaleString() + '</strong></div>' +
             '<div>Investors: <strong>' + p.investorCount + '</strong></div>' +
-            '<div>Total Profit Distributed: <strong style="color: var(--secondary-color);">$' + stats.totalProfitDistributed.toLocaleString() + '</strong></div>' +
+            '<div>Total Profit Distributed: <strong style="color: var(--secondary-color);">GH₵' + stats.totalProfitDistributed.toLocaleString() + '</strong></div>' +
             '<div>Distributions: <strong>' + stats.distributionCount + '</strong></div>' +
           '</div>' +
           (p.lastDistributionAt ? '<div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">Last distribution: ' + new Date(p.lastDistributionAt).toLocaleDateString() + '</div>' : '') +
@@ -312,7 +312,7 @@ function showProfitHistoryModal(investmentId, api) {
         // Summary
         '<div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; text-align: center;">' +
           '<div style="font-size: 0.85rem; color: #065f46;">Total Earnings from ' + data.projectName + '</div>' +
-          '<div style="font-size: 1.75rem; font-weight: 700; color: #047857;">$' + data.totalEarned.toLocaleString() + '</div>' +
+          '<div style="font-size: 1.75rem; font-weight: 700; color: #047857;">GH₵' + data.totalEarned.toLocaleString() + '</div>' +
           '<div style="font-size: 0.8rem; color: #065f46;">' + data.distributionCount + ' distribution(s)</div>' +
         '</div>' +
         
@@ -321,7 +321,7 @@ function showProfitHistoryModal(investmentId, api) {
           data.distributions.map(function(d) {
             return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border-color);">' +
               '<div>' +
-                '<div style="font-weight: 500;">$' + d.amount.toFixed(2) + '</div>' +
+                '<div style="font-weight: 500;">GH₵' + d.amount.toFixed(2) + '</div>' +
                 '<div style="font-size: 0.75rem; color: var(--text-muted);">' + (d.description || 'Profit distribution') + '</div>' +
               '</div>' +
               '<div style="text-align: right;">' +

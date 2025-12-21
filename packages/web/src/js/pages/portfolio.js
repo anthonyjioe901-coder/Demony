@@ -75,14 +75,14 @@ function loadPortfolio(api) {
       document.getElementById('portfolio-value').innerHTML = 
         '<div style="text-align: center; padding: 0.5rem;">' +
           '<h3 style="color: var(--text-muted); font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;">Portfolio Value</h3>' +
-          '<div style="font-size: 2rem; font-weight: 800; color: var(--primary-color);">$' + portfolio.currentValue.toLocaleString() + '</div>' +
-          '<div style="color: var(--secondary-color); font-size: 0.9rem; margin-top: 0.25rem;">+$' + portfolio.totalReturn.toLocaleString() + ' (' + portfolio.returnPercent.toFixed(1) + '%) all time</div>' +
+          '<div style="font-size: 2rem; font-weight: 800; color: var(--primary-color);">GH₵' + portfolio.currentValue.toLocaleString() + '</div>' +
+          '<div style="color: var(--secondary-color); font-size: 0.9rem; margin-top: 0.25rem;">+GH₵' + portfolio.totalReturn.toLocaleString() + ' (' + portfolio.returnPercent.toFixed(1) + '%) all time</div>' +
         '</div>';
       
       // Stats Grid
       document.getElementById('portfolio-stats').innerHTML = 
         '<div class="card stat-card">' +
-          '<div class="value" style="color: var(--secondary-color);">$' + portfolio.totalInvested.toLocaleString() + '</div>' +
+          '<div class="value" style="color: var(--secondary-color);">GH₵' + portfolio.totalInvested.toLocaleString() + '</div>' +
           '<div class="label">Total Invested</div>' +
         '</div>' +
         '<div class="card stat-card">' +
