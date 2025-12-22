@@ -10,6 +10,7 @@ import { renderBusinessDashboard } from './pages/business.js';
 import { renderWallet } from './pages/wallet.js';
 import { renderProfile } from './pages/profile.js';
 import { renderTerms, renderPrivacy, renderRiskDisclosure, renderAgreementModal } from './pages/legal.js';
+import { renderSupport } from './pages/support.js';
 
 // Initialize API client
 const api = new Api();
@@ -45,6 +46,8 @@ router.addRoute('business', function(container) { renderBusinessDashboard(contai
 router.addRoute('terms', function(container) { renderTerms(container); });
 router.addRoute('privacy', function(container) { renderPrivacy(container); });
 router.addRoute('risk', function(container) { renderRiskDisclosure(container); });
+// Support
+router.addRoute('support', function(container) { renderSupport(container, api); });
 
 // Expose app globally
 window.DemonyApp = {

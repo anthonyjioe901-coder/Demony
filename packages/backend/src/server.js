@@ -61,6 +61,7 @@ var adminRoutes = require('./routes/admin.js');
 var withdrawalRoutes = require('./routes/withdrawals.js');
 var walletRoutes = require('./routes/wallet.js');
 var uploadRoutes = require('./routes/upload.js');
+var supportRoutes = require('./routes/support.js');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -72,6 +73,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/support', supportRoutes);
 
 // Root endpoint
 app.get('/', function(req, res) {

@@ -126,12 +126,20 @@ router.post('/:id/calculate-returns', async function(req, res) {
       return res.status(404).json({ error: 'Project not found' });
     }
     
-    // Parse target return (e.g., "10-15%" -> min: 10, max: 15)
+    // Parse target return (handle various formats: "10-15%", "20% in 30 days", "25%", etc.)
     var targetReturn = project.targetReturn || '10-15%';
-    var returnMatch = targetReturn.match(/(\d+)(?:\s*-\s*(\d+))?/);
-    var minReturnPercent = returnMatch ? parseFloat(returnMatch[1]) : 10;
-    var maxReturnPercent = returnMatch && returnMatch[2] ? parseFloat(returnMatch[2]) : minReturnPercent;
+    // Extract all numbers from the string
+    var numbers = targetReturn.match(/\d+/g);
+    var minReturnPercent = numbers && numbers.length > 0 ? parseFloat(numbers[0]) : 10;
+    var maxReturnPercent = numbers && numbers.length > 1 ? parseFloat(numbers[1]) : minReturnPercent;
     var avgReturnPercent = (minReturnPercent + maxReturnPercent) / 2;
+
+    // Ensure we have valid percentages
+    if (isNaN(avgReturnPercent) || avgReturnPercent <= 0) {
+      avgReturnPercent = 10; // Default fallback
+      minReturnPercent = 10;
+      maxReturnPercent = 10;
+    }
     
     // Use project duration if not specified
     var duration = durationMonths || project.duration || 12;
@@ -153,11 +161,17 @@ router.post('/:id/calculate-returns', async function(req, res) {
     var projectedAnnualProfit = amount * annualReturnRate;
     var projectedMonthlyProfit = projectedAnnualProfit / 12;
     var projectedTotalProfit = projectedAnnualProfit * (duration / 12);
-    
+
     // Apply investor share (platform takes their cut)
     var investorAnnualProfit = projectedAnnualProfit * investorShare;
     var investorMonthlyProfit = projectedMonthlyProfit * investorShare;
     var investorTotalProfit = projectedTotalProfit * investorShare;
+
+    // Ensure all values are valid numbers
+    investorAnnualProfit = isNaN(investorAnnualProfit) ? 0 : Math.round(investorAnnualProfit * 100) / 100;
+    investorMonthlyProfit = isNaN(investorMonthlyProfit) ? 0 : Math.round(investorMonthlyProfit * 100) / 100;
+    investorTotalProfit = isNaN(investorTotalProfit) ? 0 : Math.round(investorTotalProfit * 100) / 100;
+    var investorTotalValue = isNaN(amount + investorTotalProfit) ? amount : Math.round((amount + investorTotalProfit) * 100) / 100;
     
     res.json({
       disclaimer: 'IMPORTANT: These are PROJECTED returns only. Actual profits depend on project performance and are NOT guaranteed. You may receive more, less, or nothing.',
@@ -179,20 +193,20 @@ router.post('/:id/calculate-returns', async function(req, res) {
       
       projectedReturns: {
         note: 'Based on average target return of ' + avgReturnPercent + '% annually',
-        annualProfit: Math.round(investorAnnualProfit * 100) / 100,
-        monthlyProfit: Math.round(investorMonthlyProfit * 100) / 100,
-        totalProfit: Math.round(investorTotalProfit * 100) / 100,
-        totalValue: Math.round((amount + investorTotalProfit) * 100) / 100
+        annualProfit: investorAnnualProfit,
+        monthlyProfit: investorMonthlyProfit,
+        totalProfit: investorTotalProfit,
+        totalValue: investorTotalValue
       },
       
       returnScenarios: {
         pessimistic: {
           returnRate: minReturnPercent + '%',
-          totalProfit: Math.round(amount * (minReturnPercent / 100) * investorShare * (duration / 12) * 100) / 100
+          totalProfit: isNaN(amount * (minReturnPercent / 100) * investorShare * (duration / 12)) ? 0 : Math.round(amount * (minReturnPercent / 100) * investorShare * (duration / 12) * 100) / 100
         },
         optimistic: {
           returnRate: maxReturnPercent + '%',
-          totalProfit: Math.round(amount * (maxReturnPercent / 100) * investorShare * (duration / 12) * 100) / 100
+          totalProfit: isNaN(amount * (maxReturnPercent / 100) * investorShare * (duration / 12)) ? 0 : Math.round(amount * (maxReturnPercent / 100) * investorShare * (duration / 12) * 100) / 100
         },
         worstCase: {
           returnRate: '0%',

@@ -220,6 +220,23 @@ Api.prototype.cancelWithdrawal = function(id) {
   });
 };
 
+// ==================== SUPPORT ====================
+
+Api.prototype.submitSupportTicket = function(data) {
+  return this.request('/support/tickets', {
+    method: 'POST',
+    body: data
+  });
+};
+
+Api.prototype.getTicketStatus = function(ticketId) {
+  return this.request('/support/tickets/' + ticketId);
+};
+
+Api.prototype.getSystemStatus = function() {
+  return this.request('/support/status');
+};
+
 // ==================== ADMIN API ====================
 // Initialize admin namespace with proper binding
 Api.prototype.getAdmin = function() {

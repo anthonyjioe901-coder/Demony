@@ -759,6 +759,157 @@ var templates = {
       `,
       text: `Deposit Confirmed!\n\nHi ${data.userName},\n\nGH₵${data.amount.toLocaleString()} has been added to your wallet.\n\nNew balance: GH₵${(data.newBalance || data.amount).toLocaleString()}`
     };
+  },
+
+  // Support ticket confirmation (sent to user)
+  supportTicketConfirmation: function(data) {
+    return {
+      subject: '🎫 Support Ticket Received - ' + data.ticketId,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .ticket-box { background: linear-gradient(135deg, #dbeafe, #e0e7ff); border-radius: 12px; padding: 25px; margin: 20px 0; text-align: center; }
+            .ticket-id { font-size: 28px; font-weight: bold; color: #4f46e5; font-family: 'SFMono-Regular', Consolas, monospace; }
+            .details { background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0; }
+            .details-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+            .details-row:last-child { border-bottom: none; }
+            .label { color: #64748b; }
+            .value { font-weight: 600; color: #1e293b; }
+            .message-box { background: #fefce8; border-left: 4px solid #eab308; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🎫 Support Ticket Received</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.userName},</p>
+              <p>Thank you for contacting Demony Support. We've received your request and will get back to you within 24-48 hours.</p>
+              
+              <div class="ticket-box">
+                <p style="margin: 0 0 10px; color: #64748b;">Your Ticket ID</p>
+                <div class="ticket-id">${data.ticketId}</div>
+                <p style="margin: 10px 0 0; font-size: 12px; color: #64748b;">Save this ID to track your request</p>
+              </div>
+              
+              <div class="details">
+                <div class="details-row">
+                  <span class="label">Category</span>
+                  <span class="value">${data.category}</span>
+                </div>
+                <div class="details-row">
+                  <span class="label">Subject</span>
+                  <span class="value">${data.subject}</span>
+                </div>
+                <div class="details-row">
+                  <span class="label">Priority</span>
+                  <span class="value">${data.priority || 'Normal'}</span>
+                </div>
+              </div>
+              
+              <div class="message-box">
+                <strong>Your Message:</strong>
+                <p style="margin: 10px 0 0;">${data.message}</p>
+              </div>
+              
+              <p style="text-align: center;">
+                <a href="${data.appUrl || 'https://demony.com'}/#support" style="background: #6366f1; color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-weight: 600;">Track Your Ticket →</a>
+              </p>
+              
+              <p style="font-size: 14px; color: #64748b; text-align: center; margin-top: 25px;">
+                Need urgent help? Call us at <strong>+233 24 925 1305</strong> or<br>
+                WhatsApp <strong>+233 24 925 1305</strong>
+              </p>
+            </div>
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Support Ticket Received\n\nHi ${data.userName},\n\nThank you for contacting Demony Support. Your ticket ID is: ${data.ticketId}\n\nCategory: ${data.category}\nSubject: ${data.subject}\n\nYour Message:\n${data.message}\n\nWe'll respond within 24-48 hours.\n\nNeed urgent help? Call +233 24 925 1305`
+    };
+  },
+
+  // Support ticket notification (sent to support team)
+  supportTicketNotification: function(data) {
+    return {
+      subject: '🆕 New Support Ticket: ' + data.ticketId + ' - ' + data.category,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #dc2626, #ef4444); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .ticket-id { font-size: 24px; font-weight: bold; color: #dc2626; font-family: monospace; background: #fef2f2; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; }
+            .details { background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0; }
+            .details-row { padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+            .details-row:last-child { border-bottom: none; }
+            .label { color: #64748b; font-size: 12px; text-transform: uppercase; }
+            .value { font-weight: 600; color: #1e293b; margin-top: 5px; }
+            .message-box { background: #fffbeb; border: 1px solid #fcd34d; padding: 20px; margin: 20px 0; border-radius: 8px; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🆕 New Support Ticket</h1>
+            </div>
+            <div class="content">
+              <div class="ticket-id">${data.ticketId}</div>
+              
+              <div class="details">
+                <div class="details-row">
+                  <div class="label">Customer</div>
+                  <div class="value">${data.userName} (${data.userEmail})</div>
+                </div>
+                <div class="details-row">
+                  <div class="label">Category</div>
+                  <div class="value">${data.category}</div>
+                </div>
+                <div class="details-row">
+                  <div class="label">Subject</div>
+                  <div class="value">${data.subject}</div>
+                </div>
+                <div class="details-row">
+                  <div class="label">Priority</div>
+                  <div class="value">${data.priority || 'Normal'}</div>
+                </div>
+                <div class="details-row">
+                  <div class="label">Submitted</div>
+                  <div class="value">${new Date().toLocaleString()}</div>
+                </div>
+              </div>
+              
+              <div class="message-box">
+                <strong>Customer Message:</strong>
+                <p style="margin: 10px 0 0; white-space: pre-wrap;">${data.message}</p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>Demony Support System</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `New Support Ticket: ${data.ticketId}\n\nCustomer: ${data.userName} (${data.userEmail})\nCategory: ${data.category}\nSubject: ${data.subject}\nPriority: ${data.priority || 'Normal'}\n\nMessage:\n${data.message}`
+    };
   }
 };
 
@@ -950,6 +1101,33 @@ async function sendDepositEmail(user, amount, newBalance) {
   });
 }
 
+// Send support ticket confirmation to user
+async function sendSupportTicketConfirmationEmail(user, ticket) {
+  return sendEmail('supportTicketConfirmation', user.email, {
+    userName: user.name || user.email.split('@')[0],
+    ticketId: ticket.ticketId,
+    category: ticket.category,
+    subject: ticket.subject,
+    message: ticket.message,
+    priority: ticket.priority,
+    appUrl: process.env.APP_URL
+  });
+}
+
+// Send support ticket notification to support team
+async function sendSupportTicketNotificationEmail(user, ticket) {
+  var supportEmail = process.env.SUPPORT_EMAIL || 'support@demony.com';
+  return sendEmail('supportTicketNotification', supportEmail, {
+    userName: user.name || user.email.split('@')[0],
+    userEmail: user.email,
+    ticketId: ticket.ticketId,
+    category: ticket.category,
+    subject: ticket.subject,
+    message: ticket.message,
+    priority: ticket.priority
+  });
+}
+
 module.exports = {
   initMailtrap: initMailtrap,
   sendEmail: sendEmail,
@@ -967,6 +1145,8 @@ module.exports = {
   sendKycRejectedEmail: sendKycRejectedEmail,
   sendProjectUpdateEmail: sendProjectUpdateEmail,
   sendDepositEmail: sendDepositEmail,
+  sendSupportTicketConfirmationEmail: sendSupportTicketConfirmationEmail,
+  sendSupportTicketNotificationEmail: sendSupportTicketNotificationEmail,
   
   // Export templates for testing
   templates: templates

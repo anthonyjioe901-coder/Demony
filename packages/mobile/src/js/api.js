@@ -140,4 +140,16 @@ Api.prototype.requestWithdrawal = function(data) {
   });
 };
 
+// Support
+Api.prototype.submitSupportTicket = function(data) {
+  return this.request('/support/tickets', {
+    method: 'POST',
+    body: data
+  });
+};
+
+Api.prototype.getTicketStatus = function(ticketId) {
+  return this.request('/support/tickets/' + ticketId);
+};
+
 export { Api };

@@ -120,8 +120,8 @@ function loadProjects(api) {
               '<div class="progress-fill" style="width: ' + percent + '%;"></div>' +
             '</div>' +
             '<div style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.875rem;">' +
-              '<span>GH₵' + raised.toLocaleString() + ' raised</span>' +
-              '<span>' + percent + '%</span>' +
+              '<span>GH₵' + (raised && !isNaN(raised) ? raised.toLocaleString() : '0') + ' raised</span>' +
+              '<span>' + (percent && !isNaN(percent) ? percent : '0') + '%</span>' +
             '</div>' +
             '<div style="display: flex; gap: 0.5rem;">' +
               '<button class="btn btn-outline calc-btn" data-id="' + project.id + '" style="flex: 1;">Calculator</button>' +
@@ -267,8 +267,8 @@ function showInvestModal(projectId, api) {
       var isBelowMaximum = amount <= 10000000; // Max 10 million cedis
       var isValidAmount = isValidNumber && isPositive && isAboveMinimum && isBelowMaximum;
 
-      // Update display
-      amountDisplay.textContent = isValidNumber && isPositive ? amount.toLocaleString() : '0';
+      // Update display (safe)
+      amountDisplay.textContent = (isValidNumber && isPositive && amount !== null && !isNaN(amount)) ? amount.toLocaleString() : '0';
 
       var allChecked = termsCheck.checked && riskCheck.checked && lossCheck.checked && lockinCheck.checked;
       confirmBtn.disabled = !allChecked || !isValidAmount;
@@ -387,7 +387,7 @@ function showCalculatorModal(projectId, api) {
         
         '<div class="form-group">' +
           '<label for="calc-amount">Investment Amount (GH₵)</label>' +
-          '<input type="number" id="calc-amount" min="100" step="100" value="1000">' +
+          '<input type="number" id="calc-amount" min="100" step="1" value="1000">' +
         '</div>' +
         
         '<div id="calc-results" style="margin: 1.5rem 0;">' +
@@ -427,11 +427,11 @@ function showCalculatorModal(projectId, api) {
         var r = result.projectedReturns;
         var scenarios = result.returnScenarios;
 
-        // Ensure all values are numbers and not null
-        var monthlyProfit = typeof r.monthlyProfit === 'number' ? r.monthlyProfit : 0;
-        var annualProfit = typeof r.annualProfit === 'number' ? r.annualProfit : 0;
-        var totalProfit = typeof r.totalProfit === 'number' ? r.totalProfit : 0;
-        var totalValue = typeof r.totalValue === 'number' ? r.totalValue : 0;
+        // Ensure all values are valid numbers (defensive programming)
+        var monthlyProfit = (r && typeof r.monthlyProfit === 'number' && !isNaN(r.monthlyProfit) && r.monthlyProfit !== null) ? r.monthlyProfit : 0;
+        var annualProfit = (r && typeof r.annualProfit === 'number' && !isNaN(r.annualProfit) && r.annualProfit !== null) ? r.annualProfit : 0;
+        var totalProfit = (r && typeof r.totalProfit === 'number' && !isNaN(r.totalProfit) && r.totalProfit !== null) ? r.totalProfit : 0;
+        var totalValue = (r && typeof r.totalValue === 'number' && !isNaN(r.totalValue) && r.totalValue !== null) ? r.totalValue : 0;
 
         calcResults.innerHTML =
           '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">' +
@@ -459,11 +459,11 @@ function showCalculatorModal(projectId, api) {
             '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; font-size: 0.8rem; text-align: center;">' +
               '<div style="background: #fef2f2; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #991b1b;">Pessimistic</div>' +
-                '<strong>GH₵' + (scenarios && scenarios.pessimistic ? scenarios.pessimistic.totalProfit.toLocaleString() : '0') + '</strong>' +
+                '<strong>GH₵' + (scenarios && scenarios.pessimistic && scenarios.pessimistic.totalProfit !== null && typeof scenarios.pessimistic.totalProfit === 'number' && !isNaN(scenarios.pessimistic.totalProfit) ? scenarios.pessimistic.totalProfit.toLocaleString() : '0') + '</strong>' +
               '</div>' +
               '<div style="background: #f0fdf4; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #166534;">Optimistic</div>' +
-                '<strong>GH₵' + (scenarios && scenarios.optimistic ? scenarios.optimistic.totalProfit.toLocaleString() : '0') + '</strong>' +
+                '<strong>GH₵' + (scenarios && scenarios.optimistic && scenarios.optimistic.totalProfit !== null && typeof scenarios.optimistic.totalProfit === 'number' && !isNaN(scenarios.optimistic.totalProfit) ? scenarios.optimistic.totalProfit.toLocaleString() : '0') + '</strong>' +
               '</div>' +
               '<div style="background: #fef3c7; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #92400e;">Worst Case</div>' +
