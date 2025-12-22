@@ -1,52 +1,45 @@
-// Email Service using Mailtrap
-var MailtrapClient = require('mailtrap').MailtrapClient;
+// Email Service using Mailtrap SMTP (nodemailer)
+var nodemailer = require('nodemailer');
 
-// Initialize Mailtrap client
-var mailtrap = null;
-var mailtrapDisabled = false; // Flag to disable after too many failures
-var failureCount = 0;
-var MAX_FAILURES = 3; // Disable after 3 consecutive failures
+// Initialize transporter
+var transporter = null;
+var emailDisabled = false;
 
-function initMailtrap() {
-  // If we've had too many failures, don't try again
-  if (mailtrapDisabled) {
+function initTransporter() {
+  if (emailDisabled) return null;
+  if (transporter) return transporter;
+  
+  var smtpUser = process.env.MAILTRAP_SMTP_USER || process.env.MAILTRAP_API_KEY;
+  var smtpPass = process.env.MAILTRAP_SMTP_PASS;
+  
+  // If no SMTP credentials, try to use API key method
+  if (!smtpUser || !smtpPass) {
+    console.warn('⚠️ MAILTRAP_SMTP_USER and MAILTRAP_SMTP_PASS not set');
+    console.warn('   Add these to your environment variables:');
+    console.warn('   MAILTRAP_SMTP_USER=69e64812f3d151');
+    console.warn('   MAILTRAP_SMTP_PASS=<your_password>');
+    console.warn('   Emails will be logged but not sent.');
     return null;
   }
   
-  if (mailtrap) return mailtrap;
-  
-  var apiKey = process.env.MAILTRAP_API_KEY;
-  var isSandbox = process.env.MAILTRAP_USE_SANDBOX === 'true';
-  var inboxId = isSandbox ? Number(process.env.MAILTRAP_INBOX_ID) : undefined;
-  
-  if (!apiKey) {
-    console.warn('⚠️ MAILTRAP_API_KEY not set - emails will be logged but not sent');
-    return null;
-  }
-  
-  // Validate inbox ID for sandbox mode
-  if (isSandbox && (!inboxId || isNaN(inboxId) || inboxId === 123456)) {
-    console.warn('⚠️ MAILTRAP_INBOX_ID is invalid or placeholder - emails will be logged but not sent');
-    console.warn('   Get your real Inbox ID from: https://mailtrap.io/inboxes (look at the URL)');
-    return null;
-  }
-  
-  mailtrap = new MailtrapClient({
-    token: apiKey,
-    sandbox: isSandbox,
-    testInboxId: inboxId
+  transporter = nodemailer.createTransport({
+    host: 'sandbox.smtp.mailtrap.io',
+    port: 2525,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass
+    }
   });
   
-  console.log('✅ Mailtrap initialized (' + (isSandbox ? 'sandbox' : 'production') + ' mode)');
-  return mailtrap;
+  console.log('✅ Mailtrap SMTP initialized (sandbox mode)');
+  return transporter;
 }
 
-// Get sender info based on environment
+// Get sender info
 function getSender() {
-  var isSandbox = process.env.MAILTRAP_USE_SANDBOX === 'true';
   return {
     name: 'Demony',
-    email: isSandbox ? 'sandbox@example.com' : (process.env.MAIL_FROM || 'no-reply@demony.com')
+    email: process.env.MAIL_FROM || 'no-reply@demony.com'
   };
 }
 
@@ -938,7 +931,7 @@ var templates = {
  * @returns {Promise}
  */
 async function sendEmail(templateName, recipientEmail, data) {
-  var client = initMailtrap();
+  var transport = initTransporter();
   
   if (!templates[templateName]) {
     console.error('Email template not found:', templateName);
@@ -946,54 +939,39 @@ async function sendEmail(templateName, recipientEmail, data) {
   }
   
   var emailContent = templates[templateName](data);
+  var sender = getSender();
   
-  // Log email in development or if client not available
-  if (!client || process.env.NODE_ENV === 'development') {
-    console.log('📧 Email would be sent:');
+  // Log email in development or if transport not available
+  if (!transport) {
+    console.log('📧 Email would be sent (no transport):');
     console.log('  To:', recipientEmail);
     console.log('  Subject:', emailContent.subject);
     console.log('  Template:', templateName);
-    
-    if (!client) {
-      return { success: true, simulated: true };
-    }
+    return { success: true, simulated: true };
   }
   
   try {
-    var result = await client.send({
-      from: getSender(),
-      to: [{ email: recipientEmail }],
+    var result = await transport.sendMail({
+      from: '"' + sender.name + '" <' + sender.email + '>',
+      to: recipientEmail,
       subject: emailContent.subject,
       html: emailContent.html,
-      text: emailContent.text,
-      category: 'Demony Notifications'
+      text: emailContent.text
     });
     
-    // Reset failure count on success
-    failureCount = 0;
-    
     console.log('✅ Email sent to', recipientEmail, '- Template:', templateName);
-    return { success: true, result: result };
+    return { success: true, messageId: result.messageId };
   } catch (err) {
     console.error('❌ Failed to send email:', err.message);
     
-    // Check if it's an auth/rate limit error
-    if (err.message && (err.message.includes('Unauthorized') || 
-        err.message.includes('Too many') || 
-        err.message.includes('rate limit') ||
-        err.message.includes('401') ||
-        err.message.includes('403'))) {
-      failureCount++;
-      console.warn('⚠️ Mailtrap auth failure (' + failureCount + '/' + MAX_FAILURES + ')');
-      
-      if (failureCount >= MAX_FAILURES) {
-        console.error('🚫 Mailtrap disabled due to repeated auth failures.');
-        console.error('   Please check your MAILTRAP_API_KEY and MAILTRAP_INBOX_ID in environment variables.');
-        console.error('   Get a new API key from: https://mailtrap.io/api-tokens');
-        console.error('   Get Inbox ID from URL when viewing your inbox: https://mailtrap.io/inboxes/YOUR_ID/messages');
-        mailtrapDisabled = true;
-        mailtrap = null; // Reset client
-      }
+    // Check if it's an auth error - disable to prevent spam
+    if (err.message && (err.message.includes('auth') || 
+        err.message.includes('credentials') || 
+        err.message.includes('535'))) {
+      console.error('🚫 Email disabled due to auth failure.');
+      console.error('   Check MAILTRAP_SMTP_USER and MAILTRAP_SMTP_PASS');
+      emailDisabled = true;
+      transporter = null;
     }
     
     return { success: false, error: err.message };
@@ -1167,7 +1145,7 @@ async function sendSupportTicketNotificationEmail(user, ticket) {
 }
 
 module.exports = {
-  initMailtrap: initMailtrap,
+  initTransporter: initTransporter,
   sendEmail: sendEmail,
   sendBulkEmail: sendBulkEmail,
   
