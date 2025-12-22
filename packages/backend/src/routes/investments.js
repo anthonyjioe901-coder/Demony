@@ -3,6 +3,7 @@ var express = require('express');
 var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
+var emailService = require('../services/email');
 var router = express.Router();
 
 // Create investment from wallet balance
@@ -14,6 +15,7 @@ router.post('/', authenticateToken, async function(req, res) {
   // Risk acknowledgment fields (required)
   var termsAccepted = req.body.termsAccepted;
   var riskAcknowledged = req.body.riskAcknowledged;
+  var lossAcknowledged = req.body.lossAcknowledged;
   var lockInAcknowledged = req.body.lockInAcknowledged;
   
   if (!projectId || !amount) {
@@ -25,12 +27,13 @@ router.post('/', authenticateToken, async function(req, res) {
   }
   
   // Require risk acknowledgments
-  if (!termsAccepted || !riskAcknowledged || !lockInAcknowledged) {
+  if (!termsAccepted || !riskAcknowledged || !lossAcknowledged || !lockInAcknowledged) {
     return res.status(400).json({ 
       error: 'You must acknowledge all investment risks before proceeding',
       required: {
         termsAccepted: 'Accept investment terms and conditions',
         riskAcknowledged: 'Acknowledge that profits are not guaranteed',
+        lossAcknowledged: 'Confirm you can afford to lose your entire investment',
         lockInAcknowledged: 'Acknowledge that principal is locked for the project duration'
       }
     });
@@ -98,6 +101,7 @@ router.post('/', authenticateToken, async function(req, res) {
       termsAcceptance: {
         termsAccepted: true,
         riskAcknowledged: true,
+        lossAcknowledged: true,
         lockInAcknowledged: true,
         acceptedAt: new Date(),
         ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown',
@@ -119,6 +123,7 @@ router.post('/', authenticateToken, async function(req, res) {
       termsVersion: '1.0',
       termsAccepted: true,
       riskAcknowledged: true,
+      lossAcknowledged: true,
       lockInAcknowledged: true,
       ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown',
       acceptedAt: new Date()
@@ -156,6 +161,11 @@ router.post('/', authenticateToken, async function(req, res) {
     });
     
     investment.id = result.insertedId.toString();
+    
+    // Send investment confirmation email (async)
+    emailService.sendInvestmentEmail(user, investment, project).catch(function(err) {
+      console.error('Failed to send investment email:', err);
+    });
     
     res.json({
       message: 'Investment successful',

@@ -3,6 +3,7 @@ var express = require('express');
 var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
+var emailService = require('../services/email');
 var router = express.Router();
 
 // Request withdrawal
@@ -66,6 +67,11 @@ router.post('/', authenticateToken, async function(req, res) {
     );
     
     withdrawal.id = result.insertedId.toString();
+    
+    // Send withdrawal requested email (async)
+    emailService.sendWithdrawalRequestedEmail(user, withdrawal).catch(function(err) {
+      console.error('Failed to send withdrawal email:', err);
+    });
     
     res.json({
       message: 'Withdrawal request submitted. Awaiting admin approval.',

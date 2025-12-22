@@ -2,11 +2,19 @@
 var express = require('express');
 var bcrypt = require('bcryptjs');
 var jwt = require('jsonwebtoken');
+var crypto = require('crypto');
 var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
+var emailService = require('../services/email');
 var router = express.Router();
+var ObjectId = require('mongodb').ObjectId;
 
 var JWT_SECRET = process.env.JWT_SECRET || 'demony-secret-key-change-in-production';
+
+function getApiBaseUrl() {
+  var appBase = process.env.APP_URL || process.env.WEB_URL;
+  return process.env.API_URL || process.env.API_BASE_URL || (appBase ? appBase.replace(/\/$/, '') + '/api' : 'https://demony-api.onrender.com/api');
+}
 
 // Valid user roles
 var USER_ROLES = ['investor', 'business_owner', 'admin'];
@@ -98,6 +106,30 @@ router.post('/signup', async function(req, res) {
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    // Create verification token and send email
+    try {
+      var database = await db.getDb();
+      var verificationToken = crypto.randomBytes(32).toString('hex');
+      var verifyUrl = getApiBaseUrl() + '/auth/verify-email/' + verificationToken;
+      await database.collection('email_verifications').insertOne({
+        userId: newUser.id,
+        token: verificationToken,
+        used: false,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 48), // 48 hours
+        createdAt: new Date()
+      });
+      emailService.sendVerificationEmail({ email: email, name: name }, verifyUrl).catch(function(err) {
+        console.error('Failed to send verification email:', err);
+      });
+    } catch (verificationErr) {
+      console.error('Could not create verification token:', verificationErr);
+    }
+    
+    // Send welcome email (async, don't wait)
+    emailService.sendWelcomeEmail({ email: email, name: name }).catch(function(err) {
+      console.error('Failed to send welcome email:', err);
+    });
     
     res.json({ message: 'User created successfully', token: token, user: newUser });
   } catch (err) {
@@ -132,6 +164,34 @@ router.post('/login', async function(req, res) {
     if (!validPassword) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
+
+    if (!user.isVerified) {
+      try {
+        var database = await db.getDb();
+        var existing = await database.collection('email_verifications').findOne({
+          userId: user._id.toString(),
+          used: false,
+          expiresAt: { $gt: new Date() }
+        });
+        var tokenToSend = existing ? existing.token : crypto.randomBytes(32).toString('hex');
+        if (!existing) {
+          await database.collection('email_verifications').insertOne({
+            userId: user._id.toString(),
+            token: tokenToSend,
+            used: false,
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 48),
+            createdAt: new Date()
+          });
+        }
+        var verifyUrlLogin = getApiBaseUrl() + '/auth/verify-email/' + tokenToSend;
+        emailService.sendVerificationEmail(user, verifyUrlLogin).catch(function(err) {
+          console.error('Failed to send verification email:', err);
+        });
+      } catch (verifyErr) {
+        console.error('Could not send verification email on login:', verifyErr);
+      }
+      return res.status(403).json({ error: 'Please verify your email. A verification link has been sent.' });
+    }
     
     var token = jwt.sign(
       { id: user._id.toString(), email: user.email, role: user.role || 'investor' },
@@ -161,7 +221,6 @@ router.post('/login', async function(req, res) {
 // Get current user profile
 router.get('/me', authenticateToken, async function(req, res) {
   try {
-    var ObjectId = require('mongodb').ObjectId;
     var database = await db.getDb();
     var user = await database.collection('users').findOne({ _id: new ObjectId(req.user.id) });
     
@@ -216,6 +275,36 @@ router.post('/kyc/submit', authenticateToken, async function(req, res) {
     );
     
     res.json({ message: 'KYC documents submitted for review' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+// Verify email
+router.get('/verify-email/:token', async function(req, res) {
+  var token = req.params.token;
+  if (!token) return res.status(400).json({ error: 'Verification token is required' });
+  try {
+    var database = await db.getDb();
+    var record = await database.collection('email_verifications').findOne({ token: token });
+    if (!record) {
+      return res.status(400).json({ error: 'Invalid verification token' });
+    }
+    if (record.used) {
+      return res.status(400).json({ error: 'Token already used' });
+    }
+    if (record.expiresAt && record.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Token has expired' });
+    }
+    await database.collection('users').updateOne(
+      { _id: new ObjectId(record.userId) },
+      { $set: { isVerified: true, updatedAt: new Date() } }
+    );
+    await database.collection('email_verifications').updateOne(
+      { _id: record._id },
+      { $set: { used: true, usedAt: new Date() } }
+    );
+    res.json({ message: 'Email verified successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -291,16 +291,27 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async functio
 router.post('/withdraw', async function(req, res) {
   try {
     var amount = parseFloat(req.body.amount);
+    var method = req.body.method || 'bank';
     var bankCode = req.body.bankCode;
     var accountNumber = req.body.accountNumber;
     var accountName = req.body.accountName;
+    var momoNetwork = req.body.momoNetwork;
+    var momoNumber = req.body.momoNumber;
     
     if (!amount || amount < 100) {
       return res.status(400).json({ error: 'Minimum withdrawal is 100' });
     }
     
-    if (!bankCode || !accountNumber || !accountName) {
-      return res.status(400).json({ error: 'Bank details required' });
+    if (method === 'bank') {
+      if (!bankCode || !accountNumber || !accountName) {
+        return res.status(400).json({ error: 'Bank details required' });
+      }
+    } else if (method === 'momo') {
+      if (!momoNetwork || !momoNumber) {
+        return res.status(400).json({ error: 'Mobile money details required' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Unsupported withdrawal method' });
     }
     
     var database = await db.getDb();
@@ -330,10 +341,14 @@ router.post('/withdraw', async function(req, res) {
       amount: -amount, // Negative for withdrawals
       status: 'pending_approval',
       reference: reference,
-      bankDetails: {
+      payoutMethod: method,
+      payoutDetails: method === 'bank' ? {
         bankCode: bankCode,
         accountNumber: accountNumber,
         accountName: accountName
+      } : {
+        network: momoNetwork,
+        momoNumber: momoNumber
       },
       description: 'Withdrawal request',
       createdAt: new Date()

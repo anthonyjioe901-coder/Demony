@@ -485,75 +485,85 @@ function showInvestModal(projectId) {
     switchTab('profile');
     return;
   }
-  
-  var modal = document.createElement('div');
-  modal.className = 'modal active';
-  modal.innerHTML = 
-    '<div class="modal-content">' +
-      '<h2>Invest in Project</h2>' +
-      '<div id="wallet-info" style="background: var(--surface-secondary); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">Loading...</div>' +
-      '<form id="invest-form">' +
-        '<div class="form-group">' +
-          '<label for="amount">Amount (GH₵)</label>' +
-          '<input type="number" id="amount" min="100" step="100" required>' +
-        '</div>' +
-        '<div class="form-group">' +
-          '<label>Payment Method</label>' +
-          '<select id="payment-method" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--surface-color); color: var(--text-primary);">' +
-            '<option value="wallet">Wallet Balance</option>' +
-            '<option value="paystack">Pay with Paystack</option>' +
-          '</select>' +
-        '</div>' +
-        '<button type="submit" class="btn btn-primary">Invest Now</button>' +
-      '</form>' +
-      '<button class="btn btn-outline" style="margin-top: 0.75rem;" id="close-invest-modal">Cancel</button>' +
-    '</div>';
-  
-  document.body.appendChild(modal);
-  
-  // Load wallet balance
-  api.getWalletBalance().then(function(data) {
-    document.getElementById('wallet-info').innerHTML = 
-      '<div style="display: flex; justify-content: space-between; align-items: center;">' +
-        '<span style="color: var(--text-muted);">Wallet Balance</span>' +
-        '<span style="font-weight: 700; color: var(--primary-color); font-size: 1.125rem;">GH₵' + data.balance.toLocaleString() + '</span>' +
+
+  // First fetch project details
+  api.getProject(projectId).then(function(project) {
+    // Ensure lockInPeriod is a number
+    var lockInPeriod = parseInt(project.lock_in_period_months) || parseInt(project.duration) || 12;
+    var minInvestment = project.min_investment || 100;
+
+    var modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.innerHTML =
+      '<div class="modal-content">' +
+        '<h2>Invest in ' + project.name + '</h2>' +
+        '<div id="wallet-info" style="background: var(--surface-secondary); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">Loading...</div>' +
+        '<form id="invest-form">' +
+          '<div class="form-group">' +
+            '<label for="amount">Amount (GH₵)</label>' +
+            '<input type="number" id="amount" min="' + minInvestment + '" step="1" required>' +
+            '<small style="color: var(--text-muted);">Minimum investment: GH₵' + minInvestment + '</small>' +
+          '</div>' +
+          '<div class="form-group">' +
+            '<label>Payment Method</label>' +
+            '<select id="payment-method" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--surface-color); color: var(--text-primary);">' +
+              '<option value="wallet">Wallet Balance</option>' +
+              '<option value="paystack">Pay with Paystack</option>' +
+            '</select>' +
+          '</div>' +
+          '<button type="submit" class="btn btn-primary">Invest Now</button>' +
+        '</form>' +
+        '<button class="btn btn-outline" style="margin-top: 0.75rem;" id="close-invest-modal">Cancel</button>' +
       '</div>';
-  }).catch(function() {
-    document.getElementById('wallet-info').innerHTML = '<p style="color: #ef4444; font-size: 0.875rem;">Could not load wallet balance</p>';
-  });
-  
-  document.getElementById('close-invest-modal').addEventListener('click', function() {
-    modal.remove();
-  });
-  
-  document.getElementById('invest-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var amount = parseFloat(document.getElementById('amount').value);
-    var method = document.getElementById('payment-method').value;
-    
-    if (method === 'wallet') {
-      // Use wallet balance
-      api.invest({ projectId: projectId, amount: amount })
-        .then(function() {
-          alert('Investment successful!');
-          modal.remove();
-          renderTab(currentTab);
-        })
-        .catch(function(err) {
-          alert('Investment failed: ' + err.message);
-        });
-    } else {
-      // Use Paystack
-      api.investWithPaystack({ projectId: projectId, amount: amount })
-        .then(function(result) {
-          window.open(result.authorization_url, '_blank');
-          alert('Complete payment in the opened window');
-          modal.remove();
-        })
-        .catch(function(err) {
-          alert('Payment initialization failed: ' + err.message);
-        });
-    }
+
+    document.body.appendChild(modal);
+
+    // Load wallet balance
+    api.getWalletBalance().then(function(data) {
+      document.getElementById('wallet-info').innerHTML =
+        '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+          '<span style="color: var(--text-muted);">Wallet Balance</span>' +
+          '<span style="font-weight: 700; color: var(--primary-color); font-size: 1.125rem;">GH₵' + data.balance.toLocaleString() + '</span>' +
+        '</div>';
+    }).catch(function() {
+      document.getElementById('wallet-info').innerHTML = '<p style="color: #ef4444; font-size: 0.875rem;">Could not load wallet balance</p>';
+    });
+
+    document.getElementById('close-invest-modal').addEventListener('click', function() {
+      modal.remove();
+    });
+
+    document.getElementById('invest-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var amount = parseFloat(document.getElementById('amount').value);
+      var method = document.getElementById('payment-method').value;
+
+      if (method === 'wallet') {
+        // Use wallet balance
+        api.invest({ projectId: projectId, amount: amount })
+          .then(function() {
+            alert('Investment successful!');
+            modal.remove();
+            renderTab(currentTab);
+          })
+          .catch(function(err) {
+            alert('Investment failed: ' + err.message);
+          });
+      } else {
+        // Use Paystack
+        api.investWithPaystack({ projectId: projectId, amount: amount })
+          .then(function(result) {
+            window.open(result.authorization_url, '_blank');
+            alert('Complete payment in the opened window');
+            modal.remove();
+          })
+          .catch(function(err) {
+            alert('Payment initialization failed: ' + err.message);
+          });
+      }
+    });
+  }).catch(function(err) {
+    alert('Error loading project: ' + err.message);
   });
 }
 

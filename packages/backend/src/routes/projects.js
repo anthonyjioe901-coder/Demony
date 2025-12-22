@@ -32,8 +32,11 @@ function normalizeProject(p) {
     
     // Investment Terms (Phase 1)
     profit_distribution_frequency: p.profitDistributionFrequency || 'as_realized',
-    lock_in_period_months: p.lockInPeriodMonths || p.duration || 12,
-    profit_sharing_ratio: p.profitSharingRatio || { investor: 80, platform: 20 },
+    lock_in_period_months: parseInt(p.lockInPeriodMonths) || parseInt(p.duration) || 12,
+    // Always use 80/20 split (override any old 60/40 ratios)
+    profit_sharing_ratio: (p.profitSharingRatio && p.profitSharingRatio.investor === 60) 
+      ? { investor: 80, platform: 20 } 
+      : (p.profitSharingRatio || { investor: 80, platform: 20 }),
     early_withdrawal_penalty: p.earlyWithdrawalPenalty || null,
     principal_locked: true, // Principal is always locked until project closes
     profits_withdrawable: true, // Profits can be withdrawn anytime

@@ -3,6 +3,7 @@ var express = require('express');
 var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
+var emailService = require('../services/email');
 var router = express.Router();
 
 // Middleware to check admin role
@@ -174,6 +175,22 @@ router.post('/users/:id/kyc', async function(req, res) {
       { _id: new ObjectId(req.params.id) },
       { $set: updateData }
     );
+    
+    // Get user for email
+    var user = await database.collection('users').findOne({ _id: new ObjectId(req.params.id) });
+    
+    // Send KYC result email (async)
+    if (user && user.email) {
+      if (action === 'approve') {
+        emailService.sendKycApprovedEmail(user).catch(function(err) {
+          console.error('Failed to send KYC approved email:', err);
+        });
+      } else {
+        emailService.sendKycRejectedEmail(user, reason).catch(function(err) {
+          console.error('Failed to send KYC rejected email:', err);
+        });
+      }
+    }
     
     res.json({ message: 'KYC ' + action + 'd successfully' });
   } catch (err) {
@@ -514,6 +531,22 @@ router.post('/withdrawals/:id/process', async function(req, res) {
       { $set: updateData }
     );
     
+    // Get user for email notification
+    var user = await database.collection('users').findOne({ _id: new ObjectId(withdrawal.userId) });
+    
+    // Send withdrawal result email (async)
+    if (user && user.email) {
+      if (action === 'approve') {
+        emailService.sendWithdrawalCompletedEmail(user, { ...withdrawal, reference: transactionRef }).catch(function(err) {
+          console.error('Failed to send withdrawal completed email:', err);
+        });
+      } else {
+        emailService.sendWithdrawalRejectedEmail(user, withdrawal, reason).catch(function(err) {
+          console.error('Failed to send withdrawal rejected email:', err);
+        });
+      }
+    }
+    
     res.json({ message: 'Withdrawal ' + action + 'd successfully' });
   } catch (err) {
     console.error(err);
@@ -613,6 +646,23 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
       }
     );
     
+    // Send profit distribution emails to all investors (async batch)
+    var emailPromises = [];
+    for (var j = 0; j < distributions.length; j++) {
+      var dist = distributions[j];
+      (function(distribution) {
+        database.collection('users').findOne({ _id: new ObjectId(distribution.userId) })
+          .then(function(invUser) {
+            if (invUser && invUser.email) {
+              return emailService.sendProfitEmail(invUser, distribution, project);
+            }
+          })
+          .catch(function(err) {
+            console.error('Failed to send profit email to user ' + distribution.userId + ':', err);
+          });
+      })(dist);
+    }
+    
     res.json({
       message: 'Profits distributed successfully',
       grossProfit: grossProfitAmount,
@@ -673,6 +723,27 @@ router.post('/projects/:id/updates', async function(req, res) {
       { _id: new ObjectId(req.params.id) },
       { $set: { lastUpdateAt: new Date() } }
     );
+    
+    // Send email notifications to all investors of this project (async)
+    database.collection('investments').find({ projectId: req.params.id }).toArray()
+      .then(function(projectInvestments) {
+        var userIds = projectInvestments.map(function(inv) { return new ObjectId(inv.userId); });
+        if (userIds.length === 0) return;
+        
+        return database.collection('users').find({ _id: { $in: userIds } }).toArray()
+          .then(function(investors) {
+            investors.forEach(function(investor) {
+              if (investor.email) {
+                emailService.sendProjectUpdateEmail(investor, project, update).catch(function(err) {
+                  console.error('Failed to send project update email:', err);
+                });
+              }
+            });
+          });
+      })
+      .catch(function(err) {
+        console.error('Failed to send project update emails:', err);
+      });
     
     res.json({
       message: 'Update posted successfully',

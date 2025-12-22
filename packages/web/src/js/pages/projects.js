@@ -67,6 +67,10 @@ function loadProjects(api) {
         // Get investment terms
         var profitFrequency = project.profit_distribution_frequency || 'monthly';
         var profitSharing = project.profit_sharing_ratio || { investor: 80, platform: 20 };
+        // Override old 60/40 ratios with new 80/20 standard
+        if (profitSharing.investor === 60) {
+          profitSharing = { investor: 80, platform: 20 };
+        }
         var riskLevel = project.risk_level || 'medium';
         var investorCount = project.investor_count || 0;
         
@@ -156,8 +160,13 @@ function showInvestModal(projectId, api) {
   
   // First fetch project details
   api.getProject(projectId).then(function(project) {
-    var lockInPeriod = project.lock_in_period_months || 12;
+    // Ensure lockInPeriod is a number
+    var lockInPeriod = parseInt(project.lock_in_period_months) || parseInt(project.duration) || 12;
     var profitSharing = project.profit_sharing_ratio || { investor: 80, platform: 20 };
+    // Override old 60/40 ratios with new 80/20 standard
+    if (profitSharing.investor === 60) {
+      profitSharing = { investor: 80, platform: 20 };
+    }
     var riskLevel = project.risk_level || 'medium';
     var minInvestment = project.min_investment || 100;
     
@@ -192,7 +201,10 @@ function showInvestModal(projectId, api) {
         '<form id="invest-form">' +
           '<div class="form-group">' +
             '<label for="amount">Investment Amount (GH₵)</label>' +
-            '<input type="number" id="amount" min="' + minInvestment + '" step="100" required style="font-size: 1.25rem; padding: 0.75rem;">' +
+            '<div style="display:flex; align-items:center; gap:0.5rem;">' +
+              '<span id="invest-currency" style="padding: 0.75rem 0.95rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--surface-color); cursor: pointer; user-select: none;">GH₵</span>' +
+              '<input type="number" id="amount" min="' + minInvestment + '" step="1" required style="font-size: 1.25rem; padding: 0.75rem; flex:1;">' +
+            '</div>' +
             '<small style="color: var(--text-muted);">Minimum investment: GH₵' + minInvestment + '</small>' +
           '</div>' +
           
@@ -214,6 +226,10 @@ function showInvestModal(projectId, api) {
                 '<span>I understand that <strong>profits are NOT guaranteed</strong> and depend on actual project performance</span>' +
               '</label>' +
               '<label style="display: flex; gap: 0.5rem; cursor: pointer;">' +
+                '<input type="checkbox" id="loss-check" required style="margin-top: 2px;">' +
+                '<span>I understand and <strong>can afford to lose my entire investment</strong> if the project underperforms</span>' +
+              '</label>' +
+              '<label style="display: flex; gap: 0.5rem; cursor: pointer;">' +
                 '<input type="checkbox" id="lockin-check" required style="margin-top: 2px;">' +
                 '<span>I understand my principal (GH₵<span id="amount-display">0</span>) will be <strong>LOCKED for ' + lockInPeriod + ' months</strong></span>' +
               '</label>' +
@@ -230,33 +246,63 @@ function showInvestModal(projectId, api) {
     document.body.appendChild(modal);
     
     var amountInput = document.getElementById('amount');
+    var investCurrency = document.getElementById('invest-currency');
     var amountDisplay = document.getElementById('amount-display');
     var returnPreview = document.getElementById('return-preview');
     var confirmBtn = document.getElementById('confirm-invest-btn');
     var termsCheck = document.getElementById('terms-check');
     var riskCheck = document.getElementById('risk-check');
+    var lossCheck = document.getElementById('loss-check');
     var lockinCheck = document.getElementById('lockin-check');
     
     // Update amount display and button state
     function updateUI() {
       var amount = parseFloat(amountInput.value) || 0;
-      amountDisplay.textContent = amount.toLocaleString();
-      
-      var allChecked = termsCheck.checked && riskCheck.checked && lockinCheck.checked;
-      var validAmount = amount >= minInvestment;
-      confirmBtn.disabled = !allChecked || !validAmount;
-      
+      var amountValue = amountInput.value.trim();
+
+      // Validation
+      var isValidNumber = !isNaN(amount) && amountValue !== '';
+      var isPositive = amount > 0;
+      var isAboveMinimum = amount >= minInvestment;
+      var isBelowMaximum = amount <= 10000000; // Max 10 million cedis
+      var isValidAmount = isValidNumber && isPositive && isAboveMinimum && isBelowMaximum;
+
+      // Update display
+      amountDisplay.textContent = isValidNumber && isPositive ? amount.toLocaleString() : '0';
+
+      var allChecked = termsCheck.checked && riskCheck.checked && lossCheck.checked && lockinCheck.checked;
+      confirmBtn.disabled = !allChecked || !isValidAmount;
+
+      // Show validation errors
+      var errorMsg = '';
+      if (amountValue !== '' && !isValidNumber) {
+        errorMsg = 'Please enter a valid number';
+      } else if (isValidNumber && !isPositive) {
+        errorMsg = 'Amount must be greater than 0';
+      } else if (isValidNumber && isPositive && !isAboveMinimum) {
+        errorMsg = 'Minimum investment is GH₵' + minInvestment.toLocaleString();
+      } else if (isValidNumber && isPositive && !isBelowMaximum) {
+        errorMsg = 'Maximum investment is GH₵10,000,000';
+      }
+
+      // Update input styling
+      amountInput.style.borderColor = errorMsg ? '#ef4444' : 'var(--border-color)';
+
       // Fetch projected returns if amount is valid
-      if (validAmount) {
+      if (isValidAmount) {
         api.calculateReturns(projectId, amount).then(function(result) {
-          returnPreview.style.display = 'block';
-          returnPreview.innerHTML = 
-            '<h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem;">📊 Projected Returns (Not Guaranteed)</h4>' +
-            '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">' +
-              '<div>Monthly: <strong style="color: var(--secondary-color);">GH₵' + result.projectedReturns.monthlyProfit.toLocaleString() + '</strong></div>' +
-              '<div>Annual: <strong style="color: var(--secondary-color);">GH₵' + result.projectedReturns.annualProfit.toLocaleString() + '</strong></div>' +
-            '</div>' +
-            '<p style="color: #ef4444; font-size: 0.75rem; margin: 0.5rem 0 0 0;">⚠️ ' + result.disclaimer.substring(0, 80) + '...</p>';
+          if (result && result.projectedReturns) {
+            returnPreview.style.display = 'block';
+            returnPreview.innerHTML =
+              '<h4 style="margin: 0 0 0.5rem 0; font-size: 0.85rem;">📊 Projected Returns (Not Guaranteed)</h4>' +
+              '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">' +
+                '<div>Monthly: <strong style="color: var(--secondary-color);">GH₵' + (result.projectedReturns.monthlyProfit || 0).toLocaleString() + '</strong></div>' +
+                '<div>Annual: <strong style="color: var(--secondary-color);">GH₵' + (result.projectedReturns.annualProfit || 0).toLocaleString() + '</strong></div>' +
+              '</div>' +
+              '<p style="color: #ef4444; font-size: 0.75rem; margin: 0.5rem 0 0 0;">⚠️ ' + (result.disclaimer ? result.disclaimer.substring(0, 80) + '...' : 'Profits are not guaranteed') + '</p>';
+          } else {
+            returnPreview.style.display = 'none';
+          }
         }).catch(function() {
           returnPreview.style.display = 'none';
         });
@@ -266,8 +312,12 @@ function showInvestModal(projectId, api) {
     }
     
     amountInput.addEventListener('input', updateUI);
+    if (investCurrency) {
+      investCurrency.addEventListener('click', function() { amountInput.focus(); });
+    }
     termsCheck.addEventListener('change', updateUI);
     riskCheck.addEventListener('change', updateUI);
+    lossCheck.addEventListener('change', updateUI);
     lockinCheck.addEventListener('change', updateUI);
     
     document.getElementById('close-invest-modal').addEventListener('click', function() {
@@ -286,6 +336,7 @@ function showInvestModal(projectId, api) {
         amount: amount,
         termsAccepted: true,
         riskAcknowledged: true,
+        lossAcknowledged: true,
         lockInAcknowledged: true
       })
         .then(function(result) {
@@ -360,55 +411,70 @@ function showCalculatorModal(projectId, api) {
         calcResults.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Minimum amount is GH₵100</div>';
         return;
       }
-      
+
+      if (amount > 10000000) { // Max 10 million cedis
+        calcResults.innerHTML = '<div style="text-align: center; color: #ef4444;">Maximum investment amount is GH₵10,000,000</div>';
+        return;
+      }
+
       calcResults.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Calculating...</div>';
-      
+
       api.calculateReturns(projectId, amount).then(function(result) {
+        if (!result || !result.projectedReturns) {
+          throw new Error('Invalid response from server');
+        }
+
         var r = result.projectedReturns;
         var scenarios = result.returnScenarios;
-        
-        calcResults.innerHTML = 
+
+        // Ensure all values are numbers and not null
+        var monthlyProfit = typeof r.monthlyProfit === 'number' ? r.monthlyProfit : 0;
+        var annualProfit = typeof r.annualProfit === 'number' ? r.annualProfit : 0;
+        var totalProfit = typeof r.totalProfit === 'number' ? r.totalProfit : 0;
+        var totalValue = typeof r.totalValue === 'number' ? r.totalValue : 0;
+
+        calcResults.innerHTML =
           '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">' +
             '<h4 style="margin: 0 0 1rem 0;">Projected Returns</h4>' +
             '<div style="display: grid; gap: 0.75rem;">' +
               '<div style="display: flex; justify-content: space-between; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
                 '<span>Monthly Profit:</span>' +
-                '<strong style="color: var(--secondary-color);">GH₵' + r.monthlyProfit.toLocaleString() + '</strong>' +
+                '<strong style="color: var(--secondary-color);">GH₵' + monthlyProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="display: flex; justify-content: space-between; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
                 '<span>Annual Profit:</span>' +
-                '<strong style="color: var(--secondary-color);">GH₵' + r.annualProfit.toLocaleString() + '</strong>' +
+                '<strong style="color: var(--secondary-color);">GH₵' + annualProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="display: flex; justify-content: space-between; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
-                '<span>Total (' + result.investment.durationMonths + ' mo):</span>' +
-                '<strong style="color: var(--secondary-color);">GH₵' + r.totalProfit.toLocaleString() + '</strong>' +
+                '<span>Total (' + (result.investment ? result.investment.durationMonths : 12) + ' mo):</span>' +
+                '<strong style="color: var(--secondary-color);">GH₵' + totalProfit.toLocaleString() + '</strong>' +
               '</div>' +
               '<div style="display: flex; justify-content: space-between;">' +
                 '<span>Total Value:</span>' +
-                '<strong style="color: var(--primary-color); font-size: 1.1rem;">GH₵' + r.totalValue.toLocaleString() + '</strong>' +
+                '<strong style="color: var(--primary-color); font-size: 1.1rem;">GH₵' + totalValue.toLocaleString() + '</strong>' +
               '</div>' +
             '</div>' +
-            
+
             '<h4 style="margin: 1.5rem 0 0.75rem 0; font-size: 0.9rem;">Scenarios</h4>' +
             '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; font-size: 0.8rem; text-align: center;">' +
               '<div style="background: #fef2f2; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #991b1b;">Pessimistic</div>' +
-                '<strong>GH₵' + scenarios.pessimistic.totalProfit.toLocaleString() + '</strong>' +
+                '<strong>GH₵' + (scenarios && scenarios.pessimistic ? scenarios.pessimistic.totalProfit.toLocaleString() : '0') + '</strong>' +
               '</div>' +
               '<div style="background: #f0fdf4; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #166534;">Optimistic</div>' +
-                '<strong>GH₵' + scenarios.optimistic.totalProfit.toLocaleString() + '</strong>' +
+                '<strong>GH₵' + (scenarios && scenarios.optimistic ? scenarios.optimistic.totalProfit.toLocaleString() : '0') + '</strong>' +
               '</div>' +
               '<div style="background: #fef3c7; padding: 0.5rem; border-radius: 4px;">' +
                 '<div style="color: #92400e;">Worst Case</div>' +
                 '<strong>GH₵0</strong>' +
               '</div>' +
             '</div>' +
-            
+
             '<p style="color: #ef4444; font-size: 0.75rem; margin: 1rem 0 0 0; text-align: center;">⚠️ Profits depend on actual project performance</p>' +
           '</div>';
       }).catch(function(err) {
-        calcResults.innerHTML = '<div style="text-align: center; color: #ef4444;">Error: ' + err.message + '</div>';
+        calcResults.innerHTML = '<div style="text-align: center; color: #ef4444;">Error calculating returns: ' + (err.message || 'Unknown error') + '</div>';
       });
     }
     

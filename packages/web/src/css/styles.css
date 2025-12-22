@@ -1802,7 +1802,7 @@ body {
 /* Projects Grid */
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 1.25rem;
 }
 
@@ -1911,9 +1911,18 @@ body {
 
 .project-card-admin .project-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border-color);
+  justify-content: flex-start;
+}
+
+.project-card-admin .project-actions .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  padding: 0.375rem 0.625rem;
 }
 
 /* Create Project Form */
