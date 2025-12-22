@@ -3,8 +3,16 @@ var MailtrapClient = require('mailtrap').MailtrapClient;
 
 // Initialize Mailtrap client
 var mailtrap = null;
+var mailtrapDisabled = false; // Flag to disable after too many failures
+var failureCount = 0;
+var MAX_FAILURES = 3; // Disable after 3 consecutive failures
 
 function initMailtrap() {
+  // If we've had too many failures, don't try again
+  if (mailtrapDisabled) {
+    return null;
+  }
+  
   if (mailtrap) return mailtrap;
   
   var apiKey = process.env.MAILTRAP_API_KEY;
@@ -13,6 +21,13 @@ function initMailtrap() {
   
   if (!apiKey) {
     console.warn('⚠️ MAILTRAP_API_KEY not set - emails will be logged but not sent');
+    return null;
+  }
+  
+  // Validate inbox ID for sandbox mode
+  if (isSandbox && (!inboxId || isNaN(inboxId) || inboxId === 123456)) {
+    console.warn('⚠️ MAILTRAP_INBOX_ID is invalid or placeholder - emails will be logged but not sent');
+    console.warn('   Get your real Inbox ID from: https://mailtrap.io/inboxes (look at the URL)');
     return null;
   }
   
@@ -932,7 +947,7 @@ async function sendEmail(templateName, recipientEmail, data) {
   
   var emailContent = templates[templateName](data);
   
-  // Log email in development
+  // Log email in development or if client not available
   if (!client || process.env.NODE_ENV === 'development') {
     console.log('📧 Email would be sent:');
     console.log('  To:', recipientEmail);
@@ -954,10 +969,33 @@ async function sendEmail(templateName, recipientEmail, data) {
       category: 'Demony Notifications'
     });
     
+    // Reset failure count on success
+    failureCount = 0;
+    
     console.log('✅ Email sent to', recipientEmail, '- Template:', templateName);
     return { success: true, result: result };
   } catch (err) {
     console.error('❌ Failed to send email:', err.message);
+    
+    // Check if it's an auth/rate limit error
+    if (err.message && (err.message.includes('Unauthorized') || 
+        err.message.includes('Too many') || 
+        err.message.includes('rate limit') ||
+        err.message.includes('401') ||
+        err.message.includes('403'))) {
+      failureCount++;
+      console.warn('⚠️ Mailtrap auth failure (' + failureCount + '/' + MAX_FAILURES + ')');
+      
+      if (failureCount >= MAX_FAILURES) {
+        console.error('🚫 Mailtrap disabled due to repeated auth failures.');
+        console.error('   Please check your MAILTRAP_API_KEY and MAILTRAP_INBOX_ID in environment variables.');
+        console.error('   Get a new API key from: https://mailtrap.io/api-tokens');
+        console.error('   Get Inbox ID from URL when viewing your inbox: https://mailtrap.io/inboxes/YOUR_ID/messages');
+        mailtrapDisabled = true;
+        mailtrap = null; // Reset client
+      }
+    }
+    
     return { success: false, error: err.message };
   }
 }

@@ -165,7 +165,10 @@ router.post('/login', async function(req, res) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    if (!user.isVerified) {
+    // Check email verification (skip in development or if SKIP_EMAIL_VERIFICATION is set)
+    var skipVerification = process.env.NODE_ENV === 'development' || process.env.SKIP_EMAIL_VERIFICATION === 'true';
+    
+    if (!user.isVerified && !skipVerification) {
       try {
         var database = await db.getDb();
         var existing = await database.collection('email_verifications').findOne({
@@ -190,7 +193,11 @@ router.post('/login', async function(req, res) {
       } catch (verifyErr) {
         console.error('Could not send verification email on login:', verifyErr);
       }
-      return res.status(403).json({ error: 'Please verify your email. A verification link has been sent.' });
+      return res.status(403).json({ 
+        error: 'Please verify your email. A verification link has been sent to ' + user.email,
+        needsVerification: true,
+        email: user.email
+      });
     }
     
     var token = jwt.sign(

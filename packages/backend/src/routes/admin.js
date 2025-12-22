@@ -147,6 +147,33 @@ router.get('/users/:id', async function(req, res) {
   }
 });
 
+// Manually verify user email (admin override)
+router.post('/users/:id/verify-email', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    
+    var result = await database.collection('users').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { 
+        $set: { 
+          isVerified: true,
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log('✅ Admin verified email for user:', req.params.id);
+    res.json({ message: 'User email verified successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Verify/Reject KYC
 router.post('/users/:id/kyc', async function(req, res) {
   var action = req.body.action; // 'approve' or 'reject'
