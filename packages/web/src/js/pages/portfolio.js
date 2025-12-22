@@ -125,67 +125,16 @@ function attachInvestmentDrilldown(api) {
   if (!cards || cards.length === 0) return;
   cards.forEach(function(card) {
     card.style.cursor = 'pointer';
-    card.setAttribute('title', 'View your investments');
+    card.setAttribute('title', 'Click to view detailed investments page');
     card.addEventListener('click', function() {
-      showInvestmentsModal(api);
+      // Navigate to investments page instead of showing modal
+      if (window.DemonyApp && window.DemonyApp.router) {
+        window.DemonyApp.router.navigate('investments');
+      } else {
+        window.location.hash = '#/investments';
+      }
     });
   });
-}
-
-function showInvestmentsModal(api) {
-  var modal = document.createElement('div');
-  modal.className = 'modal active';
-  modal.innerHTML = 
-    '<div class="modal-content" style="max-width: 720px;">' +
-      '<h2>Your Investments</h2>' +
-      '<div id="investments-list" style="max-height: 400px; overflow-y: auto; margin-top: 1rem;">' +
-        '<div style="padding: 1rem; text-align: center; color: var(--text-muted);">Loading investments...</div>' +
-      '</div>' +
-      '<div class="form-actions" style="margin-top: 1rem;">' +
-        '<button type="button" class="btn btn-primary close-modal" style="width: 100%;">Close</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(modal);
-
-  modal.querySelector('.close-modal').addEventListener('click', function() { modal.remove(); });
-  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
-
-  api.getMyInvestments()
-    .then(function(response) {
-      var investments = response.investments || response;
-      var list = modal.querySelector('#investments-list');
-      if (!investments || investments.length === 0) {
-        list.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-muted);">No investments yet</div>';
-        return;
-      }
-      list.innerHTML = investments.map(function(inv) {
-        var amount = Number(inv.amount || inv.principal || 0);
-        var earnings = Number(inv.earnings || 0);
-        var status = inv.status || 'active';
-        var date = inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : '';
-        return (
-          '<div class="card" style="margin-bottom: 0.75rem;">' +
-            '<div style="display: flex; justify-content: space-between; gap: 1rem; align-items: center; flex-wrap: wrap;">' +
-              '<div>' +
-                '<div style="font-weight: 700;">' + (inv.projectName || inv.project || 'Project') + '</div>' +
-                '<div style="color: var(--text-muted); font-size: 0.9rem;">' + date + '</div>' +
-              '</div>' +
-              '<div style="text-align: right;">' +
-                '<div style="font-weight: 700; color: var(--secondary-color);">GH₵' + amount.toLocaleString() + '</div>' +
-                '<div style="color: var(--text-muted); font-size: 0.85rem;">Earnings: GH₵' + earnings.toLocaleString() + '</div>' +
-              '</div>' +
-            '</div>' +
-            '<div style="margin-top: 0.5rem; display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--text-muted);">' +
-              '<span>Status: <strong style="text-transform: capitalize;">' + status.replace('_', ' ') + '</strong></span>' +
-              '<span>Ownership: ' + (inv.ownershipPercent ? inv.ownershipPercent.toFixed ? inv.ownershipPercent.toFixed(2) : inv.ownershipPercent : '—') + '%</span>' +
-            '</div>' +
-          '</div>'
-        );
-      }).join('');
-    })
-    .catch(function() {
-      modal.querySelector('#investments-list').innerHTML = '<div style="padding: 1rem; text-align: center; color: #ef4444;">Unable to load investments</div>';
-    });
 }
 
 function createAllocationBar(label, percent, color) {

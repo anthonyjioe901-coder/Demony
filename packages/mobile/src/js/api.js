@@ -29,11 +29,11 @@ Api.prototype.request = function(endpoint, options) {
     headers: headers,
     body: options.body ? JSON.stringify(options.body) : undefined
   }).then(function(response) {
-    if (response.status === 401 || response.status === 403) {
+    // Handle auth errors - but not for login/signup endpoints
+    if ((response.status === 401 || response.status === 403) && endpoint.indexOf('/auth/login') === -1 && endpoint.indexOf('/auth/signup') === -1) {
       // Token expired or invalid
       localStorage.removeItem('demony_token');
       self.token = null;
-      // Don't reload in mobile app, just throw
       throw new Error('Authentication required');
     }
     if (!response.ok) {

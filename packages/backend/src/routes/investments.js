@@ -328,9 +328,24 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
     }
     
     // Payment successful - activate investment
+    // Calculate lock-in end date
+    var project = await database.collection('projects').findOne({ _id: new ObjectId(investment.projectId) });
+    var lockInPeriodMonths = project ? (project.lockInPeriodMonths || project.duration || 12) : 12;
+    var lockInEndDate = new Date();
+    lockInEndDate.setMonth(lockInEndDate.getMonth() + lockInPeriodMonths);
+    
     await database.collection('investments').updateOne(
       { paymentReference: reference },
-      { $set: { status: 'active', paidAt: new Date(), updatedAt: new Date() } }
+      { 
+        $set: { 
+          status: 'active', 
+          paidAt: new Date(), 
+          lockInEndDate: lockInEndDate,
+          lockInPeriodMonths: lockInPeriodMonths,
+          principalLocked: true,
+          updatedAt: new Date() 
+        } 
+      }
     );
     
     // Update user totals

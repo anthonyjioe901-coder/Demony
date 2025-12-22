@@ -509,6 +509,26 @@ body {
   border-color: var(--primary-color);
 }
 
+.form-group select,
+select {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-color);
+  color: var(--text-color);
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: menulist;
+  -moz-appearance: menulist;
+}
+
+.form-group select:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
 .form-actions {
   display: flex;
   gap: 1rem;

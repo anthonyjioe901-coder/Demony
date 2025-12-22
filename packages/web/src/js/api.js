@@ -22,7 +22,8 @@ Api.prototype.request = function(endpoint, options) {
     headers: headers,
     body: options.body ? JSON.stringify(options.body) : undefined
   }).then(function(response) {
-    if (response.status === 401 || response.status === 403) {
+    // Handle auth errors - but not for login/signup endpoints
+    if ((response.status === 401 || response.status === 403) && endpoint.indexOf('/auth/login') === -1 && endpoint.indexOf('/auth/signup') === -1) {
       localStorage.removeItem('demony_token');
       localStorage.removeItem('demony_user');
       self.token = null;
