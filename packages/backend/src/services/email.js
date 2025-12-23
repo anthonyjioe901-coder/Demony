@@ -1,5 +1,5 @@
 // Email Service using Resend (https://resend.com)
-var Resend = require('resend').default || require('resend');
+const { Resend } = require('resend');
 
 // Initialize client
 var resendClient = null;
