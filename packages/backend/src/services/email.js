@@ -1,38 +1,30 @@
-// Email Service using Mailtrap SMTP (nodemailer)
-var nodemailer = require('nodemailer');
+// Email Service using Resend (https://resend.com)
+var Resend = require('resend').default || require('resend');
 
-// Initialize transporter
-var transporter = null;
+// Initialize client
+var resendClient = null;
 var emailDisabled = false;
 
 function initTransporter() {
   if (emailDisabled) return null;
-  if (transporter) return transporter;
-  
-  var smtpUser = process.env.MAILTRAP_SMTP_USER || process.env.MAILTRAP_API_KEY;
-  var smtpPass = process.env.MAILTRAP_SMTP_PASS;
-  
-  // If no SMTP credentials, try to use API key method
-  if (!smtpUser || !smtpPass) {
-    console.warn('⚠️ MAILTRAP_SMTP_USER and MAILTRAP_SMTP_PASS not set');
-    console.warn('   Add these to your environment variables:');
-    console.warn('   MAILTRAP_SMTP_USER=69e64812f3d151');
-    console.warn('   MAILTRAP_SMTP_PASS=<your_password>');
+  if (resendClient) return resendClient;
+
+  var apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('⚠️ RESEND_API_KEY not set');
+    console.warn('   Set RESEND_API_KEY in your environment to enable sending via Resend.');
     console.warn('   Emails will be logged but not sent.');
     return null;
   }
-  
-  transporter = nodemailer.createTransport({
-    host: 'sandbox.smtp.mailtrap.io',
-    port: 2525,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass
-    }
-  });
-  
-  console.log('✅ Mailtrap SMTP initialized (sandbox mode)');
-  return transporter;
+
+  try {
+    resendClient = new Resend(apiKey);
+    console.log('✅ Resend client initialized');
+    return resendClient;
+  } catch (err) {
+    console.error('❌ Failed to initialize Resend client:', err && err.message);
+    return null;
+  }
 }
 
 // Get sender info
@@ -949,32 +941,31 @@ async function sendEmail(templateName, recipientEmail, data) {
     console.log('  Template:', templateName);
     return { success: true, simulated: true };
   }
-  
+
   try {
-    var result = await transport.sendMail({
-      from: '"' + sender.name + '" <' + sender.email + '>',
+    var from = '"' + sender.name + '" <' + sender.email + '>';
+    var result = await transport.emails.send({
+      from: from,
       to: recipientEmail,
       subject: emailContent.subject,
       html: emailContent.html,
       text: emailContent.text
     });
-    
+
     console.log('✅ Email sent to', recipientEmail, '- Template:', templateName);
-    return { success: true, messageId: result.messageId };
+    return { success: true, messageId: result && (result.id || result.messageId) };
   } catch (err) {
-    console.error('❌ Failed to send email:', err.message);
-    
-    // Check if it's an auth error - disable to prevent spam
-    if (err.message && (err.message.includes('auth') || 
-        err.message.includes('credentials') || 
-        err.message.includes('535'))) {
-      console.error('🚫 Email disabled due to auth failure.');
-      console.error('   Check MAILTRAP_SMTP_USER and MAILTRAP_SMTP_PASS');
+    console.error('❌ Failed to send email via Resend:', err && err.message);
+
+    // If API key is invalid or unauthorized, disable sending to avoid repeated failures
+    if (err && err.message && (err.message.toLowerCase().includes('unauthorized') || err.message.toLowerCase().includes('invalid'))) {
+      console.error('🚫 Email disabled due to Resend auth failure.');
+      console.error('   Check RESEND_API_KEY in your environment.');
       emailDisabled = true;
-      transporter = null;
+      resendClient = null;
     }
-    
-    return { success: false, error: err.message };
+
+    return { success: false, error: err && err.message };
   }
 }
 
