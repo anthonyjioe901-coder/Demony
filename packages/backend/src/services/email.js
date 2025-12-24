@@ -1,28 +1,30 @@
-// Email Service using Resend (https://resend.com)
-const { Resend } = require('resend');
+// Email Service using Brevo (https://brevo.com)
+const brevo = require('@getbrevo/brevo');
 
 // Initialize client
-var resendClient = null;
+var brevoClient = null;
 var emailDisabled = false;
 
 function initTransporter() {
   if (emailDisabled) return null;
-  if (resendClient) return resendClient;
+  if (brevoClient) return brevoClient;
 
-  var apiKey = process.env.RESEND_API_KEY;
+  var apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
-    console.warn('⚠️ RESEND_API_KEY not set');
-    console.warn('   Set RESEND_API_KEY in your environment to enable sending via Resend.');
+    console.warn('⚠️ BREVO_API_KEY not set');
+    console.warn('   Set BREVO_API_KEY in your environment to enable sending via Brevo.');
     console.warn('   Emails will be logged but not sent.');
     return null;
   }
 
   try {
-    resendClient = new Resend(apiKey);
-    console.log('✅ Resend client initialized');
-    return resendClient;
+    brevoClient = new brevo.TransactionalEmailsApi();
+    var apiKeyAuth = brevoClient.authentications['apiKey'];
+    apiKeyAuth.apiKey = apiKey;
+    console.log('✅ Brevo client initialized');
+    return brevoClient;
   } catch (err) {
-    console.error('❌ Failed to initialize Resend client:', err && err.message);
+    console.error('❌ Failed to initialize Brevo client:', err && err.message);
     return null;
   }
 }
@@ -943,26 +945,26 @@ async function sendEmail(templateName, recipientEmail, data) {
   }
 
   try {
-    var from = '"' + sender.name + '" <' + sender.email + '>';
-    var result = await transport.emails.send({
-      from: from,
-      to: recipientEmail,
-      subject: emailContent.subject,
-      html: emailContent.html,
-      text: emailContent.text
-    });
+    var sendSmtpEmail = new (require('@getbrevo/brevo').SendSmtpEmail)();
+    sendSmtpEmail.subject = emailContent.subject;
+    sendSmtpEmail.htmlContent = emailContent.html;
+    sendSmtpEmail.textContent = emailContent.text;
+    sendSmtpEmail.sender = { name: sender.name, email: sender.email };
+    sendSmtpEmail.to = [{ email: recipientEmail }];
+    
+    var result = await transport.sendTransacEmail(sendSmtpEmail);
 
     console.log('✅ Email sent to', recipientEmail, '- Template:', templateName);
-    return { success: true, messageId: result && (result.id || result.messageId) };
+    return { success: true, messageId: result && (result.body && result.body.messageId || result.messageId) };
   } catch (err) {
-    console.error('❌ Failed to send email via Resend:', err && err.message);
+    console.error('❌ Failed to send email via Brevo:', err && err.message);
 
     // If API key is invalid or unauthorized, disable sending to avoid repeated failures
     if (err && err.message && (err.message.toLowerCase().includes('unauthorized') || err.message.toLowerCase().includes('invalid'))) {
-      console.error('🚫 Email disabled due to Resend auth failure.');
-      console.error('   Check RESEND_API_KEY in your environment.');
+      console.error('🚫 Email disabled due to Brevo auth failure.');
+      console.error('   Check BREVO_API_KEY in your environment.');
       emailDisabled = true;
-      resendClient = null;
+      brevoClient = null;
     }
 
     return { success: false, error: err && err.message };

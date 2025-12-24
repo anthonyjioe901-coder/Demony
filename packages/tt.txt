@@ -1,0 +1,205 @@
+I'll analyze the handwritten notes to extract the bug reports and investigate the codebase.
+
+Bug Reports from Images
+From the handwritten notes, I can identify the following issues:
+
+Portfolio Page Issue: When tapping on "Total Invested, Active Investors, and Avg Returns" it should be able to display all your investors
+Withdraw Profits Issue: When tapping on withdraw profits, it should be able to take you to either momo or bank account
+Risk Disclosure Agreement: Don't agree on the form (Risk disclosure) to confirm I can afford to lose my entire investment account
+Email Verification: A link must be sent to your email when you are new and you want to log in and create a new account
+Currency Symbol Issue: When you type on the currency symbol it should take open up sometimes
+No Favicon: There is no favicon
+Investment Projects: When you tap on all categories and you...
+Let me search for more relevant files to understand the complete architecture:
+
+Explored 4 files
+Let me search for more files to understand the withdrawal flow and other issues:
+
+Search for favicon references in HTML files
+Explored 2 files
+Search for email verification logic in backend routes
+Read 
+packages/backend/src/routes/auth.js
+Now let me check the portfolio page for the "all investors" issue:
+
+Search for portfolio stats display
+Based on my analysis of the handwritten notes and codebase investigation, here's a comprehensive Bug Report and Fix Plan:
+
+📋 BUG REPORTS IDENTIFIED
+1. Portfolio Page - Missing "All Investors" Display
+Issue: When tapping on "Total Invested, Active Investors, and Avg Returns" it should display all your investors.
+
+Location: packages/web/src/js/pages/portfolio.js
+
+Root Cause: The portfolio page only shows aggregate stats but doesn't have a clickable feature to view detailed investor list or investment breakdown.
+
+Current Behavior: Stats are displayed as static cards without any interaction.
+
+2. Withdraw Profits - Missing Payment Method Selection
+Issue: When tapping on withdraw profits, it should be able to take you to either momo or bank account.
+
+Location: packages/web/src/js/pages/wallet.js (lines 197-305)
+
+Root Cause: The withdrawal modal only shows bank account option. There's no Mobile Money (MoMo) option implemented.
+
+Current Behavior: Only bank withdrawal is available in showWithdrawModal() function.
+
+3. Missing Risk Disclosure Confirmation Checkbox
+Issue: Don't agree on the form (Risk disclosure) to confirm "I can afford to lose my entire investment account"
+
+Location: packages/web/src/js/pages/projects.js (lines 211-229)
+
+Root Cause: The investment modal has 3 checkboxes but is missing the critical "I can afford to lose my entire investment" acknowledgment.
+
+Current Checkboxes:
+
+Terms & Conditions
+Profits NOT guaranteed
+Principal locked for X months
+Missing: "I can afford to lose my entire investment" checkbox
+
+4. Email Verification Not Implemented
+Issue: A link must be sent to your email when you are new and you want to log in and create a new account.
+
+Location: packages/backend/src/routes/auth.js
+
+Root Cause: Email verification system is not implemented. Users can sign up without email verification.
+
+Current Behavior: User account is created immediately without email verification step.
+
+5. Currency Symbol Input Issue
+Issue: When you type on the currency symbol it should take/open up sometimes (unclear from notes, likely referring to currency input field behavior)
+
+Location: Multiple input fields across investment and wallet pages
+
+Root Cause: Currency inputs don't have proper formatting or currency symbol handling. The GH₵ symbol is hardcoded in labels but not interactive.
+
+6. Missing Favicon
+Issue: There is no favicon
+
+Location: packages/web/src/index.html (line 7) and packages/web/public/favicon.ico
+
+Root Cause:
+
+No favicon link tag in HTML
+The favicon.ico file exists but is empty (1 byte)
+7. Investment Projects Category Filter Issue (Incomplete in notes)
+Issue: "When you tap on all categories and you..." (note was cut off)
+
+Location: packages/web/src/js/pages/projects.js (lines 8-24)
+
+Potential Issue: Category filter might not be working properly or has UX issues.
+
+🔧 COMPREHENSIVE FIX PLAN
+Fix 1: Portfolio - Add Investor Details Modal
+Files to modify:
+
+packages/web/src/js/pages/portfolio.js
+Changes:
+
+Make the stats cards clickable
+Create a modal to show detailed investment breakdown
+Add API endpoint to fetch detailed portfolio data
+Display list of all investments with project names, amounts, dates
+Implementation:
+
+// Add click handlers to stats cards
+// Create showInvestorDetailsModal() function
+// Fetch and display investment list with filtering/sorting
+Fix 2: Add Mobile Money (MoMo) Withdrawal Option
+Files to modify:
+
+packages/web/src/js/pages/wallet.js
+packages/backend/src/routes/wallet.js
+Changes:
+
+Add payment method selection (Bank/MoMo) in withdrawal modal
+Show different form fields based on selection:
+Bank: Account number, bank selection, account name
+MoMo: Phone number, network selection (MTN, Vodafone, AirtelTigo)
+Update backend to handle MoMo withdrawals
+Integrate with Paystack Transfer API for MoMo
+Fix 3: Add "Afford to Lose" Risk Acknowledgment
+Files to modify:
+
+packages/web/src/js/pages/projects.js (investment modal)
+Changes:
+
+Add 4th checkbox: "I understand and can afford to lose my entire investment"
+Update validation to require all 4 checkboxes
+Update backend to store this acknowledgment
+Add to investment terms acceptance record
+Fix 4: Implement Email Verification System
+Files to modify:
+
+packages/backend/src/routes/auth.js
+Create new file: packages/backend/src/utils/email.js
+packages/web/src/js/app.js
+Changes:
+
+Backend:
+
+Generate verification token on signup
+Send verification email with link
+Create /auth/verify-email/:token endpoint
+Prevent certain actions until email verified
+Frontend:
+
+Show "Verify your email" banner for unverified users
+Create email verification page
+Handle verification link clicks
+Resend verification email option
+Email Service:
+
+Set up email service (Nodemailer with Gmail/SendGrid)
+Create email templates
+Add verification link with token
+Fix 5: Improve Currency Input Handling
+Files to modify:
+
+packages/web/src/js/pages/projects.js
+packages/web/src/js/pages/wallet.js
+Changes:
+
+Add currency formatting on input
+Auto-format numbers with commas
+Add GH₵ prefix in input field (read-only)
+Handle paste events properly
+Create reusable currency input component
+Fix 6: Add Favicon
+Files to modify:
+
+packages/web/src/index.html
+packages/web/public/favicon.ico (replace with actual icon)
+Changes:
+
+Create proper favicon.ico file (16x16, 32x32, 48x48 sizes)
+Add favicon link tags in HTML:
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+Generate favicon from logo (💎 diamond emoji or custom design)
+Fix 7: Verify Category Filter Functionality
+Files to modify:
+
+packages/web/src/js/pages/projects.js
+Changes:
+
+Test category filter behavior
+Ensure "All Categories" option clears filter
+Add loading state during filter changes
+Fix any race conditions in filter + sort combination
+📊 PRIORITY ORDER
+HIGH PRIORITY:
+
+Fix 3: Add "Afford to Lose" checkbox (legal/compliance)
+Fix 4: Email verification (security)
+Fix 6: Add favicon (professional appearance)
+MEDIUM PRIORITY:
+
+Fix 2: MoMo withdrawal option (user convenience)
+Fix 1: Portfolio investor details (transparency)
+Fix 5: Currency input improvements (UX)
+LOW PRIORITY:
+
+Fix 7: Category filter verification (minor UX
