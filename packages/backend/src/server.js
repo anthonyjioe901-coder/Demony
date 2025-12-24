@@ -19,15 +19,23 @@ try {
 }
 
 // CORS configuration for production
+// Parse comma-separated allowed origins from env
+var envAllowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(function(origin) { return origin.trim(); })
+  : [];
+
 var allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3002',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'https://demony-web.onrender.com',
+  'https://demony.vercel.app',
   process.env.WEB_URL,
   process.env.MOBILE_URL
-].filter(Boolean);
+].concat(envAllowedOrigins).filter(Boolean);
+
+console.log('🌐 Allowed CORS origins:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -42,7 +50,8 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
+      console.log('❌ CORS blocked origin:', origin);
+      console.log('   Add it to ALLOWED_ORIGINS env variable');
       callback(new Error('Not allowed by CORS'));
     }
   },
