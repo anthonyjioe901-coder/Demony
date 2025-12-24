@@ -165,8 +165,10 @@ router.post('/login', async function(req, res) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Check email verification (skip in development or if SKIP_EMAIL_VERIFICATION is set)
-    var skipVerification = process.env.NODE_ENV === 'development' || process.env.SKIP_EMAIL_VERIFICATION === 'true';
+    // Check email verification (skip in development, if SKIP_EMAIL_VERIFICATION is set, or temporarily skip for all)
+    // TODO: Re-enable once email provider is fully configured
+    var skipVerification = true; // Temporarily skip until Brevo is verified
+    // var skipVerification = process.env.NODE_ENV === 'development' || process.env.SKIP_EMAIL_VERIFICATION === 'true';
     
     if (!user.isVerified && !skipVerification) {
       try {
@@ -295,26 +297,51 @@ router.get('/verify-email/:token', async function(req, res) {
     var database = await db.getDb();
     var record = await database.collection('email_verifications').findOne({ token: token });
     if (!record) {
-      return res.status(400).json({ error: 'Invalid verification token' });
+      // Redirect with error
+      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
+      return res.redirect(appUrl + '/#login?verified=invalid');
     }
     if (record.used) {
-      return res.status(400).json({ error: 'Token already used' });
+      // Already verified - redirect to login
+      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
+      return res.redirect(appUrl + '/#login?verified=already');
     }
     if (record.expiresAt && record.expiresAt < new Date()) {
-      return res.status(400).json({ error: 'Token has expired' });
+      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
+      return res.redirect(appUrl + '/#login?verified=expired');
     }
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(record.userId) },
-      { $set: { isVerified: true, updatedAt: new Date() } }
-    );
+    
+    // Update user - handle both string and ObjectId userId
+    var userId = record.userId;
+    var updateResult;
+    try {
+      // Try as ObjectId first
+      updateResult = await database.collection('users').updateOne(
+        { _id: new ObjectId(userId) },
+        { $set: { isVerified: true, updatedAt: new Date() } }
+      );
+    } catch (e) {
+      // If that fails, try as string
+      updateResult = await database.collection('users').updateOne(
+        { _id: userId },
+        { $set: { isVerified: true, updatedAt: new Date() } }
+      );
+    }
+    
+    console.log('✅ Email verified for userId:', userId, '- matchedCount:', updateResult.matchedCount, '- modifiedCount:', updateResult.modifiedCount);
+    
     await database.collection('email_verifications').updateOne(
       { _id: record._id },
       { $set: { used: true, usedAt: new Date() } }
     );
-    res.json({ message: 'Email verified successfully' });
+    
+    // Redirect to login with success message
+    var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
+    res.redirect(appUrl + '/#login?verified=success');
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Verification error:', err);
+    var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
+    res.redirect(appUrl + '/#login?verified=error');
   }
 });
 
