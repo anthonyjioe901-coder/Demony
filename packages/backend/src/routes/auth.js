@@ -292,27 +292,38 @@ router.post('/kyc/submit', authenticateToken, async function(req, res) {
 // Verify email
 router.get('/verify-email/:token', async function(req, res) {
   var token = req.params.token;
+  console.log('📧 Verification attempt for token:', token ? token.substring(0, 10) + '...' : 'none');
+  
   if (!token) return res.status(400).json({ error: 'Verification token is required' });
+  
   try {
     var database = await db.getDb();
     var record = await database.collection('email_verifications').findOne({ token: token });
+    
+    console.log('📋 Verification record found:', !!record);
+    
     if (!record) {
-      // Redirect with error
+      console.log('❌ Invalid verification token');
       var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
       return res.redirect(appUrl + '/#login?verified=invalid');
     }
+    
     if (record.used) {
-      // Already verified - redirect to login
+      console.log('⚠️ Token already used');
       var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
       return res.redirect(appUrl + '/#login?verified=already');
     }
+    
     if (record.expiresAt && record.expiresAt < new Date()) {
+      console.log('⏰ Token expired');
       var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
       return res.redirect(appUrl + '/#login?verified=expired');
     }
     
     // Update user - handle both string and ObjectId userId
     var userId = record.userId;
+    console.log('👤 Updating user:', userId);
+    
     var updateResult;
     try {
       // Try as ObjectId first
@@ -320,15 +331,30 @@ router.get('/verify-email/:token', async function(req, res) {
         { _id: new ObjectId(userId) },
         { $set: { isVerified: true, updatedAt: new Date() } }
       );
+      console.log('📝 Update result (ObjectId):', {
+        matched: updateResult.matchedCount,
+        modified: updateResult.modifiedCount
+      });
     } catch (e) {
+      console.log('⚠️ ObjectId update failed, trying string ID:', e.message);
       // If that fails, try as string
       updateResult = await database.collection('users').updateOne(
         { _id: userId },
         { $set: { isVerified: true, updatedAt: new Date() } }
       );
+      console.log('📝 Update result (string):', {
+        matched: updateResult.matchedCount,
+        modified: updateResult.modifiedCount
+      });
     }
     
-    console.log('✅ Email verified for userId:', userId, '- matchedCount:', updateResult.matchedCount, '- modifiedCount:', updateResult.modifiedCount);
+    if (updateResult.matchedCount === 0) {
+      console.log('❌ User not found for userId:', userId);
+      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
+      return res.redirect(appUrl + '/#login?verified=usernotfound');
+    }
+    
+    console.log('✅ Email verified successfully for userId:', userId);
     
     await database.collection('email_verifications').updateOne(
       { _id: record._id },
@@ -339,7 +365,7 @@ router.get('/verify-email/:token', async function(req, res) {
     var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
     res.redirect(appUrl + '/#login?verified=success');
   } catch (err) {
-    console.error('Verification error:', err);
+    console.error('❌ Verification error:', err);
     var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
     res.redirect(appUrl + '/#login?verified=error');
   }

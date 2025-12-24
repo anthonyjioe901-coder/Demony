@@ -429,5 +429,54 @@ function updateActiveNavLink() {
 window.addEventListener('hashchange', updateActiveNavLink);
 updateActiveNavLink();
 
+// Check for email verification status in URL
+function checkVerificationStatus() {
+  var hash = window.location.hash || '';
+  var params = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : '');
+  var verified = params.get('verified');
+  
+  if (verified) {
+    var messages = {
+      'success': '✅ Email verified successfully! You can now login.',
+      'already': 'ℹ️ This email has already been verified. Please login.',
+      'invalid': '❌ Invalid verification link. Please sign up again or contact support.',
+      'expired': '⏰ Verification link expired. Please login to request a new one.',
+      'usernotfound': '❌ User not found. Please sign up again.',
+      'error': '❌ Verification failed. Please try again or contact support.'
+    };
+    
+    var message = messages[verified] || 'Unknown verification status';
+    var alertClass = verified === 'success' || verified === 'already' ? 'success' : 'error';
+    
+    // Show alert message
+    var alert = document.createElement('div');
+    alert.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; padding: 1rem 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); max-width: 500px; text-align: center; font-weight: 500;';
+    alert.style.backgroundColor = alertClass === 'success' ? '#10b981' : '#ef4444';
+    alert.style.color = 'white';
+    alert.textContent = message;
+    document.body.appendChild(alert);
+    
+    // Auto-remove after 6 seconds
+    setTimeout(function() {
+      alert.style.opacity = '0';
+      alert.style.transition = 'opacity 0.5s';
+      setTimeout(function() { alert.remove(); }, 500);
+    }, 6000);
+    
+    // Clean URL
+    var cleanHash = hash.split('?')[0] || '#login';
+    window.history.replaceState(null, '', cleanHash);
+    
+    // Auto-open login modal if not already logged in
+    if (!localStorage.getItem('demony_user')) {
+      setTimeout(function() {
+        var loginBtn = document.getElementById('login-btn');
+        if (loginBtn) loginBtn.click();
+      }, 500);
+    }
+  }
+}
+
 // Initial navigation - honor current hash
 router.init('home');
+checkVerificationStatus();
