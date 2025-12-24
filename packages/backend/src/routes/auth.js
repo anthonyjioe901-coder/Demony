@@ -12,8 +12,9 @@ var ObjectId = require('mongodb').ObjectId;
 var JWT_SECRET = process.env.JWT_SECRET || 'demony-secret-key-change-in-production';
 
 function getApiBaseUrl() {
-  var appBase = process.env.APP_URL || process.env.WEB_URL;
-  return process.env.API_URL || process.env.API_BASE_URL || (appBase ? appBase.replace(/\/$/, '') + '/api' : 'https://demony-api.onrender.com/api');
+  // Use API_URL directly if set, otherwise default to the backend API on Render
+  // IMPORTANT: This must point to the BACKEND, not the frontend!
+  return process.env.API_URL || process.env.API_BASE_URL || 'https://demony-api.onrender.com/api';
 }
 
 // Valid user roles
