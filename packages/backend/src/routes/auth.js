@@ -165,38 +165,50 @@ router.post('/login', async function(req, res) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Check email verification (skip in development, if SKIP_EMAIL_VERIFICATION is set, or temporarily skip for all)
-    // TODO: Re-enable once email provider is fully configured
-    var skipVerification = true; // Temporarily skip until Brevo is verified
-    // var skipVerification = process.env.NODE_ENV === 'development' || process.env.SKIP_EMAIL_VERIFICATION === 'true';
+    // Check email verification - require verification unless in development or explicitly skipped
+    var skipVerification = process.env.NODE_ENV === 'development' || process.env.SKIP_EMAIL_VERIFICATION === 'true';
     
     if (!user.isVerified && !skipVerification) {
+      console.log('📧 User not verified, sending verification email to:', user.email);
       try {
         var database = await db.getDb();
+        // Check for existing valid verification token
         var existing = await database.collection('email_verifications').findOne({
           userId: user._id.toString(),
           used: false,
           expiresAt: { $gt: new Date() }
         });
-        var tokenToSend = existing ? existing.token : crypto.randomBytes(32).toString('hex');
-        if (!existing) {
+        
+        var tokenToSend;
+        if (existing) {
+          tokenToSend = existing.token;
+          console.log('📧 Using existing verification token for:', user.email);
+        } else {
+          tokenToSend = crypto.randomBytes(32).toString('hex');
           await database.collection('email_verifications').insertOne({
             userId: user._id.toString(),
             token: tokenToSend,
             used: false,
-            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 48),
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 48), // 48 hours
             createdAt: new Date()
           });
+          console.log('📧 Created new verification token for:', user.email);
         }
+        
         var verifyUrlLogin = getApiBaseUrl() + '/auth/verify-email/' + tokenToSend;
-        emailService.sendVerificationEmail(user, verifyUrlLogin).catch(function(err) {
-          console.error('Failed to send verification email:', err);
+        console.log('📧 Sending verification email to:', user.email, '- URL:', verifyUrlLogin);
+        
+        emailService.sendVerificationEmail(user, verifyUrlLogin).then(function(result) {
+          console.log('✅ Verification email sent successfully:', result);
+        }).catch(function(err) {
+          console.error('❌ Failed to send verification email:', err);
         });
       } catch (verifyErr) {
-        console.error('Could not send verification email on login:', verifyErr);
+        console.error('❌ Error handling verification email on login:', verifyErr);
       }
+      
       return res.status(403).json({ 
-        error: 'Please verify your email. A verification link has been sent to ' + user.email,
+        error: 'Please verify your email first. A verification link has been sent to ' + user.email + '. Check your inbox and spam folder.',
         needsVerification: true,
         email: user.email
       });
