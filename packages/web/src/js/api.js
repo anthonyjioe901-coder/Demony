@@ -32,7 +32,11 @@ Api.prototype.request = function(endpoint, options) {
     }
     if (!response.ok) {
       return response.json().then(function(err) {
-        throw new Error(err.error || 'Request failed: ' + response.status);
+        // Preserve additional error properties like needsVerification
+        var error = new Error(err.error || 'Request failed: ' + response.status);
+        error.needsVerification = err.needsVerification;
+        error.email = err.email;
+        throw error;
       });
     }
     return response.json();

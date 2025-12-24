@@ -288,7 +288,14 @@ function showAuthModal(type) {
           navigateAfterAuth();
         })
         .catch(function(err) {
-          alert(err.message);
+          // Check if it's a verification error
+          if (err.needsVerification) {
+            modal.remove();
+            showNotification('A verification link has been sent to ' + err.email + '. Please check your inbox and spam folder to verify your account before logging in.', 'warning');
+          } else {
+            // Show error in modal or as alert
+            showNotification(err.message || 'Login failed. Please try again.', 'error');
+          }
         });
     } else {
       // Signup flow - show agreement modal first
@@ -430,6 +437,43 @@ window.addEventListener('hashchange', updateActiveNavLink);
 updateActiveNavLink();
 
 // Check for email verification status in URL
+function showNotification(message, type) {
+  // type: 'success', 'error', 'info', 'warning'
+  var colors = {
+    'success': { bg: '#10b981', icon: '✅' },
+    'error': { bg: '#ef4444', icon: '❌' },
+    'info': { bg: '#3b82f6', icon: 'ℹ️' },
+    'warning': { bg: '#f59e0b', icon: '⚠️' }
+  };
+  
+  var color = colors[type] || colors['info'];
+  
+  var notification = document.createElement('div');
+  notification.style.cssText = 'position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 10000; padding: 1.25rem 2rem; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); max-width: 600px; width: 90%; text-align: center; font-weight: 600; font-size: 1rem; line-height: 1.5; animation: slideDown 0.3s ease-out;';
+  notification.style.backgroundColor = color.bg;
+  notification.style.color = 'white';
+  notification.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;"><span style="font-size: 1.5rem;">' + color.icon + '</span><span>' + message + '</span></div>';
+  
+  // Add animation
+  var style = document.createElement('style');
+  style.textContent = '@keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }';
+  document.head.appendChild(style);
+  
+  document.body.appendChild(notification);
+  
+  // Auto-remove after 7 seconds
+  setTimeout(function() {
+    notification.style.opacity = '0';
+    notification.style.transition = 'opacity 0.5s';
+    setTimeout(function() { 
+      notification.remove(); 
+      style.remove();
+    }, 500);
+  }, 7000);
+  
+  return notification;
+}
+
 function checkVerificationStatus() {
   var hash = window.location.hash || '';
   var params = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : '');
@@ -437,31 +481,19 @@ function checkVerificationStatus() {
   
   if (verified) {
     var messages = {
-      'success': '✅ Email verified successfully! You can now login.',
-      'already': 'ℹ️ This email has already been verified. Please login.',
-      'invalid': '❌ Invalid verification link. Please sign up again or contact support.',
-      'expired': '⏰ Verification link expired. Please login to request a new one.',
-      'usernotfound': '❌ User not found. Please sign up again.',
-      'error': '❌ Verification failed. Please try again or contact support.'
+      'success': 'Email verified successfully! You can now login to your account.',
+      'already': 'This email has already been verified. Please login.',
+      'invalid': 'Invalid verification link. Please sign up again or contact support.',
+      'expired': 'Verification link expired. Please login to request a new one.',
+      'usernotfound': 'User not found. Please sign up again.',
+      'error': 'Verification failed. Please try again or contact support.'
     };
     
     var message = messages[verified] || 'Unknown verification status';
-    var alertClass = verified === 'success' || verified === 'already' ? 'success' : 'error';
+    var notifType = (verified === 'success' || verified === 'already') ? 'success' : 'error';
     
-    // Show alert message
-    var alert = document.createElement('div');
-    alert.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10000; padding: 1rem 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); max-width: 500px; text-align: center; font-weight: 500;';
-    alert.style.backgroundColor = alertClass === 'success' ? '#10b981' : '#ef4444';
-    alert.style.color = 'white';
-    alert.textContent = message;
-    document.body.appendChild(alert);
-    
-    // Auto-remove after 6 seconds
-    setTimeout(function() {
-      alert.style.opacity = '0';
-      alert.style.transition = 'opacity 0.5s';
-      setTimeout(function() { alert.remove(); }, 500);
-    }, 6000);
+    // Show notification
+    showNotification(message, notifType);
     
     // Clean URL
     var cleanHash = hash.split('?')[0] || '#login';
