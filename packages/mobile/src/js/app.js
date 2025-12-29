@@ -86,22 +86,92 @@ function renderTab(tabName) {
 
 // Home Tab
 function renderHome() {
+  // SVG Icons
+  const icons = {
+    money: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-secondary"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+    users: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+    chart: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-secondary"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>',
+    trend: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>',
+    target: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>',
+    phone: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>',
+    referral: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>'
+  };
+
   mainContent.innerHTML = 
-    '<div class="page-header">' +
-      '<h1>Welcome to Demony</h1>' +
-      '<p>Invest in local businesses</p>' +
-    '</div>' +
-    
-    '<div id="home-stats" class="stats-grid">' +
-      'Loading stats...' +
-    '</div>' +
-    
-    '<div class="card">' +
-      '<h3>Featured Projects</h3>' +
-      '<div id="featured-projects" class="project-list">' +
-        'Loading projects...' +
+    // HERO SECTION
+    '<section class="hero" style="text-align: center; padding: 2rem 1rem; background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%); border-radius: 16px; margin-bottom: 1.5rem;">' +
+      '<h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 0.5rem; line-height: 1.2;">Start Investing from Just GH₵20</h2>' +
+      '<p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem;">Build wealth by supporting local businesses. Diversify your portfolio and earn real returns.</p>' +
+      '<div style="display: flex; gap: 0.5rem; justify-content: center;">' +
+        '<button class="btn btn-primary" onclick="switchTab(\'projects\')" style="flex: 1;">Start Investing</button>' +
+        '<button class="btn btn-outline" onclick="switchTab(\'projects\')" style="flex: 1;">Browse</button>' +
       '</div>' +
-    '</div>';
+    '</section>' +
+    
+    // TRUST & TRACTION SECTION
+    '<section style="margin-bottom: 2rem;">' +
+      '<div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem;">' +
+        '<div class="card stat-card" style="text-align: center; padding: 1rem;">' +
+          '<div style="margin-bottom: 0.5rem; color: var(--secondary-color);">' + icons.money + '</div>' +
+          '<div class="value" style="color: var(--secondary-color); font-size: 1.1rem;">GH₵2.5M+</div>' +
+          '<div class="label" style="font-size: 0.75rem; font-weight: 600;">Invested</div>' +
+        '</div>' +
+        '<div class="card stat-card" style="text-align: center; padding: 1rem;">' +
+          '<div style="margin-bottom: 0.5rem; color: var(--primary-color);">' + icons.users + '</div>' +
+          '<div class="value" style="color: var(--primary-color); font-size: 1.1rem;">5,000+</div>' +
+          '<div class="label" style="font-size: 0.75rem; font-weight: 600;">Investors</div>' +
+        '</div>' +
+        '<div class="card stat-card" style="text-align: center; padding: 1rem;">' +
+          '<div style="margin-bottom: 0.5rem; color: var(--secondary-color);">' + icons.chart + '</div>' +
+          '<div class="value" style="color: var(--secondary-color); font-size: 1.1rem;">150+</div>' +
+          '<div class="label" style="font-size: 0.75rem; font-weight: 600;">Projects</div>' +
+        '</div>' +
+        '<div class="card stat-card" style="text-align: center; padding: 1rem;">' +
+          '<div style="margin-bottom: 0.5rem; color: var(--primary-color);">' + icons.trend + '</div>' +
+          '<div class="value" style="color: var(--primary-color); font-size: 1.1rem;">12%</div>' +
+          '<div class="label" style="font-size: 0.75rem; font-weight: 600;">Avg. Returns</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="text-align: center; margin-top: 1rem;">' +
+        '<span style="display: inline-block; background: #10b98133; color: var(--secondary-color); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">✓ Licensed & Regulated</span>' +
+      '</div>' +
+    '</section>' +
+    
+    // WHY DEMONY? SECTION
+    '<section style="margin-bottom: 2rem;">' +
+      '<h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 1rem; text-align: center;">Why Invest with Demony?</h2>' +
+      '<div style="display: grid; gap: 1rem;">' +
+        '<div class="card" style="padding: 1rem; display: flex; align-items: center; gap: 1rem;">' +
+          '<div style="color: var(--primary-color);">' + icons.target + '</div>' +
+          '<div>' +
+            '<h3 style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;">Low Barrier to Entry</h3>' +
+            '<p style="color: var(--text-muted); font-size: 0.85rem;">Start with just GH₵20</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="card" style="padding: 1rem; display: flex; align-items: center; gap: 1rem;">' +
+          '<div style="color: var(--secondary-color);">' + icons.money + '</div>' +
+          '<div>' +
+            '<h3 style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;">Transparent Returns</h3>' +
+            '<p style="color: var(--text-muted); font-size: 0.85rem;">See exactly what you earn</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="card" style="padding: 1rem; display: flex; align-items: center; gap: 1rem;">' +
+          '<div style="color: var(--primary-color);">' + icons.referral + '</div>' +
+          '<div>' +
+            '<h3 style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;">Earn While Referring</h3>' +
+            '<p style="color: var(--text-muted); font-size: 0.85rem;">Give GH₵50, Get GH₵50</p>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</section>' +
+    
+    // FEATURED PROJECTS SECTION
+    '<section style="margin-bottom: 2rem;">' +
+      '<h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem;">Popular Opportunities</h2>' +
+      '<div id="featured-projects" class="project-list">' +
+        '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Loading projects...</div>' +
+      '</div>' +
+    '</section>';
     
   // Load data
   if (api.token) {
