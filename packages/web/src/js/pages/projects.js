@@ -98,7 +98,10 @@ function loadProjects(api) {
           '<div class="project-content" style="padding: 1.5rem;">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">' +
               '<span class="badge">' + (project.category || 'General') + '</span>' +
-              '<span style="color: var(--text-muted); font-size: 0.875rem;">📅 ' + ageDisplay + '</span>' +
+              '<div style="display: flex; align-items: center; gap: 0.5rem;">' +
+                '<span style="color: var(--text-muted); font-size: 0.875rem;">📅 ' + ageDisplay + '</span>' +
+                '<button class="share-project-btn" data-id="' + project.id + '" data-name="' + encodeURIComponent(project.name) + '" title="Share project" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem;">📤</button>' +
+              '</div>' +
             '</div>' +
             '<h3>' + project.name + '</h3>' +
             '<p style="color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;">' + (project.description || '').substring(0, 100) + '...</p>' +
@@ -144,6 +147,16 @@ function loadProjects(api) {
         btn.addEventListener('click', function() {
           var id = this.getAttribute('data-id');
           showCalculatorModal(id, api);
+        });
+      });
+      
+      // Attach share button handlers
+      document.querySelectorAll('.share-project-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var id = this.getAttribute('data-id');
+          var name = decodeURIComponent(this.getAttribute('data-name'));
+          showShareModal(id, name);
         });
       });
     })
@@ -491,6 +504,73 @@ function showCalculatorModal(projectId, api) {
     });
   }).catch(function(err) {
     alert('Error loading project: ' + err.message);
+  });
+}
+
+// Social Share Modal for Projects
+function showShareModal(projectId, projectName) {
+  var baseUrl = window.location.origin + window.location.pathname;
+  var shareUrl = baseUrl + '#projects/' + projectId;
+  var shareMessage = 'Check out this investment opportunity on Demony: ' + projectName + ' 🚀 Invest in local businesses and earn returns!';
+  
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 400px;">' +
+      '<h2 style="margin-bottom: 1rem;">Share This Project</h2>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1.5rem;">Spread the word about this investment opportunity!</p>' +
+      
+      '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">' +
+        '<button id="share-wa" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; background: #25D366; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">' +
+          '<span>💬</span> WhatsApp' +
+        '</button>' +
+        '<button id="share-tw" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; background: #1DA1F2; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">' +
+          '<span>🐦</span> Twitter' +
+        '</button>' +
+        '<button id="share-fb" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; background: #1877F2; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">' +
+          '<span>📘</span> Facebook' +
+        '</button>' +
+        '<button id="share-copy" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; background: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">' +
+          '<span>📋</span> Copy Link' +
+        '</button>' +
+      '</div>' +
+      
+      '<button class="btn btn-outline" id="close-share-modal" style="width: 100%; margin-top: 1.5rem;">Close</button>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  document.getElementById('share-wa').addEventListener('click', function() {
+    if (window.DemonyAnalytics) window.DemonyAnalytics.trackReferralShare('whatsapp');
+    window.open('https://wa.me/?text=' + encodeURIComponent(shareMessage + ' ' + shareUrl), '_blank');
+  });
+  
+  document.getElementById('share-tw').addEventListener('click', function() {
+    if (window.DemonyAnalytics) window.DemonyAnalytics.trackReferralShare('twitter');
+    window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareMessage) + '&url=' + encodeURIComponent(shareUrl), '_blank');
+  });
+  
+  document.getElementById('share-fb').addEventListener('click', function() {
+    if (window.DemonyAnalytics) window.DemonyAnalytics.trackReferralShare('facebook');
+    window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(shareUrl) + '&quote=' + encodeURIComponent(shareMessage), '_blank');
+  });
+  
+  document.getElementById('share-copy').addEventListener('click', function() {
+    var btn = this;
+    navigator.clipboard.writeText(shareUrl).then(function() {
+      btn.innerHTML = '<span>✓</span> Copied!';
+      setTimeout(function() {
+        btn.innerHTML = '<span>📋</span> Copy Link';
+      }, 2000);
+    });
+  });
+  
+  document.getElementById('close-share-modal').addEventListener('click', function() {
+    modal.remove();
+  });
+  
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) modal.remove();
   });
 }
 

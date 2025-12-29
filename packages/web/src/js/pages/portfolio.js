@@ -22,6 +22,23 @@ function renderPortfolio(container, api) {
         '<p>Your investment overview</p>' +
       '</div>' +
       
+      // Referral Widget - Prominent placement
+      '<div id="referral-widget" class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; position: relative; overflow: hidden;">' +
+        '<div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.1;">🎁</div>' +
+        '<div style="position: relative; z-index: 1;">' +
+          '<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">' +
+            '<span style="font-size: 1.5rem;">🎁</span>' +
+            '<h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Give GH₵50, Get GH₵50</h3>' +
+          '</div>' +
+          '<p style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 1rem;">Share your referral code and earn GH₵50 when friends invest!</p>' +
+          '<div id="referral-code-section" style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 0.75rem; margin-bottom: 1rem;">' +
+            '<div style="text-align: center; color: rgba(255,255,255,0.7);">Loading your code...</div>' +
+          '</div>' +
+          '<div id="referral-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; font-size: 0.8rem;">' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      
       // Main Portfolio Value Card
       '<div id="portfolio-value" class="card" style="margin-bottom: 1.5rem;">' +
         '<div style="text-align: center; padding: 0.5rem;">' +
@@ -66,6 +83,104 @@ function renderPortfolio(container, api) {
   container.innerHTML = html;
   
   loadPortfolio(api);
+  loadReferralWidget(api);
+}
+
+function loadReferralWidget(api) {
+  api.getReferralCode()
+    .then(function(data) {
+      var codeSection = document.getElementById('referral-code-section');
+      var statsSection = document.getElementById('referral-stats');
+      
+      if (!codeSection) return;
+      
+      codeSection.innerHTML = 
+        '<div style="display: flex; align-items: center; gap: 0.5rem;">' +
+          '<div style="flex: 1;">' +
+            '<div style="font-size: 0.7rem; opacity: 0.8; margin-bottom: 0.25rem;">Your referral code</div>' +
+            '<div id="referral-code-display" style="font-family: monospace; font-size: 1.25rem; font-weight: 800; letter-spacing: 2px;">' + data.code + '</div>' +
+          '</div>' +
+          '<button id="copy-referral-btn" style="background: white; color: #6366f1; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">' +
+            '<span>📋</span> Copy' +
+          '</button>' +
+        '</div>' +
+        '<div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; justify-content: center;">' +
+          '<button id="share-whatsapp" style="background: #25D366; color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">' +
+            '<span>💬</span> WhatsApp' +
+          '</button>' +
+          '<button id="share-twitter" style="background: #1DA1F2; color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">' +
+            '<span>🐦</span> Twitter' +
+          '</button>' +
+          '<button id="share-facebook" style="background: #1877F2; color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">' +
+            '<span>📘</span> Facebook' +
+          '</button>' +
+        '</div>';
+      
+      // Stats
+      if (statsSection && data.stats) {
+        statsSection.innerHTML = 
+          '<div style="background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 8px;">' +
+            '<div style="font-size: 1.25rem; font-weight: 800;">' + data.stats.totalReferrals + '</div>' +
+            '<div style="opacity: 0.8;">Referred</div>' +
+          '</div>' +
+          '<div style="background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 8px;">' +
+            '<div style="font-size: 1.25rem; font-weight: 800;">' + data.stats.completedReferrals + '</div>' +
+            '<div style="opacity: 0.8;">Invested</div>' +
+          '</div>' +
+          '<div style="background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 8px;">' +
+            '<div style="font-size: 1.25rem; font-weight: 800;">GH₵' + data.stats.totalEarned + '</div>' +
+            '<div style="opacity: 0.8;">Earned</div>' +
+          '</div>';
+      }
+      
+      // Copy button
+      var copyBtn = document.getElementById('copy-referral-btn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', function() {
+          navigator.clipboard.writeText(data.shareUrl).then(function() {
+            copyBtn.innerHTML = '<span>✓</span> Copied!';
+            setTimeout(function() {
+              copyBtn.innerHTML = '<span>📋</span> Copy';
+            }, 2000);
+          });
+        });
+      }
+      
+      // Social share buttons
+      var shareMessage = 'Join me on Demony and get GH₵50 bonus on your first investment! Use my code: ' + data.code + ' 🚀';
+      var shareUrl = data.shareUrl;
+      
+      var whatsappBtn = document.getElementById('share-whatsapp');
+      if (whatsappBtn) {
+        whatsappBtn.addEventListener('click', function() {
+          if (window.DemonyAnalytics) window.DemonyAnalytics.trackReferralShare('whatsapp');
+          window.open('https://wa.me/?text=' + encodeURIComponent(shareMessage + ' ' + shareUrl), '_blank');
+        });
+      }
+      
+      var twitterBtn = document.getElementById('share-twitter');
+      if (twitterBtn) {
+        twitterBtn.addEventListener('click', function() {
+          if (window.DemonyAnalytics) window.DemonyAnalytics.trackReferralShare('twitter');
+          window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareMessage) + '&url=' + encodeURIComponent(shareUrl), '_blank');
+        });
+      }
+      
+      var facebookBtn = document.getElementById('share-facebook');
+      if (facebookBtn) {
+        facebookBtn.addEventListener('click', function() {
+          if (window.DemonyAnalytics) window.DemonyAnalytics.trackReferralShare('facebook');
+          window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(shareUrl) + '&quote=' + encodeURIComponent(shareMessage), '_blank');
+        });
+      }
+    })
+    .catch(function(err) {
+      console.error('Error loading referral widget:', err);
+      var codeSection = document.getElementById('referral-code-section');
+      if (codeSection) {
+        codeSection.innerHTML = '<div style="text-align: center; opacity: 0.7;">Unable to load referral code</div>';
+      }
+    });
 }
 
 function loadPortfolio(api) {

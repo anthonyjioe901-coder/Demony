@@ -1,6 +1,7 @@
 // Demony - Main Application Entry Point
 import { Router } from './router.js';
 import { Api } from './api.js';
+import { Analytics } from './analytics.js';
 import { renderHome } from './pages/home.js';
 import { renderProjects } from './pages/projects.js';
 import { renderInvestments } from './pages/investments.js';
@@ -14,6 +15,9 @@ import { renderSupport } from './pages/support.js';
 
 // Initialize API client
 const api = new Api();
+
+// Make Analytics globally available
+window.DemonyAnalytics = Analytics;
 
 // Theme Logic
 const themeToggle = document.getElementById('theme-toggle');
@@ -85,6 +89,101 @@ if (mobileMenuBtn) {
   });
 }
 
+// Update mobile tab bar based on authentication status
+function updateMobileTabBar(isAuthenticated) {
+  var tabBar = document.querySelector('.mobile-tab-bar .tab-items');
+  if (!tabBar) return;
+  
+  var currentHash = window.location.hash.replace('#', '') || 'home';
+  
+  if (isAuthenticated) {
+    // Authenticated: Projects | Investments | Wallet | Portfolio | Support
+    tabBar.innerHTML = 
+      '<a href="#projects" data-page="projects" class="tab-item' + (currentHash === 'projects' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>' +
+        '</span>' +
+        '<span>Projects</span>' +
+      '</a>' +
+      '<a href="#investments" data-page="investments" class="tab-item' + (currentHash === 'investments' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>' +
+        '</span>' +
+        '<span>Investments</span>' +
+      '</a>' +
+      '<a href="#wallet" data-page="wallet" class="tab-item' + (currentHash === 'wallet' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>' +
+        '</span>' +
+        '<span>Wallet</span>' +
+      '</a>' +
+      '<a href="#portfolio" data-page="portfolio" class="tab-item' + (currentHash === 'portfolio' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>' +
+        '</span>' +
+        '<span>Portfolio</span>' +
+      '</a>' +
+      '<a href="#support" data-page="support" class="tab-item' + (currentHash === 'support' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>' +
+        '</span>' +
+        '<span>Support</span>' +
+      '</a>';
+    
+    // If on home page, redirect to projects
+    if (currentHash === 'home' || currentHash === '') {
+      router.navigate('projects');
+    }
+  } else {
+    // Not authenticated: Home | Projects | Wallet | Portfolio | Support
+    tabBar.innerHTML = 
+      '<a href="#home" data-page="home" class="tab-item' + (currentHash === 'home' || currentHash === '' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>' +
+        '</span>' +
+        '<span>Home</span>' +
+      '</a>' +
+      '<a href="#projects" data-page="projects" class="tab-item' + (currentHash === 'projects' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>' +
+        '</span>' +
+        '<span>Projects</span>' +
+      '</a>' +
+      '<a href="#wallet" data-page="wallet" class="tab-item' + (currentHash === 'wallet' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>' +
+        '</span>' +
+        '<span>Wallet</span>' +
+      '</a>' +
+      '<a href="#portfolio" data-page="portfolio" class="tab-item' + (currentHash === 'portfolio' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>' +
+        '</span>' +
+        '<span>Portfolio</span>' +
+      '</a>' +
+      '<a href="#support" data-page="support" class="tab-item' + (currentHash === 'support' ? ' active' : '') + '">' +
+        '<span class="tab-icon">' +
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>' +
+        '</span>' +
+        '<span>Support</span>' +
+      '</a>';
+  }
+  
+  // Re-attach click handlers for tab navigation
+  var mobileTabBar = document.getElementById('mobile-tab-bar');
+  if (mobileTabBar) {
+    mobileTabBar.querySelectorAll('.tab-item').forEach(function(tab) {
+      tab.addEventListener('click', function(e) {
+        e.preventDefault();
+        var page = this.getAttribute('data-page');
+        if (page) {
+          router.navigate(page);
+        }
+      });
+    });
+  }
+}
+
 // Auth State Management
 function updateAuthState() {
   var user = localStorage.getItem('demony_user');
@@ -97,6 +196,9 @@ function updateAuthState() {
   removableLinks.forEach(function(link) {
     if (link.parentElement) link.parentElement.remove();
   });
+  
+  // Update mobile tab bar based on auth
+  updateMobileTabBar(!!user);
   
   if (user) {
     user = JSON.parse(user);
@@ -285,6 +387,7 @@ function showAuthModal(type) {
         .then(function() {
           modal.remove();
           updateAuthState();
+          Analytics.trackLogin();
           navigateAfterAuth();
         })
         .catch(function(err) {
@@ -319,8 +422,26 @@ function showAuthModal(type) {
         function onAccept() {
           // User accepted - proceed with signup
           api.signup(signupData)
-            .then(function() {
+            .then(function(result) {
               updateAuthState();
+              Analytics.trackSignup({ role: signupData.role });
+              
+              // Track referral if there was a referral code
+              if (pendingReferralCode && result.user && result.user.id) {
+                api.trackReferral(pendingReferralCode, result.user.id, signupData.email)
+                  .then(function(trackResult) {
+                    if (trackResult.tracked) {
+                      console.log('📣 Referral tracked successfully');
+                    }
+                    // Clear stored referral code
+                    localStorage.removeItem('demony_referral_code');
+                    pendingReferralCode = null;
+                  })
+                  .catch(function(err) {
+                    console.error('Error tracking referral:', err);
+                  });
+              }
+              
               navigateAfterAuth();
               // Show welcome message
               showWelcomeMessage(name);
@@ -474,6 +595,45 @@ function showNotification(message, type) {
   return notification;
 }
 
+// Referral code handling
+var pendingReferralCode = null;
+
+function checkReferralCode() {
+  // Check URL for referral code (?ref=CODE)
+  var urlParams = new URLSearchParams(window.location.search);
+  var refCode = urlParams.get('ref');
+  
+  if (refCode) {
+    pendingReferralCode = refCode.toUpperCase();
+    localStorage.setItem('demony_referral_code', pendingReferralCode);
+    
+    // Validate the referral code
+    api.validateReferralCode(pendingReferralCode)
+      .then(function(result) {
+        if (result.valid) {
+          showNotification('🎁 You were referred by ' + result.referrerName + '! Sign up and invest to get GH₵' + result.bonus + ' bonus!', 'success');
+          // Auto-open signup modal
+          setTimeout(function() {
+            var signupBtn = document.getElementById('signup-btn');
+            if (signupBtn && !localStorage.getItem('demony_user')) signupBtn.click();
+          }, 1500);
+        }
+      })
+      .catch(function(err) {
+        console.error('Error validating referral code:', err);
+      });
+    
+    // Clean URL
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+  } else {
+    // Check localStorage for previously saved referral code
+    var savedCode = localStorage.getItem('demony_referral_code');
+    if (savedCode) {
+      pendingReferralCode = savedCode;
+    }
+  }
+}
+
 function checkVerificationStatus() {
   var hash = window.location.hash || '';
   var params = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : '');
@@ -511,4 +671,5 @@ function checkVerificationStatus() {
 
 // Initial navigation - honor current hash
 router.init('home');
+checkReferralCode();
 checkVerificationStatus();

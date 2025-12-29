@@ -6,6 +6,10 @@ var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
 var router = express.Router();
 
+// Import referral completion function
+var referralModule = require('./referrals');
+var completeReferral = referralModule.completeReferral;
+
 // Create investment from wallet balance
 router.post('/', authenticateToken, async function(req, res) {
   var projectId = req.body.projectId;
@@ -161,6 +165,16 @@ router.post('/', authenticateToken, async function(req, res) {
     });
     
     investment.id = result.insertedId.toString();
+    
+    // Check and complete any pending referral for this user
+    try {
+      var referralResult = await completeReferral(userId, amount);
+      if (referralResult.completed) {
+        console.log('🎁 Referral bonus awarded for investment by user ' + userId);
+      }
+    } catch (refErr) {
+      console.error('Referral completion error (non-critical):', refErr);
+    }
     
     // Send investment confirmation email (async)
     emailService.sendInvestmentEmail(user, investment, project).catch(function(err) {

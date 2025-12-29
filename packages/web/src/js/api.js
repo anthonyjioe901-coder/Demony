@@ -359,4 +359,29 @@ Api.prototype.getAdmin = function() {
   };
 };
 
+// ==================== REFERRALS ====================
+
+Api.prototype.getReferralCode = function() {
+  return this.request('/referrals/my-code');
+};
+
+Api.prototype.getReferralHistory = function() {
+  return this.request('/referrals/history');
+};
+
+Api.prototype.validateReferralCode = function(code) {
+  return this.request('/referrals/validate/' + code);
+};
+
+Api.prototype.trackReferral = function(code, refereeId, refereeEmail) {
+  return this.request('/referrals/track', {
+    method: 'POST',
+    body: { code: code, refereeId: refereeId, refereeEmail: refereeEmail }
+  });
+};
+
+Api.prototype.getReferralLeaderboard = function() {
+  return this.request('/referrals/leaderboard');
+};
+
 export { Api };

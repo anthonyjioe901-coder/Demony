@@ -1,0 +1,401 @@
+// Referral System Routes - MongoDB version
+var express = require('express');
+var crypto = require('crypto');
+var db = require('../../../database/src/index');
+var authenticateToken = require('../middleware/auth');
+var emailService = require('../services/email');
+var router = express.Router();
+var ObjectId = require('mongodb').ObjectId;
+
+// Referral bonus amounts in GH₵
+var REFERRAL_BONUS_REFERRER = 50; // Bonus for the person who referred
+var REFERRAL_BONUS_REFEREE = 50;  // Bonus for the new user
+var MIN_INVESTMENT_FOR_BONUS = 100; // Minimum investment to trigger bonus
+
+// Generate referral code from user ID
+function generateReferralCode(userId) {
+  // Create a short, unique code from user ID + random string
+  var hash = crypto.createHash('sha256').update(userId + Date.now().toString()).digest('hex');
+  return 'DEM' + hash.substring(0, 6).toUpperCase();
+}
+
+// Get or create referral code for current user
+router.get('/my-code', authenticateToken, async function(req, res) {
+  try {
+    var database = await db.getDb();
+    var userId = req.user.id;
+    
+    // Check if user already has a referral code
+    var existing = await database.collection('referral_codes').findOne({
+      userId: userId
+    });
+    
+    if (existing) {
+      // Get referral stats
+      var stats = await getReferralStats(database, userId);
+      return res.json({
+        code: existing.code,
+        shareUrl: getShareUrl(existing.code),
+        stats: stats
+      });
+    }
+    
+    // Generate new code
+    var code = generateReferralCode(userId);
+    
+    // Make sure code is unique
+    var attempts = 0;
+    while (attempts < 5) {
+      var codeExists = await database.collection('referral_codes').findOne({ code: code });
+      if (!codeExists) break;
+      code = generateReferralCode(userId + attempts.toString());
+      attempts++;
+    }
+    
+    await database.collection('referral_codes').insertOne({
+      userId: userId,
+      code: code,
+      createdAt: new Date(),
+      isActive: true
+    });
+    
+    var stats = await getReferralStats(database, userId);
+    
+    res.json({
+      code: code,
+      shareUrl: getShareUrl(code),
+      stats: stats
+    });
+  } catch (err) {
+    console.error('Error getting referral code:', err);
+    res.status(500).json({ error: 'Failed to get referral code' });
+  }
+});
+
+// Get referral stats for a user
+async function getReferralStats(database, userId) {
+  var referrals = await database.collection('referrals').find({
+    referrerId: userId
+  }).toArray();
+  
+  var totalReferrals = referrals.length;
+  var completedReferrals = referrals.filter(function(r) { return r.status === 'completed'; }).length;
+  var pendingReferrals = referrals.filter(function(r) { return r.status === 'pending'; }).length;
+  var totalEarned = referrals.reduce(function(sum, r) {
+    return sum + (r.bonusPaid || 0);
+  }, 0);
+  
+  return {
+    totalReferrals: totalReferrals,
+    completedReferrals: completedReferrals,
+    pendingReferrals: pendingReferrals,
+    totalEarned: totalEarned,
+    bonusPerReferral: REFERRAL_BONUS_REFERRER
+  };
+}
+
+function getShareUrl(code) {
+  var baseUrl = process.env.WEB_URL || 'https://demony-web.onrender.com';
+  return baseUrl + '?ref=' + code;
+}
+
+// Get referral history
+router.get('/history', authenticateToken, async function(req, res) {
+  try {
+    var database = await db.getDb();
+    var userId = req.user.id;
+    
+    var referrals = await database.collection('referrals').aggregate([
+      { $match: { referrerId: userId } },
+      { $sort: { createdAt: -1 } },
+      { $limit: 50 }
+    ]).toArray();
+    
+    // Get referred user names (privacy: only first name + initial)
+    var referralList = await Promise.all(referrals.map(async function(ref) {
+      try {
+        var referredUser = await database.collection('users').findOne({
+          _id: new ObjectId(ref.refereeId)
+        });
+        var displayName = 'Anonymous';
+        if (referredUser && referredUser.name) {
+          var nameParts = referredUser.name.split(' ');
+          displayName = nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '');
+        }
+        return {
+          id: ref._id.toString(),
+          displayName: displayName,
+          status: ref.status,
+          bonusPaid: ref.bonusPaid || 0,
+          createdAt: ref.createdAt,
+          investedAt: ref.investedAt
+        };
+      } catch (e) {
+        return {
+          id: ref._id.toString(),
+          displayName: 'User',
+          status: ref.status,
+          bonusPaid: ref.bonusPaid || 0,
+          createdAt: ref.createdAt,
+          investedAt: ref.investedAt
+        };
+      }
+    }));
+    
+    res.json({ referrals: referralList });
+  } catch (err) {
+    console.error('Error getting referral history:', err);
+    res.status(500).json({ error: 'Failed to get referral history' });
+  }
+});
+
+// Validate a referral code (public - for signup page)
+router.get('/validate/:code', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    var code = req.params.code.toUpperCase();
+    
+    var referralCode = await database.collection('referral_codes').findOne({
+      code: code,
+      isActive: true
+    });
+    
+    if (!referralCode) {
+      return res.json({ valid: false });
+    }
+    
+    // Get referrer name (first name only for privacy)
+    var referrer = await database.collection('users').findOne({
+      _id: new ObjectId(referralCode.userId)
+    });
+    
+    var referrerName = 'a friend';
+    if (referrer && referrer.name) {
+      referrerName = referrer.name.split(' ')[0];
+    }
+    
+    res.json({
+      valid: true,
+      referrerName: referrerName,
+      bonus: REFERRAL_BONUS_REFEREE
+    });
+  } catch (err) {
+    console.error('Error validating referral code:', err);
+    res.status(500).json({ error: 'Failed to validate code' });
+  }
+});
+
+// Track a referral (called during signup)
+router.post('/track', async function(req, res) {
+  try {
+    var code = req.body.code;
+    var refereeId = req.body.refereeId;
+    var refereeEmail = req.body.refereeEmail;
+    
+    if (!code || !refereeId) {
+      return res.status(400).json({ error: 'Code and refereeId required' });
+    }
+    
+    var database = await db.getDb();
+    code = code.toUpperCase();
+    
+    // Find the referral code
+    var referralCode = await database.collection('referral_codes').findOne({
+      code: code,
+      isActive: true
+    });
+    
+    if (!referralCode) {
+      return res.json({ tracked: false, reason: 'Invalid code' });
+    }
+    
+    // Can't refer yourself
+    if (referralCode.userId === refereeId) {
+      return res.json({ tracked: false, reason: 'Cannot refer yourself' });
+    }
+    
+    // Check if this user was already referred
+    var existingReferral = await database.collection('referrals').findOne({
+      refereeId: refereeId
+    });
+    
+    if (existingReferral) {
+      return res.json({ tracked: false, reason: 'Already referred' });
+    }
+    
+    // Create referral record
+    await database.collection('referrals').insertOne({
+      referrerId: referralCode.userId,
+      refereeId: refereeId,
+      refereeEmail: refereeEmail,
+      code: code,
+      status: 'pending', // pending = signed up, completed = made qualifying investment
+      bonusPaid: 0,
+      createdAt: new Date()
+    });
+    
+    console.log('📣 Referral tracked: ' + refereeId + ' referred by ' + referralCode.userId);
+    
+    res.json({ tracked: true });
+  } catch (err) {
+    console.error('Error tracking referral:', err);
+    res.status(500).json({ error: 'Failed to track referral' });
+  }
+});
+
+// Complete a referral (called when referee makes qualifying investment)
+// This is an internal function called from the investments route
+async function completeReferral(refereeId, investmentAmount) {
+  try {
+    if (investmentAmount < MIN_INVESTMENT_FOR_BONUS) {
+      console.log('📣 Investment amount ' + investmentAmount + ' below minimum ' + MIN_INVESTMENT_FOR_BONUS);
+      return { completed: false, reason: 'Below minimum' };
+    }
+    
+    var database = await db.getDb();
+    
+    // Find pending referral for this user
+    var referral = await database.collection('referrals').findOne({
+      refereeId: refereeId,
+      status: 'pending'
+    });
+    
+    if (!referral) {
+      return { completed: false, reason: 'No pending referral' };
+    }
+    
+    // Update referral status
+    await database.collection('referrals').updateOne(
+      { _id: referral._id },
+      {
+        $set: {
+          status: 'completed',
+          bonusPaid: REFERRAL_BONUS_REFERRER,
+          investedAt: new Date(),
+          investmentAmount: investmentAmount
+        }
+      }
+    );
+    
+    // Credit referrer's wallet
+    await database.collection('users').updateOne(
+      { _id: new ObjectId(referral.referrerId) },
+      {
+        $inc: { walletBalance: REFERRAL_BONUS_REFERRER }
+      }
+    );
+    
+    // Credit referee's wallet
+    await database.collection('users').updateOne(
+      { _id: new ObjectId(refereeId) },
+      {
+        $inc: { walletBalance: REFERRAL_BONUS_REFEREE }
+      }
+    );
+    
+    // Create transaction records
+    await database.collection('transactions').insertMany([
+      {
+        userId: referral.referrerId,
+        type: 'referral_bonus',
+        amount: REFERRAL_BONUS_REFERRER,
+        status: 'completed',
+        description: 'Referral bonus - friend invested',
+        createdAt: new Date()
+      },
+      {
+        userId: refereeId,
+        type: 'referral_bonus',
+        amount: REFERRAL_BONUS_REFEREE,
+        status: 'completed',
+        description: 'Welcome bonus - first investment',
+        createdAt: new Date()
+      }
+    ]);
+    
+    // Notify referrer via email
+    try {
+      var referrer = await database.collection('users').findOne({
+        _id: new ObjectId(referral.referrerId)
+      });
+      if (referrer && referrer.email) {
+        await emailService.sendEmail({
+          to: referrer.email,
+          subject: '🎉 You earned GH₵' + REFERRAL_BONUS_REFERRER + ' referral bonus!',
+          html: '<h2>Great news, ' + (referrer.name || 'Investor') + '!</h2>' +
+            '<p>Your friend just made their first investment on Demony.</p>' +
+            '<p><strong>GH₵' + REFERRAL_BONUS_REFERRER + '</strong> has been added to your wallet!</p>' +
+            '<p>Keep sharing your referral code to earn more bonuses.</p>' +
+            '<p>Best,<br>The Demony Team</p>'
+        });
+      }
+    } catch (emailErr) {
+      console.error('Failed to send referral notification email:', emailErr);
+    }
+    
+    console.log('📣 Referral completed! Referrer ' + referral.referrerId + ' and referee ' + refereeId + ' each received bonus');
+    
+    return { 
+      completed: true, 
+      referrerBonus: REFERRAL_BONUS_REFERRER, 
+      refereeBonus: REFERRAL_BONUS_REFEREE 
+    };
+  } catch (err) {
+    console.error('Error completing referral:', err);
+    return { completed: false, reason: 'Error processing' };
+  }
+}
+
+// Leaderboard (optional - gamification)
+router.get('/leaderboard', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    
+    var leaders = await database.collection('referrals').aggregate([
+      { $match: { status: 'completed' } },
+      { $group: {
+        _id: '$referrerId',
+        count: { $sum: 1 },
+        earned: { $sum: '$bonusPaid' }
+      }},
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]).toArray();
+    
+    // Get user names
+    var leaderboard = await Promise.all(leaders.map(async function(leader, index) {
+      try {
+        var user = await database.collection('users').findOne({
+          _id: new ObjectId(leader._id)
+        });
+        var displayName = 'Investor';
+        if (user && user.name) {
+          var nameParts = user.name.split(' ');
+          displayName = nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '');
+        }
+        return {
+          rank: index + 1,
+          displayName: displayName,
+          referrals: leader.count,
+          earned: leader.earned
+        };
+      } catch (e) {
+        return {
+          rank: index + 1,
+          displayName: 'Investor',
+          referrals: leader.count,
+          earned: leader.earned
+        };
+      }
+    }));
+    
+    res.json({ leaderboard: leaderboard });
+  } catch (err) {
+    console.error('Error getting leaderboard:', err);
+    res.status(500).json({ error: 'Failed to get leaderboard' });
+  }
+});
+
+module.exports = router;
+module.exports.completeReferral = completeReferral;
+module.exports.REFERRAL_BONUS_REFEREE = REFERRAL_BONUS_REFEREE;

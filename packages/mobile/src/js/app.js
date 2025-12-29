@@ -69,6 +69,9 @@ function renderTab(tabName) {
     case 'projects':
       renderProjects();
       break;
+    case 'investments':
+      renderInvestments();
+      break;
     case 'wallet':
       renderWallet();
       break;
@@ -175,6 +178,98 @@ function renderProjects() {
           showInvestModal(id);
         });
       });
+    }
+  });
+}
+
+// Investments Tab
+function renderInvestments() {
+  if (!api.token) {
+    mainContent.innerHTML = 
+      '<div class="page-header"><h1>My Investments</h1></div>' +
+      '<div class="card" style="text-align: center; padding: 2rem;">' +
+        '<p>Please login to view your investments</p>' +
+        '<button class="btn btn-primary" onclick="switchTab(\'profile\')">Login</button>' +
+      '</div>';
+    return;
+  }
+
+  mainContent.innerHTML = 
+    '<div class="page-header">' +
+      '<h1>My Investments</h1>' +
+      '<p>Track your active investments</p>' +
+    '</div>' +
+    
+    '<div id="investments-summary" class="stats-grid">Loading...</div>' +
+    
+    '<div class="card">' +
+      '<h3>Active Investments</h3>' +
+      '<div id="investments-list" class="list-item-container">' +
+        'Loading...' +
+      '</div>' +
+    '</div>';
+    
+  // Load portfolio summary
+  api.getPortfolio().then(function(portfolio) {
+    var summaryEl = document.getElementById('investments-summary');
+    if (summaryEl) {
+      summaryEl.innerHTML = 
+        '<div class="card stat-card">' +
+          '<div class="value">GH₵' + portfolio.totalInvested.toLocaleString() + '</div>' +
+          '<div class="label">Total Invested</div>' +
+        '</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value" style="color: var(--secondary-color);">GH₵' + portfolio.totalReturn.toLocaleString() + '</div>' +
+          '<div class="label">Total Earnings</div>' +
+        '</div>' +
+        '<div class="card stat-card">' +
+          '<div class="value">' + portfolio.activeInvestments + '</div>' +
+          '<div class="label">Active</div>' +
+        '</div>';
+    }
+  }).catch(function() {
+    var summaryEl = document.getElementById('investments-summary');
+    if (summaryEl) {
+      summaryEl.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ef4444;">Error loading summary</div>';
+    }
+  });
+  
+  // Load investments list
+  api.getMyInvestments().then(function(investments) {
+    var listEl = document.getElementById('investments-list');
+    if (!listEl) return;
+
+    if (!investments || investments.length === 0) {
+      listEl.innerHTML = '<p style="text-align: center; padding: 2rem; color: var(--text-muted);">No investments yet. <a href="#" onclick="switchTab(\'projects\')">Browse projects</a></p>';
+      return;
+    }
+    
+    listEl.innerHTML = investments.map(function(inv) {
+      var amount = parseFloat(inv.amount) || 0;
+      var earnings = parseFloat(inv.earnings) || 0;
+      var returnPercent = amount > 0 ? ((earnings / amount) * 100).toFixed(1) : 0;
+      
+      return '<div class="list-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">' +
+        '<div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">' +
+          '<div>' +
+            '<div style="font-weight: 600;">' + (inv.projectName || inv.project_name || 'Project') + '</div>' +
+            '<div style="font-size: 0.75rem; color: var(--text-muted);">' + (inv.category || 'General') + '</div>' +
+          '</div>' +
+          '<div style="text-align: right;">' +
+            '<div style="font-weight: 700; color: var(--primary-color);">GH₵' + amount.toLocaleString() + '</div>' +
+            '<div style="font-size: 0.75rem; color: ' + (earnings > 0 ? 'var(--secondary-color)' : 'var(--text-muted)') + ';">+' + returnPercent + '%</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="width: 100%; display: flex; justify-content: space-between; font-size: 0.75rem;">' +
+          '<span style="color: var(--text-muted);">Earnings:</span>' +
+          '<span style="color: var(--secondary-color); font-weight: 600;">GH₵' + earnings.toLocaleString() + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }).catch(function() {
+    var listEl = document.getElementById('investments-list');
+    if (listEl) {
+      listEl.innerHTML = '<p style="color: #ef4444; text-align: center;">Error loading investments</p>';
     }
   });
 }
@@ -406,6 +501,7 @@ function renderProfile() {
   if (user) {
     document.getElementById('logout-btn').addEventListener('click', function() {
       api.logout();
+      updateTabBar();
       renderProfile();
     });
   } else {
@@ -477,6 +573,7 @@ function showSignInModal() {
     api.login({ email: email, password: password })
       .then(function() {
         modal.remove();
+        updateTabBar();
         renderProfile();
       })
       .catch(function(err) {
@@ -577,6 +674,109 @@ function showInvestModal(projectId) {
 // Initialize Theme
 var savedTheme = localStorage.getItem('theme') || 'light';
 document.documentElement.setAttribute('data-theme', savedTheme);
+
+// Update tab bar based on authentication status
+function updateTabBar() {
+  var isAuthenticated = !!localStorage.getItem('demony_token');
+  var tabBar = document.getElementById('tab-bar');
+  
+  if (!tabBar) return;
+  
+  if (isAuthenticated) {
+    // Authenticated: Projects | Investments | Wallet | Portfolio | Support
+    tabBar.innerHTML = 
+      '<button class="tab-item active" data-tab="projects">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />' +
+        '</svg>' +
+        '<span class="tab-label">Projects</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="investments">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />' +
+        '</svg>' +
+        '<span class="tab-label">Investments</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="wallet">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />' +
+        '</svg>' +
+        '<span class="tab-label">Wallet</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="portfolio">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />' +
+        '</svg>' +
+        '<span class="tab-label">Portfolio</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="profile">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />' +
+        '</svg>' +
+        '<span class="tab-label">Profile</span>' +
+      '</button>';
+    
+    // Navigate to projects if currently on home
+    if (currentTab === 'home') {
+      currentTab = 'projects';
+      renderProjects();
+    }
+  } else {
+    // Not authenticated: Home | Projects | Wallet | Portfolio | Support
+    tabBar.innerHTML = 
+      '<button class="tab-item active" data-tab="home">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />' +
+        '</svg>' +
+        '<span class="tab-label">Home</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="projects">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />' +
+        '</svg>' +
+        '<span class="tab-label">Projects</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="wallet">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />' +
+        '</svg>' +
+        '<span class="tab-label">Wallet</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="portfolio">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />' +
+        '</svg>' +
+        '<span class="tab-label">Portfolio</span>' +
+      '</button>' +
+      '<button class="tab-item" data-tab="profile">' +
+        '<svg class="tab-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />' +
+        '</svg>' +
+        '<span class="tab-label">Profile</span>' +
+      '</button>';
+  }
+  
+  // Re-attach event listeners
+  document.querySelectorAll('.tab-item').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var tabName = this.getAttribute('data-tab');
+      switchTab(tabName);
+    });
+  });
+  
+  // Update active state
+  document.querySelectorAll('.tab-item').forEach(function(tab) {
+    tab.classList.remove('active');
+    if (tab.getAttribute('data-tab') === currentTab) {
+      tab.classList.add('active');
+    }
+  });
+}
+
+// Call updateTabBar on init and after login/logout
+updateTabBar();
 
 // Support Modal
 function showSupportModal() {
