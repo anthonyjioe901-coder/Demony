@@ -159,7 +159,7 @@ function renderHome() {
           '<div style="color: var(--primary-color);">' + icons.referral + '</div>' +
           '<div>' +
             '<h3 style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;">Earn While Referring</h3>' +
-            '<p style="color: var(--text-muted); font-size: 0.85rem;">Give GH₵50, Get GH₵50</p>' +
+            '<p style="color: var(--text-muted); font-size: 0.85rem;">Give GH₵20, Get GH₵20</p>' +
           '</div>' +
         '</div>' +
       '</div>' +

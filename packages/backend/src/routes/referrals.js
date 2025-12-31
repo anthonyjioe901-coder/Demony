@@ -8,9 +8,11 @@ var router = express.Router();
 var ObjectId = require('mongodb').ObjectId;
 
 // Referral bonus amounts in GH₵
-var REFERRAL_BONUS_REFERRER = 50; // Bonus for the person who referred
-var REFERRAL_BONUS_REFEREE = 50;  // Bonus for the new user
+var REFERRAL_BONUS_REFERRER = 20; // Bonus for the person who referred
+var REFERRAL_BONUS_REFEREE = 20;  // Bonus for the new user
 var MIN_INVESTMENT_FOR_BONUS = 100; // Minimum investment to trigger bonus
+var QUALIFYING_REFERRALS_NEEDED = 10; // Number of qualified referrals to unlock earnings
+var MIN_QUALIFYING_INVESTMENT = 100; // Minimum investment amount per referral to count as "qualified"
 
 // Generate referral code from user ID
 function generateReferralCode(userId) {
@@ -81,15 +83,32 @@ async function getReferralStats(database, userId) {
   var totalReferrals = referrals.length;
   var completedReferrals = referrals.filter(function(r) { return r.status === 'completed'; }).length;
   var pendingReferrals = referrals.filter(function(r) { return r.status === 'pending'; }).length;
+  
+  // Count qualified referrals (completed + invested GH₵100+)
+  var qualifiedReferrals = referrals.filter(function(r) {
+    return r.status === 'completed' && r.investmentAmount >= MIN_QUALIFYING_INVESTMENT;
+  }).length;
+  
   var totalEarned = referrals.reduce(function(sum, r) {
     return sum + (r.bonusPaid || 0);
   }, 0);
+  
+  // Check if earnings are unlocked
+  var isQualified = qualifiedReferrals >= QUALIFYING_REFERRALS_NEEDED;
+  var availableEarnings = isQualified ? totalEarned : 0;
+  var lockedEarnings = isQualified ? 0 : totalEarned;
   
   return {
     totalReferrals: totalReferrals,
     completedReferrals: completedReferrals,
     pendingReferrals: pendingReferrals,
+    qualifiedReferrals: qualifiedReferrals,
+    qualifyingNeeded: QUALIFYING_REFERRALS_NEEDED,
     totalEarned: totalEarned,
+    availableEarnings: availableEarnings,
+    lockedEarnings: lockedEarnings,
+    isQualified: isQualified,
+    progress: Math.min(100, Math.round((qualifiedReferrals / QUALIFYING_REFERRALS_NEEDED) * 100)),
     bonusPerReferral: REFERRAL_BONUS_REFERRER
   };
 }
@@ -277,15 +296,58 @@ async function completeReferral(refereeId, investmentAmount) {
       }
     );
     
-    // Credit referrer's wallet
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(referral.referrerId) },
-      {
-        $inc: { walletBalance: REFERRAL_BONUS_REFERRER }
-      }
-    );
+    // Check if referrer now qualifies for earnings unlock
+    var stats = await getReferralStats(database, referral.referrerId);
+    var justQualified = stats.qualifiedReferrals === QUALIFYING_REFERRALS_NEEDED;
     
-    // Credit referee's wallet
+    // If just qualified, credit all accumulated bonuses
+    if (justQualified) {
+      await database.collection('users').updateOne(
+        { _id: new ObjectId(referral.referrerId) },
+        {
+          $inc: { walletBalance: stats.totalEarned }
+        }
+      );
+      
+      // Create transaction for unlocked earnings
+      await database.collection('transactions').insertOne({
+        userId: referral.referrerId,
+        type: 'referral_bonus',
+        amount: stats.totalEarned,
+        status: 'completed',
+        description: 'Referral earnings unlocked! (' + stats.qualifiedReferrals + ' qualified referrals)',
+        createdAt: new Date()
+      });
+    } else if (stats.isQualified) {
+      // Already qualified, credit new bonus immediately
+      await database.collection('users').updateOne(
+        { _id: new ObjectId(referral.referrerId) },
+        {
+          $inc: { walletBalance: REFERRAL_BONUS_REFERRER }
+        }
+      );
+      
+      await database.collection('transactions').insertOne({
+        userId: referral.referrerId,
+        type: 'referral_bonus',
+        amount: REFERRAL_BONUS_REFERRER,
+        status: 'completed',
+        description: 'Referral bonus - friend invested',
+        createdAt: new Date()
+      });
+    } else {
+      // Not yet qualified, bonus is tracked but locked
+      await database.collection('transactions').insertOne({
+        userId: referral.referrerId,
+        type: 'referral_bonus_pending',
+        amount: REFERRAL_BONUS_REFERRER,
+        status: 'pending',
+        description: 'Referral bonus (locked - ' + stats.qualifiedReferrals + '/' + QUALIFYING_REFERRALS_NEEDED + ' qualified)',
+        createdAt: new Date()
+      });
+    }
+    
+    // Credit referee's welcome bonus immediately
     await database.collection('users').updateOne(
       { _id: new ObjectId(refereeId) },
       {
@@ -293,25 +355,14 @@ async function completeReferral(refereeId, investmentAmount) {
       }
     );
     
-    // Create transaction records
-    await database.collection('transactions').insertMany([
-      {
-        userId: referral.referrerId,
-        type: 'referral_bonus',
-        amount: REFERRAL_BONUS_REFERRER,
-        status: 'completed',
-        description: 'Referral bonus - friend invested',
-        createdAt: new Date()
-      },
-      {
-        userId: refereeId,
-        type: 'referral_bonus',
-        amount: REFERRAL_BONUS_REFEREE,
-        status: 'completed',
-        description: 'Welcome bonus - first investment',
-        createdAt: new Date()
-      }
-    ]);
+    await database.collection('transactions').insertOne({
+      userId: refereeId,
+      type: 'referral_bonus',
+      amount: REFERRAL_BONUS_REFEREE,
+      status: 'completed',
+      description: 'Welcome bonus - first investment',
+      createdAt: new Date()
+    });
     
     // Notify referrer via email
     try {
@@ -319,14 +370,40 @@ async function completeReferral(refereeId, investmentAmount) {
         _id: new ObjectId(referral.referrerId)
       });
       if (referrer && referrer.email) {
-        await emailService.sendEmail({
-          to: referrer.email,
-          subject: '🎉 You earned GH₵' + REFERRAL_BONUS_REFERRER + ' referral bonus!',
-          html: '<h2>Great news, ' + (referrer.name || 'Investor') + '!</h2>' +
+        var emailSubject = '';
+        var emailBody = '';
+        
+        if (justQualified) {
+          emailSubject = '🎉 Congratulations! You unlocked GH₵' + stats.totalEarned + ' in referral earnings!';
+          emailBody = '<h2>Amazing news, ' + (referrer.name || 'Investor') + '!</h2>' +
+            '<p>You\'ve reached ' + QUALIFYING_REFERRALS_NEEDED + ' qualified referrals!</p>' +
+            '<p><strong>GH₵' + stats.totalEarned + '</strong> in accumulated referral bonuses has been unlocked and added to your wallet!</p>' +
+            '<p>From now on, all new referral bonuses will be credited immediately.</p>' +
+            '<p>Keep sharing to earn more!</p>' +
+            '<p>Best,<br>The Demony Team</p>';
+        } else if (stats.isQualified) {
+          emailSubject = '🎉 You earned GH₵' + REFERRAL_BONUS_REFERRER + ' referral bonus!';
+          emailBody = '<h2>Great news, ' + (referrer.name || 'Investor') + '!</h2>' +
             '<p>Your friend just made their first investment on Demony.</p>' +
             '<p><strong>GH₵' + REFERRAL_BONUS_REFERRER + '</strong> has been added to your wallet!</p>' +
             '<p>Keep sharing your referral code to earn more bonuses.</p>' +
-            '<p>Best,<br>The Demony Team</p>'
+            '<p>Best,<br>The Demony Team</p>';
+        } else {
+          emailSubject = '📊 Referral progress: ' + stats.qualifiedReferrals + '/' + QUALIFYING_REFERRALS_NEEDED + ' qualified!';
+          emailBody = '<h2>Good progress, ' + (referrer.name || 'Investor') + '!</h2>' +
+            '<p>Your friend just made their first investment on Demony.</p>' +
+            '<p>You\'ve earned <strong>GH₵' + REFERRAL_BONUS_REFERRER + '</strong> (currently locked).</p>' +
+            '<p><strong>Progress:</strong> ' + stats.qualifiedReferrals + ' out of ' + QUALIFYING_REFERRALS_NEEDED + ' qualified referrals.</p>' +
+            '<p>Once you reach ' + QUALIFYING_REFERRALS_NEEDED + ' qualified referrals, all earnings will be unlocked!</p>' +
+            '<p><strong>Total pending:</strong> GH₵' + stats.lockedEarnings + '</p>' +
+            '<p>Keep sharing your code!</p>' +
+            '<p>Best,<br>The Demony Team</p>';
+        }
+        
+        await emailService.sendEmail({
+          to: referrer.email,
+          subject: emailSubject,
+          html: emailBody
         });
       }
     } catch (emailErr) {

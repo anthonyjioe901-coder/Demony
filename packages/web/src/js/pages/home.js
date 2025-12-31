@@ -79,7 +79,7 @@ function renderHome(container, api) {
         '<div class="card" style="padding: 1.5rem; text-align: center; border-radius: 16px;">' +
           '<div style="margin-bottom: 1rem; color: var(--primary-color);">' + icons.referral + '</div>' +
           '<h3 style="font-weight: 700; margin-bottom: 0.5rem; font-size: 1.1rem;">Earn While Referring</h3>' +
-          '<p style="color: var(--text-muted); font-size: 0.95rem;">Give GH₵50, Get GH₵50 for every friend who invests</p>' +
+          '<p style="color: var(--text-muted); font-size: 0.95rem;">Give GH₵20, Get GH₵20 when friends invest (unlock earnings after 10 qualified referrals)</p>' +
         '</div>' +
       '</div>' +
     '</section>' +
