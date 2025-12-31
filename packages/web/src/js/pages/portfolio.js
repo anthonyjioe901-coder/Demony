@@ -138,21 +138,29 @@ function loadReferralWidget(api) {
       if (statsSection && data.stats) {
         var progressSection = document.getElementById('referral-progress');
         
+        // Default values to prevent "undefined"
+        var qualifiedReferrals = data.stats.qualifiedReferrals || 0;
+        var qualifyingNeeded = data.stats.qualifyingNeeded || 10;
+        var totalReferrals = data.stats.totalReferrals || 0;
+        var isQualified = data.stats.isQualified || false;
+        var availableEarnings = data.stats.availableEarnings || 0;
+        var lockedEarnings = data.stats.lockedEarnings || 0;
+        var progressPercent = data.stats.progress || 0;
+        
         // Show qualification progress
-        if (progressSection && !data.stats.isQualified) {
-          var progressPercent = data.stats.progress || 0;
+        if (progressSection && !isQualified) {
           progressSection.innerHTML = 
             '<div class="referral-progress-header">' +
-              '<span class="referral-progress-label"><strong>' + data.stats.qualifiedReferrals + '/' + data.stats.qualifyingNeeded + '</strong> Qualified Referrals</span>' +
+              '<span class="referral-progress-label"><strong>' + qualifiedReferrals + '/' + qualifyingNeeded + '</strong> Qualified Referrals</span>' +
               '<span class="referral-progress-percent">' + progressPercent + '%</span>' +
             '</div>' +
             '<div class="referral-progress-bar-bg">' +
               '<div class="referral-progress-bar-fill" style="width: ' + progressPercent + '%;"></div>' +
             '</div>' +
             '<p class="referral-lock-msg">' +
-              '<span>🔒</span> Earnings locked until ' + data.stats.qualifyingNeeded + ' qualified referrals (GH₵100+ investment each)' +
+              '<span>🔒</span> Earnings locked until ' + qualifyingNeeded + ' qualified referrals (GH₵100+ investment each)' +
             '</p>';
-        } else if (progressSection && data.stats.isQualified) {
+        } else if (progressSection && isQualified) {
           progressSection.innerHTML = 
             '<div class="referral-unlocked-msg">' +
               '<span>✅</span> <strong>Qualified!</strong> All earnings unlocked' +
@@ -161,16 +169,16 @@ function loadReferralWidget(api) {
         
         statsSection.innerHTML = 
           '<div class="referral-stat-item">' +
-            '<div class="referral-stat-value">' + data.stats.totalReferrals + '</div>' +
+            '<div class="referral-stat-value">' + totalReferrals + '</div>' +
             '<div class="referral-stat-label">Referred</div>' +
           '</div>' +
           '<div class="referral-stat-item">' +
-            '<div class="referral-stat-value">' + data.stats.qualifiedReferrals + '/' + data.stats.qualifyingNeeded + '</div>' +
+            '<div class="referral-stat-value">' + qualifiedReferrals + '/' + qualifyingNeeded + '</div>' +
             '<div class="referral-stat-label">Qualified</div>' +
           '</div>' +
           '<div class="referral-stat-item">' +
-            '<div class="referral-stat-value">GH₵' + (data.stats.isQualified ? data.stats.availableEarnings : data.stats.lockedEarnings) + '</div>' +
-            '<div class="referral-stat-label">' + (data.stats.isQualified ? 'Available' : 'Locked') + '</div>' +
+            '<div class="referral-stat-value">GH₵' + (isQualified ? availableEarnings : lockedEarnings) + '</div>' +
+            '<div class="referral-stat-label">' + (isQualified ? 'Available' : 'Locked') + '</div>' +
           '</div>';
       }
       
