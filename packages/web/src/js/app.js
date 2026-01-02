@@ -12,6 +12,8 @@ import { renderWallet } from './pages/wallet.js';
 import { renderProfile } from './pages/profile.js';
 import { renderTerms, renderPrivacy, renderRiskDisclosure, renderAgreementModal } from './pages/legal.js';
 import { renderSupport } from './pages/support.js';
+import { renderSettings } from './pages/settings.js';
+import { renderReferrals } from './pages/referrals.js';
 
 // Initialize API client
 const api = new Api();
@@ -44,6 +46,8 @@ router.addRoute('investments', function(container) { renderInvestments(container
 router.addRoute('portfolio', function(container) { renderPortfolio(container, api); });
 router.addRoute('wallet', function(container) { renderWallet(container, api); });
 router.addRoute('profile', function(container) { renderProfile(container, api); });
+router.addRoute('settings', function(container) { renderSettings(container, api); });
+router.addRoute('referrals', function(container) { renderReferrals(container, api); });
 router.addRoute('admin', function(container) { renderAdmin(container, api); });
 router.addRoute('business', function(container) { renderBusinessDashboard(container, api); });
 // Legal pages
@@ -86,6 +90,42 @@ if (mobileMenuBtn) {
     if (navLinks) navLinks.classList.toggle('active');
     if (authButtons) authButtons.classList.toggle('active');
     this.classList.toggle('active');
+  });
+}
+
+// Profile Dropdown Toggle
+var userMenuToggle = document.getElementById('user-menu-toggle');
+var userDropdown = document.getElementById('user-dropdown');
+if (userMenuToggle && userDropdown) {
+  userMenuToggle.addEventListener('click', function(e) {
+    e.stopPropagation();
+    userDropdown.classList.toggle('active');
+    // Rotate the chevron icon
+    var chevron = this.querySelector('svg');
+    if (chevron) {
+      chevron.style.transform = userDropdown.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!userMenuToggle.contains(e.target) && !userDropdown.contains(e.target)) {
+      userDropdown.classList.remove('active');
+      var chevron = userMenuToggle.querySelector('svg');
+      if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+  });
+  
+  // Handle dropdown navigation
+  userDropdown.querySelectorAll('[data-page]').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      var page = this.getAttribute('data-page');
+      router.navigate(page);
+      userDropdown.classList.remove('active');
+      var chevron = userMenuToggle.querySelector('svg');
+      if (chevron) chevron.style.transform = 'rotate(0deg)';
+    });
   });
 }
 
@@ -205,8 +245,8 @@ function updateAuthState() {
     if (authButtons) authButtons.style.display = 'none';
     if (userMenu) {
       userMenu.style.display = 'flex';
-      var userName = document.getElementById('user-name');
-      if (userName) userName.textContent = user.name;
+      var userNameDisplay = document.getElementById('user-name-display');
+      if (userNameDisplay) userNameDisplay.textContent = user.name;
     }
     
     // Hide investor-specific links for admin and business owners
