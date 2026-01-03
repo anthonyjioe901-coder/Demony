@@ -351,6 +351,7 @@ router.post('/projects', async function(req, res) {
     var priority = parseInt(req.body.priority !== undefined ? req.body.priority : req.body.featureOrder, 10) || 0;
     var status = req.body.status || 'active';
     var tags = Array.isArray(req.body.tags) ? req.body.tags : [];
+    var progressStatus = req.body.progressStatus || 'not_started'; // 'not_started', 'ongoing', 'completed'
     
     // Validate required fields
     if (!name || !description || !category || !goalAmount) {
@@ -376,6 +377,7 @@ router.post('/projects', async function(req, res) {
       currentFunding: 0,
       investorCount: 0,
       status: status, // Admin decides if active/inactive
+      progressStatus: progressStatus, // 'not_started', 'ongoing', 'completed'
       createdBy: 'admin',
       createdByAdmin: req.user.userId,
       isCompanyProject: true, // Flag to identify company-initiated projects
@@ -404,7 +406,7 @@ router.put('/projects/:id', async function(req, res) {
     var allowedFields = [
       'name', 'description', 'category', 'goalAmount', 'minInvestment',
       'targetReturn', 'duration', 'riskLevel', 'imageUrl', 'documents',
-      'status', 'featured', 'isCompanyProject', 'priority', 'tags'
+      'status', 'featured', 'isCompanyProject', 'priority', 'tags', 'progressStatus'
     ];
     
     var updateData = { updatedAt: new Date() };

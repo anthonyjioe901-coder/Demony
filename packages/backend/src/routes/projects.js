@@ -43,7 +43,10 @@ function normalizeProject(p) {
     
     // Risk Information
     risk_factors: p.riskFactors || ['Market conditions may affect returns', 'Principal is locked for project duration'],
-    risk_disclaimer: 'Profits are not guaranteed. Returns depend on actual project performance.'
+    risk_disclaimer: 'Profits are not guaranteed. Returns depend on actual project performance.',
+    
+    // Project Progress Status (set by admin)
+    progress_status: p.progressStatus || 'not_started' // 'not_started', 'ongoing', 'completed'
   };
 }
 

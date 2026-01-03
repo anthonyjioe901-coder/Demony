@@ -91,9 +91,19 @@ function loadProjects(api) {
           'high': '#ef4444'
         }[riskLevel] || '#f59e0b';
         
+        // Progress status display
+        var progressStatus = project.progressStatus || 'not_started';
+        var progressStatusInfo = {
+          'not_started': { label: 'Not Started', bgColor: '#94a3b8', icon: '○' },
+          'ongoing': { label: 'In Progress', bgColor: '#6366f1', icon: '◐' },
+          'completed': { label: 'Completed', bgColor: '#10b981', icon: '●' }
+        };
+        var progressInfo = progressStatusInfo[progressStatus] || progressStatusInfo['not_started'];
+        
         return '<div class="card project-card">' +
-          '<div class="project-image" style="height: 200px;">' +
+          '<div class="project-image" style="height: 200px; position: relative;">' +
             '<img src="' + imageUrl + '" alt="' + (project.name || 'Project') + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800' + '\'' + ';">' +
+            '<span class="progress-status-indicator" style="position: absolute; bottom: 10px; left: 10px; background: ' + progressInfo.bgColor + '; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.25); letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;"><span style="font-size: 0.6rem;">' + progressInfo.icon + '</span>' + progressInfo.label + '</span>' +
           '</div>' +
           '<div class="project-content" style="padding: 1.5rem;">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">' +

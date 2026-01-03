@@ -417,6 +417,16 @@ function loadAdminTab(adminApi, api, tab) {
                 '</select>' +
               '</div>' +
             '</div>' +
+            '<div class="form-row">' +
+              '<div class="form-group">' +
+                '<label>Project Progress</label>' +
+                '<select name="progressStatus" class="input">' +
+                  '<option value="not_started" selected>○ Not Started</option>' +
+                  '<option value="ongoing">◐ In Progress</option>' +
+                  '<option value="completed">● Completed</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
           '</div>' +
           
           // Options Section
@@ -458,6 +468,7 @@ function loadAdminTab(adminApi, api, tab) {
         featured: form.featured.checked,
         priority: parseInt(form.priority.value, 10) || 0,
         status: form.status.value,
+        progressStatus: form.progressStatus.value || 'not_started',
         tags: parseTags(form.tags.value)
       };
       
@@ -506,12 +517,22 @@ function loadAdminTab(adminApi, api, tab) {
             var statusClass = statusColors[project.status] || '';
             var progress = project.goalAmount > 0 ? Math.min(100, ((project.currentFunding || 0) / project.goalAmount) * 100) : 0;
             
+            // Progress status display
+            var progressStatus = project.progressStatus || 'not_started';
+            var progressStatusInfo = {
+              'not_started': { label: 'NOT STARTED', class: 'badge-outline', color: '#94a3b8', icon: '○' },
+              'ongoing': { label: 'IN PROGRESS', class: 'badge-primary', color: '#6366f1', icon: '◐' },
+              'completed': { label: 'COMPLETED', class: 'badge-success', color: '#10b981', icon: '●' }
+            };
+            var progressInfo = progressStatusInfo[progressStatus] || progressStatusInfo['not_started'];
+            
             // Use imageUrl or fallback
             var imageUrl = project.imageUrl || project.image_url || project.dataUrl || 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400';
             
             return '<div class="project-card-admin">' +
               '<div class="project-image" style="background-image: url(\'' + imageUrl + '\');">' +
                 (project.featured ? '<span class="featured-badge">⭐ Featured</span>' : '') +
+                '<span class="progress-status-badge" style="position: absolute; bottom: 8px; left: 8px; background: ' + progressInfo.color + '; color: white; padding: 5px 12px; border-radius: 14px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 5px;"><span style="font-size: 0.55rem;">' + progressInfo.icon + '</span>' + progressInfo.label + '</span>' +
               '</div>' +
               '<div class="project-content">' +
                 '<div class="project-header">' +
@@ -539,6 +560,9 @@ function loadAdminTab(adminApi, api, tab) {
                   '<button class="btn btn-sm btn-outline edit-project-btn" data-id="' + project.id + '">✏️ Edit</button>' +
                   '<button class="btn btn-sm btn-outline toggle-status-btn" data-id="' + project.id + '" data-status="' + (project.status || 'active') + '">' +
                     ((project.status || 'active') === 'active' ? '🚫 Inactivate' : '✅ Activate') +
+                  '</button>' +
+                  '<button class="btn btn-sm btn-outline toggle-progress-btn" data-id="' + project.id + '" data-progress="' + progressStatus + '" title="Toggle project progress" style="font-size: 0.75rem;">' +
+                    (progressStatus === 'not_started' ? '▶ Start' : progressStatus === 'ongoing' ? '✓ Complete' : '↺ Reset') +
                   '</button>' +
                   '<button class="btn btn-sm btn-danger remove-project-btn" data-id="' + project.id + '">🗑 Remove</button>' +
                   (project.status === 'active' ? 
@@ -576,6 +600,7 @@ function openEditProjectModal(project, adminApi, api) {
   var imageUrl = project.imageUrl || project.image_url || project.dataUrl || '';
   var status = project.status || 'active';
   var priority = project.priority || 0;
+  var progressStatus = project.progressStatus || 'not_started';
 
   modal.innerHTML =
     '<div class="modal-content modal-lg">' +
@@ -664,6 +689,16 @@ function openEditProjectModal(project, adminApi, api) {
               '</select>' +
             '</div>' +
           '</div>' +
+          '<div class="form-row">' +
+            '<div class="form-group">' +
+              '<label>Project Progress</label>' +
+              '<select name="progressStatus" class="input">' +
+                '<option value="not_started"' + (progressStatus === 'not_started' ? ' selected' : '') + '>○ Not Started</option>' +
+                '<option value="ongoing"' + (progressStatus === 'ongoing' ? ' selected' : '') + '>◐ In Progress</option>' +
+                '<option value="completed"' + (progressStatus === 'completed' ? ' selected' : '') + '>● Completed</option>' +
+              '</select>' +
+            '</div>' +
+          '</div>' +
           '<div class="checkbox-group">' +
             '<label class="checkbox-label">' +
               '<input type="checkbox" name="featured"' + (project.featured ? ' checked' : '') + '>' +
@@ -734,6 +769,7 @@ function openEditProjectModal(project, adminApi, api) {
       featured: form.featured.checked,
       priority: parseInt(form.priority.value, 10) || 0,
       status: form.status.value,
+      progressStatus: form.progressStatus.value || 'not_started',
       tags: parseTags(form.tags.value)
     };
 
@@ -992,6 +1028,38 @@ function attachProjectListHandlers(adminApi, api) {
         .then(function() {
           loadAdminTab(adminApi, api, 'all-projects');
           loadAdminAlerts(adminApi);
+        })
+        .catch(function(err) {
+          alert('❌ Error: ' + err.message);
+        });
+    });
+  });
+
+  // Progress Status Toggle (Not Started -> Ongoing -> Completed -> Not Started)
+  document.querySelectorAll('.toggle-progress-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var currentProgress = this.getAttribute('data-progress') || 'not_started';
+      
+      // Cycle through: not_started -> ongoing -> completed -> not_started
+      var progressCycle = {
+        'not_started': 'ongoing',
+        'ongoing': 'completed',
+        'completed': 'not_started'
+      };
+      var nextProgress = progressCycle[currentProgress] || 'not_started';
+      
+      var progressLabels = {
+        'not_started': 'Not Started',
+        'ongoing': 'In Progress',
+        'completed': 'Completed'
+      };
+      
+      if (!confirm('Change project progress to "' + progressLabels[nextProgress] + '"?')) return;
+
+      adminApi.updateProject(id, { progressStatus: nextProgress })
+        .then(function() {
+          loadAdminTab(adminApi, api, 'all-projects');
         })
         .catch(function(err) {
           alert('❌ Error: ' + err.message);

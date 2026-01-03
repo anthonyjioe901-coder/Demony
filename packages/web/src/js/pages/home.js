@@ -207,13 +207,18 @@ function renderHome(container, api) {
         };
         var icon = categoryIcons[(project.category || '').toLowerCase()] || categoryIcons.default;
         
+        // Progress status
+        var progressStatus = project.progressStatus || 'not_started';
+        var progressDot = { 'not_started': '○', 'ongoing': '◐', 'completed': '●' }[progressStatus] || '○';
+        var progressColor = { 'not_started': '#94a3b8', 'ongoing': '#6366f1', 'completed': '#10b981' }[progressStatus] || '#94a3b8';
+        
         return '<div class="project-item" style="display: flex; align-items: center; padding: 1rem; background: var(--surface-elevated); border-radius: 14px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; cursor: pointer;" onclick="window.DemonyApp.router.navigate(\'projects\')">' +
           '<div class="icon" style="width: 48px; height: 48px; border-radius: 14px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; margin-right: 0.85rem;">' +
             icon +
           '</div>' +
           '<div class="info" style="flex: 1; min-width: 0;">' +
             '<div class="name" style="font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + project.name + '</div>' +
-            '<div class="category" style="color: var(--text-muted); font-size: 0.75rem;">' + (project.category || 'General') + '</div>' +
+            '<div class="category" style="color: var(--text-muted); font-size: 0.75rem;">' + (project.category || 'General') + ' <span style="margin-left: 0.5rem; color: ' + progressColor + ';">' + progressDot + '</span></div>' +
           '</div>' +
           '<div class="progress" style="text-align: right; min-width: 80px;">' +
             '<div class="amount" style="font-weight: 800; font-size: 0.9rem;">GH₵' + parseFloat(project.raised_amount || 0).toLocaleString() + '</div>' +
