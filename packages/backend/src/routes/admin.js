@@ -75,22 +75,46 @@ router.get('/stats', async function(req, res) {
 router.get('/users', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = parseInt(req.query.limit) || 20;
+    var limit = parseInt(req.query.limit) || 200; // Increased to show all users
     var skip = (page - 1) * limit;
     var role = req.query.role;
     var kycStatus = req.query.kycStatus;
     var verified = req.query.verified;
+    var search = req.query.search && req.query.search.trim() !== '' ? req.query.search.trim() : null;
+    var sortBy = req.query.sortBy || 'name'; // Default sort by name
     
     var filter = {};
     if (role) filter.role = role;
     if (kycStatus) filter['kyc.status'] = kycStatus;
     if (verified !== undefined) filter.isVerified = verified === 'true';
     
+    // Add search functionality
+    if (search) {
+      var searchRegex = { $regex: search, $options: 'i' };
+      filter.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex }
+      ];
+    }
+    
+    // Determine sort order
+    var sortOptions = {};
+    if (sortBy === 'name') {
+      sortOptions = { name: 1 }; // A-Z
+    } else if (sortBy === 'newest') {
+      sortOptions = { createdAt: -1 };
+    } else if (sortBy === 'oldest') {
+      sortOptions = { createdAt: 1 };
+    } else {
+      sortOptions = { name: 1 }; // Default to name
+    }
+    
     var database = await db.getDb();
     var users = await database.collection('users')
       .find(filter)
       .project({ password: 0 }) // Exclude password
-      .sort({ createdAt: -1 })
+      .sort(sortOptions)
       .skip(skip)
       .limit(limit)
       .toArray();
@@ -279,11 +303,39 @@ router.get('/projects', async function(req, res) {
     }
     
     var database = await db.getDb();
+    
+    // Sort: active projects first, then by funding/investors/disbursement
+    // Using aggregation for complex sorting
+    var pipeline = [
+      { $match: filter },
+      {
+        $addFields: {
+          // Active projects get priority 1, others get 0
+          statusPriority: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] },
+          // Calculate total funding (handle different field names)
+          totalFunding: { $ifNull: ['$currentFunding', { $ifNull: ['$raisedAmount', 0] }] },
+          // Investor count
+          investors: { $ifNull: ['$investorCount', 0] },
+          // Total disbursement
+          disbursement: { $ifNull: ['$totalProfitDistributed', 0] }
+        }
+      },
+      {
+        $sort: {
+          statusPriority: -1,  // Active first
+          totalFunding: -1,    // Most funded
+          investors: -1,       // Most investors
+          disbursement: -1,    // Most disbursement
+          createdAt: -1        // Newest
+        }
+      },
+      { $skip: skip },
+      { $limit: limit }
+    ];
+    
     var projects = await database.collection('projects')
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .aggregate(pipeline)
+      .toArray();
       .toArray();
     
     var total = await database.collection('projects').countDocuments(filter);

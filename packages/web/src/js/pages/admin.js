@@ -272,48 +272,102 @@ function loadAdminTab(adminApi, api, tab) {
   
   // ========== ALL USERS ==========
   else if (tab === 'all-users') {
-    adminApi.getUsers({})
-      .then(function(result) {
-        var nonAdminUsers = result.users.filter(function(user) {
-          return user.role !== 'admin';
+    // Show search and filter UI first
+    tabContent.innerHTML = 
+      '<div class="admin-users-header" style="margin-bottom: 1.5rem;">' +
+        '<div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">' +
+          '<div style="flex: 1; min-width: 250px; position: relative;">' +
+            '<input type="text" id="admin-user-search" placeholder="Search by name, email, or phone..." ' +
+              'style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color);">' +
+            '<svg style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+              '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>' +
+            '</svg>' +
+          '</div>' +
+          '<select id="admin-role-filter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color);">' +
+            '<option value="">All Roles</option>' +
+            '<option value="investor">Investors</option>' +
+            '<option value="business_owner">Business Owners</option>' +
+          '</select>' +
+          '<select id="admin-user-sort" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color);">' +
+            '<option value="name">Sort by Name (A-Z)</option>' +
+            '<option value="newest">Newest First</option>' +
+            '<option value="oldest">Oldest First</option>' +
+          '</select>' +
+        '</div>' +
+        '<div id="admin-user-count" style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;">Loading...</div>' +
+      '</div>' +
+      '<div id="admin-users-table">Loading users...</div>';
+    
+    // Load users function
+    function loadAdminUsers() {
+      var search = document.getElementById('admin-user-search').value.trim();
+      var role = document.getElementById('admin-role-filter').value;
+      var sortBy = document.getElementById('admin-user-sort').value;
+      var tableContainer = document.getElementById('admin-users-table');
+      
+      tableContainer.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading users...</div>';
+      
+      adminApi.getUsers({ search: search, role: role, sortBy: sortBy })
+        .then(function(result) {
+          var nonAdminUsers = result.users.filter(function(user) {
+            return user.role !== 'admin';
+          });
+          
+          // Update count
+          var countEl = document.getElementById('admin-user-count');
+          if (countEl) {
+            countEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; vertical-align: middle; margin-right: 6px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Total: <strong>' + result.pagination.total + ' users</strong>' + (nonAdminUsers.length !== result.pagination.total ? ' (' + nonAdminUsers.length + ' shown)' : '');
+          }
+          
+          if (nonAdminUsers.length === 0) {
+            tableContainer.innerHTML = '<div class="empty-state">No users found matching your criteria.</div>';
+            return;
+          }
+          
+          tableContainer.innerHTML = 
+            '<div class="admin-table-wrapper">' +
+              '<table class="admin-table">' +
+                '<thead>' +
+                  '<tr>' +
+                    '<th>Name</th>' +
+                    '<th>Email</th>' +
+                    '<th>Role</th>' +
+                    '<th>KYC</th>' +
+                    '<th>Status</th>' +
+                  '</tr>' +
+                '</thead>' +
+                '<tbody>' +
+                  nonAdminUsers.map(function(user) {
+                    var kycStatus = user.kyc ? user.kyc.status : 'pending';
+                    var kycClass = kycStatus === 'verified' ? 'badge-success' : kycStatus === 'submitted' ? 'badge-warning' : '';
+                    return '<tr>' +
+                      '<td><strong>' + user.name + '</strong></td>' +
+                      '<td>' + user.email + '</td>' +
+                      '<td><span class="badge ' + (user.role === 'business_owner' ? 'badge-purple' : '') + '">' + user.role.replace('_', ' ') + '</span></td>' +
+                      '<td><span class="badge ' + kycClass + '">' + kycStatus + '</span></td>' +
+                      '<td>' + (user.isActive !== false ? '<span class="status-active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 4px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> Active</span>' : '<span class="status-suspended"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 4px; vertical-align: middle;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Suspended</span>') + '</td>' +
+                    '</tr>';
+                  }).join('') +
+                '</tbody>' +
+              '</table>' +
+            '</div>';
+        })
+        .catch(function(err) {
+          tableContainer.innerHTML = '<div class="error-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Error loading users: ' + err.message + '</div>';
         });
-        
-        if (nonAdminUsers.length === 0) {
-          tabContent.innerHTML = '<div class="empty-state">No users found</div>';
-          return;
-        }
-        
-        tabContent.innerHTML = 
-          '<div class="admin-table-wrapper">' +
-            '<table class="admin-table">' +
-              '<thead>' +
-                '<tr>' +
-                  '<th>Name</th>' +
-                  '<th>Email</th>' +
-                  '<th>Role</th>' +
-                  '<th>KYC</th>' +
-                  '<th>Status</th>' +
-                '</tr>' +
-              '</thead>' +
-              '<tbody>' +
-                nonAdminUsers.map(function(user) {
-                  var kycStatus = user.kyc ? user.kyc.status : 'pending';
-                  var kycClass = kycStatus === 'verified' ? 'badge-success' : kycStatus === 'submitted' ? 'badge-warning' : '';
-                  return '<tr>' +
-                    '<td><strong>' + user.name + '</strong></td>' +
-                    '<td>' + user.email + '</td>' +
-                    '<td><span class="badge ' + (user.role === 'business_owner' ? 'badge-purple' : '') + '">' + user.role.replace('_', ' ') + '</span></td>' +
-                    '<td><span class="badge ' + kycClass + '">' + kycStatus + '</span></td>' +
-                    '<td>' + (user.isActive !== false ? '<span class="status-active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 4px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> Active</span>' : '<span class="status-suspended"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 4px; vertical-align: middle;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Suspended</span>') + '</td>' +
-                  '</tr>';
-                }).join('') +
-              '</tbody>' +
-            '</table>' +
-          '</div>';
-      })
-      .catch(function(err) {
-        tabContent.innerHTML = '<div class="error-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Error loading users: ' + err.message + '</div>';
-      });
+    }
+    
+    // Initial load
+    loadAdminUsers();
+    
+    // Event listeners
+    var searchTimeout;
+    document.getElementById('admin-user-search').addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(loadAdminUsers, 300);
+    });
+    document.getElementById('admin-role-filter').addEventListener('change', loadAdminUsers);
+    document.getElementById('admin-user-sort').addEventListener('change', loadAdminUsers);
   }
   
   // ========== CREATE PROJECT ==========
