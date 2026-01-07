@@ -526,6 +526,39 @@ body {
 .project-card {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.project-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.project-desc {
+  color: var(--text-color);
+  opacity: 0.85;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.project-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.investment-terms {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
 }
 
 .project-card:hover {
@@ -725,12 +758,12 @@ select:focus {
 /* Badge */
 .badge {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
-  background-color: rgba(99, 102, 241, 0.2);
-  color: var(--primary-color);
+  padding: 0.35rem 0.85rem;
+  background-color: var(--primary-color);
+  color: white;
   border-radius: 9999px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* Progress bar */

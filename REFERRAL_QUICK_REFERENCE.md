@@ -20,7 +20,7 @@
 - 📊 Progress bar shows: "7/10 Qualified Referrals"
 - 💰 Display shows: "GH₵140 Locked"
 
-### After Qualification (10+ qualified referrals)
+### After Qualification (10+ qualified referra  QQQQls)
 - ✅ **All accumulated bonuses unlocked** at once
 - ✅ Added to wallet immediately
 - ✅ All future bonuses credited instantly

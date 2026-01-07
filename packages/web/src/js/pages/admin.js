@@ -25,7 +25,7 @@ function renderAdmin(container, api) {
       '<div class="admin-actions-grid">' +
         // Create Project Card
         '<div class="admin-action-card create-card" data-action="create-project">' +
-          '<div class="action-icon create-icon">➕</div>' +
+          '<div class="action-icon create-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>' +
           '<div class="action-info">' +
             '<h3>Create Project</h3>' +
             '<p>Add new investment project</p>' +
@@ -34,7 +34,7 @@ function renderAdmin(container, api) {
         
         // Users Card
         '<div class="admin-action-card" data-action="all-users">' +
-          '<div class="action-icon users-icon">👥</div>' +
+          '<div class="action-icon users-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>' +
           '<div class="action-info">' +
             '<h3>Manage Users</h3>' +
             '<p>View all investors</p>' +
@@ -43,7 +43,7 @@ function renderAdmin(container, api) {
         
         // Projects Card
         '<div class="admin-action-card active" data-action="all-projects">' +
-          '<div class="action-icon projects-icon">📊</div>' +
+          '<div class="action-icon projects-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></div>' +
           '<div class="action-info">' +
             '<h3>All Projects</h3>' +
             '<p>Manage projects</p>' +
@@ -89,7 +89,7 @@ function loadAdminAlerts(adminApi) {
         alerts.push(
           '<div class="admin-alert kyc-alert" data-action="pending-kyc">' +
             '<div class="alert-left">' +
-              '<span class="alert-icon">📋</span>' +
+              '<span class="alert-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></span>' +
               '<div class="alert-info">' +
                 '<strong>' + stats.users.pendingKyc + ' Pending KYC</strong>' +
                 '<span>Users waiting for verification</span>' +
@@ -104,7 +104,7 @@ function loadAdminAlerts(adminApi) {
         alerts.push(
           '<div class="admin-alert project-alert" data-action="pending-projects">' +
             '<div class="alert-left">' +
-              '<span class="alert-icon">🏢</span>' +
+              '<span class="alert-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/></svg></span>' +
               '<div class="alert-info">' +
                 '<strong>' + stats.projects.pending + ' Pending Projects</strong>' +
                 '<span>Projects awaiting approval</span>' +
@@ -119,7 +119,7 @@ function loadAdminAlerts(adminApi) {
         alerts.push(
           '<div class="admin-alert withdrawal-alert" data-action="pending-withdrawals">' +
             '<div class="alert-left">' +
-              '<span class="alert-icon">💸</span>' +
+              '<span class="alert-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>' +
               '<div class="alert-info">' +
                 '<strong>' + stats.withdrawals.pending + ' Withdrawals</strong> <span class="amount">GH₵' + stats.withdrawals.pendingAmount.toLocaleString() + '</span>' +
                 '<span>Waiting for processing</span>' +
@@ -133,7 +133,7 @@ function loadAdminAlerts(adminApi) {
       if (alerts.length > 0) {
         alertsContainer.innerHTML = 
           '<div class="alerts-section">' +
-            '<h3 class="alerts-title">⚡ Requires Action</h3>' +
+            '<h3 class="alerts-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Requires Action</h3>' +
             '<div class="alerts-list">' + alerts.join('') + '</div>' +
           '</div>';
         
@@ -146,7 +146,7 @@ function loadAdminAlerts(adminApi) {
       } else {
         alertsContainer.innerHTML = 
           '<div class="no-alerts">' +
-            '<span class="check-icon">✅</span>' +
+            '<span class="check-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg></span>' +
             '<p>All caught up! No pending actions.</p>' +
           '</div>';
       }
@@ -164,19 +164,19 @@ function loadAdminTab(adminApi, api, tab) {
   var content = document.getElementById('admin-content');
   
   var titles = {
-    'pending-kyc': { icon: '📋', title: 'Pending KYC Verifications' },
-    'pending-projects': { icon: '🏢', title: 'Pending Project Approvals' },
-    'pending-withdrawals': { icon: '💸', title: 'Pending Withdrawals' },
-    'all-users': { icon: '👥', title: 'All Users' },
-    'all-projects': { icon: '📊', title: 'All Projects' },
-    'create-project': { icon: '➕', title: 'Create New Project' }
+    'pending-kyc': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>', title: 'Pending KYC Verifications' },
+    'pending-projects': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/></svg>', title: 'Pending Project Approvals' },
+    'pending-withdrawals': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', title: 'Pending Withdrawals' },
+    'all-users': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', title: 'All Users' },
+    'all-projects': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>', title: 'All Projects' },
+    'create-project': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>', title: 'Create New Project' }
   };
   
-  var sectionInfo = titles[tab] || { icon: '📁', title: 'Admin' };
+  var sectionInfo = titles[tab] || { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a6 6 0 0 0-6-6 6 6 0 0 0-6 6v1h12v-1z"/><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/></svg>', title: 'Admin' };
   
   content.innerHTML = 
     '<div class="admin-section-header">' +
-      '<span class="section-icon">' + sectionInfo.icon + '</span>' +
+      '<span class="section-icon" style="display: flex; align-items: center; justify-content: center;">' + sectionInfo.icon + '</span>' +
       '<h2>' + sectionInfo.title + '</h2>' +
     '</div>' +
     '<div id="tab-content" class="tab-content"><div class="loading">Loading...</div></div>';
@@ -188,7 +188,7 @@ function loadAdminTab(adminApi, api, tab) {
     adminApi.getUsers({ kycStatus: 'submitted' })
       .then(function(result) {
         if (result.users.length === 0) {
-          tabContent.innerHTML = '<div class="empty-state">✅ No pending KYC verifications</div>';
+          tabContent.innerHTML = '<div class="empty-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> No pending KYC verifications</div>';
           return;
         }
         
@@ -215,7 +215,7 @@ function loadAdminTab(adminApi, api, tab) {
     adminApi.getProjects({ status: 'pending_review' })
       .then(function(result) {
         if (result.projects.length === 0) {
-          tabContent.innerHTML = '<div class="empty-state">✅ No pending project reviews</div>';
+          tabContent.innerHTML = '<div class="empty-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> No pending project reviews</div>';
           return;
         }
         
@@ -245,7 +245,7 @@ function loadAdminTab(adminApi, api, tab) {
     adminApi.getWithdrawals({ status: 'pending' })
       .then(function(result) {
         if (result.withdrawals.length === 0) {
-          tabContent.innerHTML = '<div class="empty-state">✅ No pending withdrawals</div>';
+          tabContent.innerHTML = '<div class="empty-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> No pending withdrawals</div>';
           return;
         }
         
@@ -304,7 +304,7 @@ function loadAdminTab(adminApi, api, tab) {
                     '<td>' + user.email + '</td>' +
                     '<td><span class="badge ' + (user.role === 'business_owner' ? 'badge-purple' : '') + '">' + user.role.replace('_', ' ') + '</span></td>' +
                     '<td><span class="badge ' + kycClass + '">' + kycStatus + '</span></td>' +
-                    '<td>' + (user.isActive !== false ? '<span class="status-active">✅ Active</span>' : '<span class="status-suspended">🚫 Suspended</span>') + '</td>' +
+                    '<td>' + (user.isActive !== false ? '<span class="status-active"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 4px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> Active</span>' : '<span class="status-suspended"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 4px; vertical-align: middle;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Suspended</span>') + '</td>' +
                   '</tr>';
                 }).join('') +
               '</tbody>' +
@@ -312,7 +312,7 @@ function loadAdminTab(adminApi, api, tab) {
           '</div>';
       })
       .catch(function(err) {
-        tabContent.innerHTML = '<div class="error-state">⚠️ Error loading users: ' + err.message + '</div>';
+        tabContent.innerHTML = '<div class="error-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Error loading users: ' + err.message + '</div>';
       });
   }
   
@@ -326,7 +326,7 @@ function loadAdminTab(adminApi, api, tab) {
             '<h3>Project Image</h3>' +
             '<div class="image-upload-area" id="image-upload-area">' +
               '<div id="image-preview" class="image-preview">' +
-                '<span class="upload-icon">📷</span>' +
+                '<span class="upload-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>' +
                 '<p>Click to upload or drag & drop</p>' +
                 '<span class="upload-hint">PNG, JPG up to 5MB</span>' +
               '</div>' +
@@ -421,9 +421,9 @@ function loadAdminTab(adminApi, api, tab) {
               '<div class="form-group">' +
                 '<label>Project Progress</label>' +
                 '<select name="progressStatus" class="input">' +
-                  '<option value="not_started" selected>○ Not Started</option>' +
-                  '<option value="ongoing">◐ In Progress</option>' +
-                  '<option value="completed">● Completed</option>' +
+                  '<option value="not_started" selected>⏳ Not Started</option>' +
+                  '<option value="ongoing">🚀 Ongoing (In Progress)</option>' +
+                  '<option value="completed">✅ Completed</option>' +
                 '</select>' +
               '</div>' +
             '</div>' +
@@ -435,7 +435,7 @@ function loadAdminTab(adminApi, api, tab) {
               '<label class="checkbox-label">' +
                 '<input type="checkbox" name="featured">' +
                 '<span class="checkmark"></span>' +
-                '<span>⭐ Featured Project (show prominently on homepage)</span>' +
+                '<span><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" style="display: inline; margin-right: 4px; vertical-align: middle;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Featured Project (show prominently on homepage)</span>' +
               '</label>' +
             '</div>' +
           '</div>' +
@@ -474,12 +474,12 @@ function loadAdminTab(adminApi, api, tab) {
       
       adminApi.createProject(data)
         .then(function(result) {
-          alert('✅ Project created and published successfully!');
+          alert('Project created and published successfully!');
           loadAdminTab(adminApi, api, 'all-projects');
           loadAdminAlerts(adminApi);
         })
         .catch(function(err) {
-          alert('❌ Error: ' + err.message);
+          alert('Error: ' + err.message);
           submitBtn.disabled = false;
           submitBtn.textContent = 'Create & Publish Project';
         });
@@ -520,9 +520,9 @@ function loadAdminTab(adminApi, api, tab) {
             // Progress status display
             var progressStatus = project.progressStatus || 'not_started';
             var progressStatusInfo = {
-              'not_started': { label: 'NOT STARTED', class: 'badge-outline', color: '#94a3b8', icon: '○' },
-              'ongoing': { label: 'IN PROGRESS', class: 'badge-primary', color: '#6366f1', icon: '◐' },
-              'completed': { label: 'COMPLETED', class: 'badge-success', color: '#10b981', icon: '●' }
+              'not_started': { label: 'NOT STARTED', class: 'badge-outline', color: '#64748b', icon: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' },
+              'ongoing': { label: 'ONGOING', class: 'badge-primary', color: '#6366f1', icon: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' },
+              'completed': { label: 'COMPLETED', class: 'badge-success', color: '#10b981', icon: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>' }
             };
             var progressInfo = progressStatusInfo[progressStatus] || progressStatusInfo['not_started'];
             
@@ -531,8 +531,8 @@ function loadAdminTab(adminApi, api, tab) {
             
             return '<div class="project-card-admin">' +
               '<div class="project-image" style="background-image: url(\'' + imageUrl + '\');">' +
-                (project.featured ? '<span class="featured-badge">⭐ Featured</span>' : '') +
-                '<span class="progress-status-badge" style="position: absolute; bottom: 8px; left: 8px; background: ' + progressInfo.color + '; color: white; padding: 5px 12px; border-radius: 14px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 5px;"><span style="font-size: 0.55rem;">' + progressInfo.icon + '</span>' + progressInfo.label + '</span>' +
+                (project.featured ? '<span class="featured-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Featured</span>' : '') +
+                '<span class="progress-status-badge" style="position: absolute; bottom: 8px; left: 8px; background: ' + progressInfo.color + '; color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 5px;">' + progressInfo.icon + ' ' + progressInfo.label + '</span>' +
               '</div>' +
               '<div class="project-content">' +
                 '<div class="project-header">' +
@@ -557,19 +557,19 @@ function loadAdminTab(adminApi, api, tab) {
                   '</div>' +
                 '</div>' +
                 '<div class="project-actions">' +
-                  '<button class="btn btn-sm btn-outline edit-project-btn" data-id="' + project.id + '">✏️ Edit</button>' +
+                  '<button class="btn btn-sm btn-outline edit-project-btn" data-id="' + project.id + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</button>' +
                   '<button class="btn btn-sm btn-outline toggle-status-btn" data-id="' + project.id + '" data-status="' + (project.status || 'active') + '">' +
-                    ((project.status || 'active') === 'active' ? '🚫 Inactivate' : '✅ Activate') +
+                    ((project.status || 'active') === 'active' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Pause' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Activate') +
                   '</button>' +
-                  '<button class="btn btn-sm btn-outline toggle-progress-btn" data-id="' + project.id + '" data-progress="' + progressStatus + '" title="Toggle project progress" style="font-size: 0.75rem;">' +
-                    (progressStatus === 'not_started' ? '▶ Start' : progressStatus === 'ongoing' ? '✓ Complete' : '↺ Reset') +
+                  '<button class="btn btn-sm btn-outline toggle-progress-btn" data-id="' + project.id + '" data-progress="' + progressStatus + '" title="Toggle project progress">' +
+                    (progressStatus === 'not_started' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Start' : progressStatus === 'ongoing' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Complete' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Restart') +
                   '</button>' +
-                  '<button class="btn btn-sm btn-danger remove-project-btn" data-id="' + project.id + '">🗑 Remove</button>' +
+                  '<button class="btn btn-sm btn-danger remove-project-btn" data-id="' + project.id + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Remove</button>' +
                   (project.status === 'active' ? 
-                    '<button class="btn btn-sm btn-outline distribute-btn" data-id="' + project.id + '">💰 Distribute</button>' : '') +
-                  '<button class="btn btn-sm btn-outline post-update-btn" data-id="' + project.id + '" data-name="' + project.name + '">📢 Post Update</button>' +
+                    '<button class="btn btn-sm btn-outline distribute-btn" data-id="' + project.id + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Distribute</button>' : '') +
+                  '<button class="btn btn-sm btn-outline post-update-btn" data-id="' + project.id + '" data-name="' + project.name + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Update</button>' +
                   '<button class="btn btn-sm ' + (project.featured ? 'btn-warning' : 'btn-outline') + ' toggle-featured-btn" data-id="' + project.id + '" data-featured="' + project.featured + '">' + 
-                    (project.featured ? '⭐ Unfeature' : '☆ Feature') + 
+                    (project.featured ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Unfeature' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Feature') + 
                   '</button>' +
                 '</div>' +
               '</div>' +
@@ -610,7 +610,7 @@ function openEditProjectModal(project, adminApi, api) {
           '<h3>Image</h3>' +
           '<div class="image-upload-area" id="edit-image-upload-area">' +
             '<div id="edit-image-preview" class="image-preview' + (imageUrl ? ' has-image' : '') + '">' +
-              (imageUrl ? ('<img src="' + imageUrl + '" alt="Preview">') : ('<span class="upload-icon">📷</span><p>Click to upload or drag & drop</p><span class="upload-hint">PNG, JPG up to 5MB</span>')) +
+              (imageUrl ? ('<img src="' + imageUrl + '" alt="Preview">') : ('<span class="upload-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span><p>Click to upload or drag & drop</p><span class="upload-hint">PNG, JPG up to 5MB</span>')) +
             '</div>' +
             '<input type="file" id="edit-image-input" accept="image/*" style="display: none;">' +
             '<input type="hidden" id="edit-image-url-input" value="' + imageUrl + '">' +
@@ -693,16 +693,16 @@ function openEditProjectModal(project, adminApi, api) {
             '<div class="form-group">' +
               '<label>Project Progress</label>' +
               '<select name="progressStatus" class="input">' +
-                '<option value="not_started"' + (progressStatus === 'not_started' ? ' selected' : '') + '>○ Not Started</option>' +
-                '<option value="ongoing"' + (progressStatus === 'ongoing' ? ' selected' : '') + '>◐ In Progress</option>' +
-                '<option value="completed"' + (progressStatus === 'completed' ? ' selected' : '') + '>● Completed</option>' +
+                '<option value="not_started"' + (progressStatus === 'not_started' ? ' selected' : '') + '>Not Started</option>' +
+                '<option value="ongoing"' + (progressStatus === 'ongoing' ? ' selected' : '') + '>Ongoing (In Progress)</option>' +
+                '<option value="completed"' + (progressStatus === 'completed' ? ' selected' : '') + '>Completed</option>' +
               '</select>' +
             '</div>' +
           '</div>' +
           '<div class="checkbox-group">' +
             '<label class="checkbox-label">' +
               '<input type="checkbox" name="featured"' + (project.featured ? ' checked' : '') + '>' +
-              '<span>⭐ Featured</span>' +
+              '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" style="display: inline; margin-right: 4px; vertical-align: middle;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Featured</span>' +
             '</label>' +
           '</div>' +
         '</div>' +
@@ -864,12 +864,12 @@ function attachKYCHandlers(adminApi, api) {
         button.textContent = '...';
         adminApi.verifyKyc(id, 'approve')
           .then(function() {
-            alert('✅ KYC approved!');
+            alert('KYC approved!');
             loadAdminTab(adminApi, api, 'pending-kyc');
             loadAdminAlerts(adminApi);
           })
           .catch(function(err) {
-            alert('❌ Error: ' + err.message);
+            alert('Error: ' + err.message);
             button.disabled = false;
             button.textContent = 'Approve';
           });
@@ -886,12 +886,12 @@ function attachKYCHandlers(adminApi, api) {
         button.disabled = true;
         adminApi.verifyKyc(id, 'reject', reason)
           .then(function() {
-            alert('✅ KYC rejected');
+            alert('KYC rejected');
             loadAdminTab(adminApi, api, 'pending-kyc');
             loadAdminAlerts(adminApi);
           })
           .catch(function(err) {
-            alert('❌ Error: ' + err.message);
+            alert('Error: ' + err.message);
             button.disabled = false;
           });
       }
@@ -1050,9 +1050,9 @@ function attachProjectListHandlers(adminApi, api) {
       var nextProgress = progressCycle[currentProgress] || 'not_started';
       
       var progressLabels = {
-        'not_started': 'Not Started',
-        'ongoing': 'In Progress',
-        'completed': 'Completed'
+        'not_started': '⏳ Not Started',
+        'ongoing': '🚀 Ongoing',
+        'completed': '✅ Completed'
       };
       
       if (!confirm('Change project progress to "' + progressLabels[nextProgress] + '"?')) return;

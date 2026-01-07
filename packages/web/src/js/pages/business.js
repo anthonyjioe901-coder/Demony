@@ -33,7 +33,7 @@ function renderBusinessDashboard(container, api) {
     if (!profile.isVerified) {
       document.getElementById('kyc-warning').innerHTML = 
         '<div class="card" style="padding: 1.5rem; margin-bottom: 2rem; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.1);">' +
-          '<h3 style="color: #f59e0b; margin-bottom: 0.5rem;">⚠️ KYC Verification Required</h3>' +
+          '<h3 style="color: #f59e0b; margin-bottom: 0.5rem;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> KYC Verification Required</h3>' +
           '<p>Please complete KYC verification before submitting projects.</p>' +
           '<button class="btn btn-primary" id="start-kyc-btn" style="margin-top: 1rem;">Complete KYC</button>' +
         '</div>';

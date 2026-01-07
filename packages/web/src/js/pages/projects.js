@@ -91,41 +91,42 @@ function loadProjects(api) {
           'high': '#ef4444'
         }[riskLevel] || '#f59e0b';
         
-        // Progress status display
+        // Progress status display - improved visibility
         var progressStatus = project.progressStatus || 'not_started';
         var progressStatusInfo = {
-          'not_started': { label: 'Not Started', bgColor: '#94a3b8', icon: '○' },
-          'ongoing': { label: 'In Progress', bgColor: '#6366f1', icon: '◐' },
-          'completed': { label: 'Completed', bgColor: '#10b981', icon: '●' }
+          'not_started': { label: 'NOT STARTED', bgColor: 'rgba(0,0,0,0.85)', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' },
+          'ongoing': { label: 'IN PROGRESS', bgColor: 'rgba(99, 102, 241, 0.95)', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' },
+          'completed': { label: 'COMPLETED', bgColor: 'rgba(16, 185, 129, 0.95)', icon: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>' }
         };
         var progressInfo = progressStatusInfo[progressStatus] || progressStatusInfo['not_started'];
         
         return '<div class="card project-card">' +
           '<div class="project-image" style="height: 200px; position: relative;">' +
             '<img src="' + imageUrl + '" alt="' + (project.name || 'Project') + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800' + '\'' + ';">' +
-            '<span class="progress-status-indicator" style="position: absolute; bottom: 10px; left: 10px; background: ' + progressInfo.bgColor + '; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.25); letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;"><span style="font-size: 0.6rem;">' + progressInfo.icon + '</span>' + progressInfo.label + '</span>' +
+            '<span class="progress-status-indicator" style="position: absolute; top: 12px; left: 12px; background: ' + progressInfo.bgColor + '; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 6px; backdrop-filter: blur(4px);">' + progressInfo.icon + ' ' + progressInfo.label + '</span>' +
           '</div>' +
-          '<div class="project-content" style="padding: 1.5rem;">' +
+          '<div class="project-content">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">' +
               '<span class="badge">' + (project.category || 'General') + '</span>' +
               '<div style="display: flex; align-items: center; gap: 0.5rem;">' +
-                '<span style="color: var(--text-muted); font-size: 0.875rem;">📅 ' + ageDisplay + '</span>' +
-                '<button class="share-project-btn" data-id="' + project.id + '" data-name="' + encodeURIComponent(project.name) + '" title="Share project" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem;">📤</button>' +
+                '<span style="color: var(--text-muted); font-size: 0.875rem; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> ' + ageDisplay + '</span>' +
+                '<button class="share-project-btn" data-id="' + project.id + '" data-name="' + encodeURIComponent(project.name) + '" title="Share project" style="background: none; border: none; cursor: pointer; padding: 0.25rem; display: flex; align-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>' +
               '</div>' +
             '</div>' +
             '<h3>' + project.name + '</h3>' +
-            '<p style="color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5;">' + (project.description || '').substring(0, 100) + '...</p>' +
+            '<p class="project-desc">' + (project.description || '').substring(0, 100) + '...</p>' +
             
             // Investment Terms Box
-            '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem;">' +
-              '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">' +
-                '<div>💰 Min: GH₵' + (project.min_investment || 100) + '</div>' +
-                '<div>📆 Profits: ' + frequencyDisplay + '</div>' +
-                '<div>👥 Investors: ' + investorCount + '</div>' +
-                '<div>💼 Share: ' + profitSharing.investor + '%</div>' +
+            '<div class="investment-terms">' +
+              '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">' +
+                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> <span style="color: var(--text-muted);">Min:</span> <strong>GH₵' + (project.min_investment || 100) + '</strong></div>' +
+                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span style="color: var(--text-muted);">Profits:</span> <strong>' + frequencyDisplay + '</strong></div>' +
+                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span style="color: var(--text-muted);">Investors:</span> <strong>' + investorCount + '</strong></div>' +
+                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span style="color: var(--text-muted);">Share:</span> <strong>' + profitSharing.investor + '%</strong></div>' +
               '</div>' +
-              '<div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between;">' +
-                '<span>⚠️ Risk: <strong style="color: ' + riskColor + ';">' + riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + '</strong></span>' +
+              '<div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 6px;">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="' + riskColor + '" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+                '<span style="color: var(--text-muted);">Risk:</span> <strong style="color: ' + riskColor + ';">' + riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + '</strong>' +
               '</div>' +
             '</div>' +
             
@@ -136,7 +137,7 @@ function loadProjects(api) {
               '<span>GH₵' + (raised && !isNaN(raised) ? raised.toLocaleString() : '0') + ' raised</span>' +
               '<span>' + (percent && !isNaN(percent) ? percent : '0') + '%</span>' +
             '</div>' +
-            '<div style="display: flex; gap: 0.5rem;">' +
+            '<div class="project-actions">' +
               '<button class="btn btn-outline calc-btn" data-id="' + project.id + '" style="flex: 1;">Calculator</button>' +
               '<button class="btn btn-primary invest-btn" data-id="' + project.id + '" style="flex: 1;">Invest</button>' +
             '</div>' +

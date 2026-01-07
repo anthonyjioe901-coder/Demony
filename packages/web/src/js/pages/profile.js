@@ -54,22 +54,22 @@ function renderProfile(container, api) {
       '<div class="card">' +
         '<div class="profile-menu">' +
           '<a href="#wallet" class="profile-menu-item" data-page="wallet">' +
-            '<span class="menu-icon">💳</span>' +
+            '<span class="menu-icon" style="display: flex; align-items: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>' +
             '<span class="menu-text">Wallet</span>' +
             '<span class="menu-arrow">›</span>' +
           '</a>' +
           '<a href="#investments" class="profile-menu-item" data-page="investments">' +
-            '<span class="menu-icon">📈</span>' +
+            '<span class="menu-icon" style="display: flex; align-items: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>' +
             '<span class="menu-text">My Investments</span>' +
             '<span class="menu-arrow">›</span>' +
           '</a>' +
           '<a href="#portfolio" class="profile-menu-item" data-page="portfolio">' +
-            '<span class="menu-icon">💼</span>' +
+            '<span class="menu-icon" style="display: flex; align-items: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>' +
             '<span class="menu-text">Portfolio</span>' +
             '<span class="menu-arrow">›</span>' +
           '</a>' +
           '<div class="profile-menu-item" id="kyc-status-item">' +
-            '<span class="menu-icon">🔐</span>' +
+            '<span class="menu-icon" style="display: flex; align-items: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>' +
             '<span class="menu-text">KYC Status</span>' +
             '<span class="menu-status" id="kyc-badge">Checking...</span>' +
           '</div>' +

@@ -20,7 +20,7 @@ function renderReferrals(container, api) {
   container.innerHTML = 
     '<section>' +
       '<div class="page-header">' +
-        '<h1>🎁 My Referrals</h1>' +
+        '<h1 style="display: flex; align-items: center; gap: 0.5rem;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/><polyline points="12 2 12 12"/><polyline points="12 2 16 6"/><polyline points="12 2 8 6"/></svg> My Referrals</h1>' +
         '<p>Invite friends and earn rewards together</p>' +
       '</div>' +
       
@@ -37,9 +37,9 @@ function renderReferrals(container, api) {
           
           // Share Buttons
           '<div id="share-buttons" style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem;">' +
-            '<button class="btn btn-outline" id="copy-link-btn" style="flex: 1; min-width: 120px;">📋 Copy Link</button>' +
-            '<button class="btn btn-outline" id="share-whatsapp" style="flex: 1; min-width: 120px;">📱 WhatsApp</button>' +
-            '<button class="btn btn-outline" id="share-twitter" style="flex: 1; min-width: 120px;">🐦 Twitter</button>' +
+            '<button class="btn btn-outline" id="copy-link-btn" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; gap: 6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Link</button>' +
+            '<button class="btn btn-outline" id="share-whatsapp" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; gap: 6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> WhatsApp</button>' +
+            '<button class="btn btn-outline" id="share-twitter" style="flex: 1; min-width: 120px; display: flex; align-items: center; justify-content: center; gap: 6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/></svg> Twitter</button>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -62,7 +62,7 @@ function renderReferrals(container, api) {
       
       // How It Works
       '<div class="card" style="margin-bottom: 1.5rem;">' +
-        '<h3 style="margin-bottom: 1rem;">📖 How It Works</h3>' +
+        '<h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> How It Works</h3>' +
         '<div style="display: grid; gap: 1rem;">' +
           '<div style="display: flex; align-items: flex-start; gap: 1rem;">' +
             '<div style="min-width: 32px; width: 32px; height: 32px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700;">1</div>' +
@@ -90,7 +90,7 @@ function renderReferrals(container, api) {
       
       // Referral History
       '<div class="card">' +
-        '<h3 style="margin-bottom: 1rem;">📊 Referral History</h3>' +
+        '<h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Referral History</h3>' +
         '<div id="referral-history-list">' +
           '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">Loading referral history...</div>' +
         '</div>' +

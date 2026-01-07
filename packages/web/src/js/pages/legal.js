@@ -10,7 +10,7 @@ export function renderTerms(container) {
       
       <div class="legal-content">
         <div class="legal-important">
-          <strong>⚠️ IMPORTANT NOTICE:</strong> By accessing or using the Demony platform, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree to these terms, do not use this platform.
+          <strong><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> IMPORTANT NOTICE:</strong> By accessing or using the Demony platform, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree to these terms, do not use this platform.
         </div>
 
         <h2>1. ACCEPTANCE OF TERMS</h2>
@@ -35,7 +35,7 @@ export function renderTerms(container) {
 
         <h2>3. INVESTMENT RISKS - CRITICAL DISCLOSURE</h2>
         <div class="legal-warning">
-          <h3>⚠️ HIGH-RISK INVESTMENT WARNING</h3>
+          <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> HIGH-RISK INVESTMENT WARNING</h3>
           <p><strong>INVESTING INVOLVES SUBSTANTIAL RISK OF LOSS, INCLUDING THE POTENTIAL LOSS OF YOUR ENTIRE INVESTMENT. PAST PERFORMANCE IS NOT INDICATIVE OF FUTURE RESULTS.</strong></p>
         </div>
         <p>3.1. By using this platform, you acknowledge and accept that:</p>
@@ -274,7 +274,7 @@ export function renderRiskDisclosure(container) {
       
       <div class="legal-content">
         <div class="legal-warning" style="margin-bottom: 2rem;">
-          <h3>⚠️ IMPORTANT RISK WARNING</h3>
+          <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> IMPORTANT RISK WARNING</h3>
           <p><strong>INVESTING IN PROJECTS THROUGH DEMONY INVOLVES A HIGH DEGREE OF RISK. YOU SHOULD NOT INVEST ANY FUNDS THAT YOU CANNOT AFFORD TO LOSE ENTIRELY.</strong></p>
         </div>
 
@@ -385,7 +385,7 @@ export function renderRiskDisclosure(container) {
         </ul>
 
         <div class="legal-signature" style="background: rgba(239, 68, 68, 0.1); border-color: #ef4444;">
-          <p><strong>⚠️ FINAL WARNING: INVESTMENT CARRIES SIGNIFICANT RISK OF LOSS. ONLY INVEST WHAT YOU CAN AFFORD TO LOSE. BY PROCEEDING, YOU ACCEPT ALL RISKS DESCRIBED IN THIS DOCUMENT.</strong></p>
+          <p><strong><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> FINAL WARNING: INVESTMENT CARRIES SIGNIFICANT RISK OF LOSS. ONLY INVEST WHAT YOU CAN AFFORD TO LOSE. BY PROCEEDING, YOU ACCEPT ALL RISKS DESCRIBED IN THIS DOCUMENT.</strong></p>
         </div>
       </div>
     </section>
@@ -424,16 +424,16 @@ export function renderAgreementModal(onAccept, onDecline) {
         </div>
         
         <div class="agreement-section">
-          <h3>⚠️ Risk Disclosure</h3>
+          <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Risk Disclosure</h3>
           <div class="agreement-summary warning">
             <p><strong>IMPORTANT:</strong> You acknowledge that:</p>
             <ul>
-              <li>⚠️ <strong>You may lose all money you invest</strong></li>
-              <li>⚠️ <strong>There are no guaranteed returns</strong></li>
-              <li>⚠️ Investments may be illiquid - you may not be able to withdraw</li>
-              <li>⚠️ Past performance does not predict future results</li>
-              <li>⚠️ Projects may fail completely</li>
-              <li>⚠️ Only invest what you can afford to lose entirely</li>
+              <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>You may lose all money you invest</strong></li>
+              <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>There are no guaranteed returns</strong></li>
+              <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Investments may be illiquid - you may not be able to withdraw</li>
+              <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Past performance does not predict future results</li>
+              <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Projects may fail completely</li>
+              <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3.05h16.94a2 2 0 0 0 1.71-3.05L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Only invest what you can afford to lose entirely</li>
             </ul>
           </div>
         </div>

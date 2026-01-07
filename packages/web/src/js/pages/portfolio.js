@@ -157,13 +157,15 @@ function loadReferralWidget(api) {
             '<div class="referral-progress-bar-bg">' +
               '<div class="referral-progress-bar-fill" style="width: ' + progressPercent + '%;"></div>' +
             '</div>' +
-            '<p class="referral-lock-msg">' +
-              '<span>🔒</span> Earnings locked until ' + qualifyingNeeded + ' qualified referrals (GH₵100+ investment each)' +
+            '<p class="referral-lock-msg" style="display: flex; align-items: center; gap: 6px;">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+              'Earnings locked until ' + qualifyingNeeded + ' qualified referrals (GH₵100+ investment each)' +
             '</p>';
         } else if (progressSection && isQualified) {
           progressSection.innerHTML = 
-            '<div class="referral-unlocked-msg">' +
-              '<span>✅</span> <strong>Qualified!</strong> All earnings unlocked' +
+            '<div class="referral-unlocked-msg" style="display: flex; align-items: center; gap: 8px;">' +
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+              '<strong>Qualified!</strong> All earnings unlocked' +
             '</div>';
         }
         

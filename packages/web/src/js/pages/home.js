@@ -125,28 +125,28 @@ function renderHome(container, api) {
       '<div style="max-width: 800px; margin: 0 auto;">' +
         '<div class="card faq-item" style="padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; cursor: pointer; transition: all 0.3s;">' +
           '<div style="display: flex; justify-content: space-between; align-items: center;" class="faq-question">' +
-            '<h3 style="font-weight: 700; font-size: 1rem;">❓ How much can I invest?</h3>' +
+            '<h3 style="font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> How much can I invest?</h3>' +
             '<span style="font-size: 1.5rem; color: var(--text-muted);">+</span>' +
           '</div>' +
           '<p class="faq-answer" style="display: none; color: var(--text-muted); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">As little as GH₵20, with no maximum limit. You\'re in complete control of how much you invest.</p>' +
         '</div>' +
         '<div class="card faq-item" style="padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; cursor: pointer; transition: all 0.3s;">' +
           '<div style="display: flex; justify-content: space-between; align-items: center;" class="faq-question">' +
-            '<h3 style="font-weight: 700; font-size: 1rem;">📊 What are typical returns?</h3>' +
+            '<h3 style="font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> What are typical returns?</h3>' +
             '<span style="font-size: 1.5rem; color: var(--text-muted);">+</span>' +
           '</div>' +
           '<p class="faq-answer" style="display: none; color: var(--text-muted); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">Our average returns are 12%. Each project is different, so returns vary. You can see expected returns for each project before investing.</p>' +
         '</div>' +
         '<div class="card faq-item" style="padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; cursor: pointer; transition: all 0.3s;">' +
           '<div style="display: flex; justify-content: space-between; align-items: center;" class="faq-question">' +
-            '<h3 style="font-weight: 700; font-size: 1rem;">💳 When do I get my money back?</h3>' +
+            '<h3 style="font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> When do I get my money back?</h3>' +
             '<span style="font-size: 1.5rem; color: var(--text-muted);">+</span>' +
           '</div>' +
           '<p class="faq-answer" style="display: none; color: var(--text-muted); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">You can withdraw profits anytime. Your initial investment is locked until the project ends (usually 12-24 months).</p>' +
         '</div>' +
         '<div class="card faq-item" style="padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; cursor: pointer; transition: all 0.3s;">' +
           '<div style="display: flex; justify-content: space-between; align-items: center;" class="faq-question">' +
-            '<h3 style="font-weight: 700; font-size: 1rem;">🔒 Is my money safe?</h3>' +
+            '<h3 style="font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Is my money safe?</h3>' +
             '<span style="font-size: 1.5rem; color: var(--text-muted);">+</span>' +
           '</div>' +
           '<p class="faq-answer" style="display: none; color: var(--text-muted); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">Yes. Every investor gets equity in projects, and we comply with all regulatory requirements. Your investments are secure.</p>' +
@@ -193,32 +193,28 @@ function renderHome(container, api) {
       
       featuredList.innerHTML = projects.slice(0, 3).map(function(project) {
         var percent = Math.round((project.raised_amount / project.goal_amount) * 100);
-        var categoryIcons = {
-          'tech': '💻', 'technology': '💻',
-          'agriculture': '🌾', 'agric': '🌾',
-          'real estate': '🏢', 'realestate': '🏢',
-          'retail': '🛒',
-          'manufacturing': '🏭',
-          'healthcare': '🏥',
-          'education': '📚',
-          'finance': '💰',
-          'energy': '⚡',
-          'default': '🏢'
-        };
-        var icon = categoryIcons[(project.category || '').toLowerCase()] || categoryIcons.default;
         
-        // Progress status
+        // Category icon SVG
+        var categoryIconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>';
+        
+        // Progress status with modern styling
         var progressStatus = project.progressStatus || 'not_started';
-        var progressDot = { 'not_started': '○', 'ongoing': '◐', 'completed': '●' }[progressStatus] || '○';
-        var progressColor = { 'not_started': '#94a3b8', 'ongoing': '#6366f1', 'completed': '#10b981' }[progressStatus] || '#94a3b8';
+        var progressInfo = {
+          'not_started': { label: 'Not Started', color: '#64748b' },
+          'ongoing': { label: 'In Progress', color: '#6366f1' },
+          'completed': { label: 'Completed', color: '#10b981' }
+        }[progressStatus] || { label: 'Not Started', color: '#64748b' };
         
         return '<div class="project-item" style="display: flex; align-items: center; padding: 1rem; background: var(--surface-elevated); border-radius: 14px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; cursor: pointer;" onclick="window.DemonyApp.router.navigate(\'projects\')">' +
-          '<div class="icon" style="width: 48px; height: 48px; border-radius: 14px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; margin-right: 0.85rem;">' +
-            icon +
+          '<div class="icon" style="width: 48px; height: 48px; border-radius: 14px; background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; margin-right: 0.85rem;">' +
+            categoryIconSvg +
           '</div>' +
           '<div class="info" style="flex: 1; min-width: 0;">' +
             '<div class="name" style="font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + project.name + '</div>' +
-            '<div class="category" style="color: var(--text-muted); font-size: 0.75rem;">' + (project.category || 'General') + ' <span style="margin-left: 0.5rem; color: ' + progressColor + ';">' + progressDot + '</span></div>' +
+            '<div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">' +
+              '<span style="color: var(--text-muted); font-size: 0.75rem;">' + (project.category || 'General') + '</span>' +
+              '<span style="font-size: 0.65rem; padding: 2px 8px; border-radius: 4px; background: ' + progressInfo.color + '22; color: ' + progressInfo.color + '; font-weight: 600;">' + progressInfo.label + '</span>' +
+            '</div>' +
           '</div>' +
           '<div class="progress" style="text-align: right; min-width: 80px;">' +
             '<div class="amount" style="font-weight: 800; font-size: 0.9rem;">GH₵' + parseFloat(project.raised_amount || 0).toLocaleString() + '</div>' +

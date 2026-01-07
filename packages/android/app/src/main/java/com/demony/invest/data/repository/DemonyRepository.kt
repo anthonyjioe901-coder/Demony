@@ -1,0 +1,264 @@
+package com.demony.invest.data.repository
+
+import com.demony.invest.data.api.DemonyApiService
+import com.demony.invest.data.local.TokenManager
+import com.demony.invest.data.models.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import retrofit2.Response
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Main repository for Demony API operations
+ * 
+ * Handles all data operations with proper error handling and
+ * abstracts the API layer from ViewModels
+ */
+@Singleton
+class DemonyRepository @Inject constructor(
+    private val apiService: DemonyApiService,
+    private val tokenManager: TokenManager
+) {
+
+    // ==================== AUTHENTICATION ====================
+
+    suspend fun login(email: String, password: String): Result<AuthResponse> = safeApiCall {
+        apiService.login(LoginRequest(email, password))
+    }.also { result ->
+        result.getOrNull()?.let { response ->
+            tokenManager.saveToken(response.token)
+            tokenManager.saveUser(response.user)
+        }
+    }
+
+    suspend fun signup(
+        name: String,
+        email: String,
+        password: String,
+        role: String = "investor",
+        phone: String? = null,
+        businessName: String? = null,
+        businessRegistration: String? = null,
+        referralCode: String? = null
+    ): Result<AuthResponse> = safeApiCall {
+        apiService.signup(
+            SignupRequest(
+                name = name,
+                email = email,
+                password = password,
+                role = role,
+                phone = phone,
+                businessName = businessName,
+                businessRegistration = businessRegistration,
+                referralCode = referralCode
+            )
+        )
+    }.also { result ->
+        result.getOrNull()?.let { response ->
+            tokenManager.saveToken(response.token)
+            tokenManager.saveUser(response.user)
+        }
+    }
+
+    suspend fun getMe(): Result<User> = safeApiCall {
+        apiService.getMe()
+    }.also { result ->
+        result.getOrNull()?.let { user ->
+            tokenManager.saveUser(user)
+        }
+    }
+
+    fun logout() {
+        tokenManager.clearAll()
+    }
+
+    fun isLoggedIn(): Boolean = tokenManager.isLoggedIn()
+
+    fun getCurrentUser(): User? = tokenManager.getUser()
+
+    // ==================== PROJECTS ====================
+
+    suspend fun getProjects(
+        page: Int = 1,
+        limit: Int = 10,
+        category: String? = null,
+        sort: String? = null
+    ): Result<ProjectsResponse> = safeApiCall {
+        apiService.getProjects(page, limit, category, sort)
+    }
+
+    suspend fun getProject(id: String): Result<Project> = safeApiCall {
+        apiService.getProject(id)
+    }
+
+    suspend fun calculateReturns(
+        projectId: String,
+        amount: Double,
+        durationMonths: Int
+    ): Result<Map<String, Any>> = safeApiCall {
+        apiService.calculateReturns(
+            projectId,
+            mapOf("amount" to amount, "durationMonths" to durationMonths)
+        )
+    }
+
+    // ==================== INVESTMENTS ====================
+
+    suspend fun invest(request: InvestRequest): Result<Investment> = safeApiCall {
+        apiService.invest(request)
+    }
+
+    suspend fun getMyInvestments(): Result<List<Investment>> = safeApiCall {
+        apiService.getMyInvestments()
+    }
+
+    suspend fun getProfitHistory(investmentId: String): Result<List<Map<String, Any>>> = safeApiCall {
+        apiService.getProfitHistory(investmentId)
+    }
+
+    suspend fun getProjectUpdates(investmentId: String): Result<List<Map<String, Any>>> = safeApiCall {
+        apiService.getProjectUpdates(investmentId)
+    }
+
+    // ==================== WALLET ====================
+
+    suspend fun getWalletBalance(): Result<WalletBalance> = safeApiCall {
+        apiService.getWalletBalance()
+    }
+
+    suspend fun getTransactions(
+        page: Int = 1,
+        limit: Int = 20,
+        type: String? = null
+    ): Result<TransactionsResponse> = safeApiCall {
+        apiService.getTransactions(page, limit, type)
+    }
+
+    suspend fun initializeDeposit(amount: Double): Result<DepositResponse> = safeApiCall {
+        apiService.initializeDeposit(DepositRequest(amount))
+    }
+
+    suspend fun verifyDeposit(reference: String): Result<MessageResponse> = safeApiCall {
+        apiService.verifyDeposit(reference)
+    }
+
+    suspend fun getBanks(): Result<BanksResponse> = safeApiCall {
+        apiService.getBanks()
+    }
+
+    suspend fun verifyBankAccount(
+        accountNumber: String,
+        bankCode: String
+    ): Result<Map<String, Any>> = safeApiCall {
+        apiService.verifyBankAccount(accountNumber, bankCode)
+    }
+
+    suspend fun requestWithdrawal(request: WithdrawRequest): Result<MessageResponse> = safeApiCall {
+        apiService.requestWithdrawal(request)
+    }
+
+    suspend fun getMyWithdrawals(): Result<TransactionsResponse> = safeApiCall {
+        apiService.getMyWithdrawals()
+    }
+
+    suspend fun cancelWithdrawal(id: String): Result<MessageResponse> = safeApiCall {
+        apiService.cancelWithdrawal(id)
+    }
+
+    // ==================== PORTFOLIO ====================
+
+    suspend fun getPortfolio(): Result<Portfolio> = safeApiCall {
+        apiService.getPortfolio()
+    }
+
+    // ==================== REFERRALS ====================
+
+    suspend fun getReferralCode(): Result<ReferralCode> = safeApiCall {
+        apiService.getReferralCode()
+    }
+
+    suspend fun getReferralHistory(): Result<ReferralHistoryResponse> = safeApiCall {
+        apiService.getReferralHistory()
+    }
+
+    suspend fun validateReferralCode(code: String): Result<Map<String, Any>> = safeApiCall {
+        apiService.validateReferralCode(code)
+    }
+
+    suspend fun getReferralLeaderboard(): Result<List<Map<String, Any>>> = safeApiCall {
+        apiService.getReferralLeaderboard()
+    }
+
+    // ==================== SUPPORT ====================
+
+    suspend fun submitSupportTicket(ticket: SupportTicket): Result<TicketResponse> = safeApiCall {
+        apiService.submitSupportTicket(ticket)
+    }
+
+    suspend fun getTicketStatus(ticketId: String): Result<SupportTicket> = safeApiCall {
+        apiService.getTicketStatus(ticketId)
+    }
+
+    suspend fun getSystemStatus(): Result<Map<String, Any>> = safeApiCall {
+        apiService.getSystemStatus()
+    }
+
+    // ==================== UPLOAD ====================
+
+    suspend fun uploadImage(imageBase64: String, filename: String): Result<Map<String, String>> = safeApiCall {
+        apiService.uploadImage(mapOf("image" to imageBase64, "filename" to filename))
+    }
+
+    // ==================== SETTINGS ====================
+
+    fun isDarkMode(): Boolean = tokenManager.isDarkMode()
+    
+    fun setDarkMode(enabled: Boolean) {
+        tokenManager.setDarkMode(enabled)
+    }
+
+    fun isBiometricEnabled(): Boolean = tokenManager.isBiometricEnabled()
+    
+    fun setBiometricEnabled(enabled: Boolean) {
+        tokenManager.setBiometricEnabled(enabled)
+    }
+
+    fun areNotificationsEnabled(): Boolean = tokenManager.areNotificationsEnabled()
+    
+    fun setNotificationsEnabled(enabled: Boolean) {
+        tokenManager.setNotificationsEnabled(enabled)
+    }
+
+    // ==================== HELPER FUNCTIONS ====================
+
+    private suspend fun <T> safeApiCall(apiCall: suspend () -> Response<T>): Result<T> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiCall()
+                if (response.isSuccessful) {
+                    response.body()?.let {
+                        Result.success(it)
+                    } ?: Result.failure(Exception("Empty response body"))
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    val errorMessage = try {
+                        // Try to parse error message from JSON
+                        com.google.gson.Gson().fromJson(errorBody, ApiError::class.java).error
+                    } catch (e: Exception) {
+                        errorBody ?: "Unknown error: ${response.code()}"
+                    }
+                    
+                    // Handle authentication errors
+                    if (response.code() == 401 || response.code() == 403) {
+                        tokenManager.clearAll()
+                    }
+                    
+                    Result.failure(Exception(errorMessage))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+}

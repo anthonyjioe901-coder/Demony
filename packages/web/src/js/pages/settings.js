@@ -20,14 +20,14 @@ function renderSettings(container, api) {
   container.innerHTML = 
     '<section>' +
       '<div class="page-header">' +
-        '<h1>⚙️ Settings</h1>' +
+        '<h1 style="display: flex; align-items: center; gap: 0.5rem;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</h1>' +
         '<p>Manage your account preferences</p>' +
       '</div>' +
       
       // Account Security Section
       '<div class="card" style="margin-bottom: 1rem;">' +
         '<h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">' +
-          '<span>🔒</span> Security' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Security' +
         '</h3>' +
         '<form id="change-password-form">' +
           '<div class="form-group">' +
@@ -49,7 +49,7 @@ function renderSettings(container, api) {
       // Profile Settings Section
       '<div class="card" style="margin-bottom: 1rem;">' +
         '<h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">' +
-          '<span>👤</span> Profile Information' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profile Information' +
         '</h3>' +
         '<form id="update-profile-form">' +
           '<div class="form-group">' +
@@ -78,34 +78,34 @@ function renderSettings(container, api) {
       // Notification Preferences
       '<div class="card" style="margin-bottom: 1rem;">' +
         '<h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">' +
-          '<span>🔔</span> Notification Preferences' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Notification Preferences' +
         '</h3>' +
         '<form id="notification-settings-form">' +
           '<div style="display: flex; flex-direction: column; gap: 1rem;">' +
             '<label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">' +
               '<span style="display: flex; align-items: center; gap: 0.5rem;">' +
-                '<span>📧</span>' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' +
                 '<span>Email Notifications</span>' +
               '</span>' +
               '<input type="checkbox" id="email-notifications" class="toggle-switch" checked>' +
             '</label>' +
             '<label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">' +
               '<span style="display: flex; align-items: center; gap: 0.5rem;">' +
-                '<span>📊</span>' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>' +
                 '<span>Investment Updates</span>' +
               '</span>' +
               '<input type="checkbox" id="investment-updates" class="toggle-switch" checked>' +
             '</label>' +
             '<label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">' +
               '<span style="display: flex; align-items: center; gap: 0.5rem;">' +
-                '<span>🎁</span>' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/><polyline points="12 2 12 12"/><polyline points="12 2 16 6"/><polyline points="12 2 8 6"/></svg>' +
                 '<span>Referral Rewards</span>' +
               '</span>' +
               '<input type="checkbox" id="referral-notifications" class="toggle-switch" checked>' +
             '</label>' +
             '<label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">' +
               '<span style="display: flex; align-items: center; gap: 0.5rem;">' +
-                '<span>📰</span>' +
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>' +
                 '<span>Marketing & Promotions</span>' +
               '</span>' +
               '<input type="checkbox" id="marketing-notifications" class="toggle-switch">' +
@@ -118,7 +118,7 @@ function renderSettings(container, api) {
       // Account Management
       '<div class="card" style="margin-bottom: 1rem;">' +
         '<h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--danger-color);">' +
-          '<span>⚠️</span> Danger Zone' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Danger Zone' +
         '</h3>' +
         '<div style="padding: 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.5rem; border: 1px solid rgba(239, 68, 68, 0.2);">' +
           '<p style="margin-bottom: 1rem; color: var(--text-muted);">Once you delete your account, there is no going back. Please be certain.</p>' +
