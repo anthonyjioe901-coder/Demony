@@ -336,7 +336,6 @@ router.get('/projects', async function(req, res) {
     var projects = await database.collection('projects')
       .aggregate(pipeline)
       .toArray();
-      .toArray();
     
     var total = await database.collection('projects').countDocuments(filter);
     
