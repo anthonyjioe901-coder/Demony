@@ -5,17 +5,26 @@ function renderProjects(container, api) {
       '<h2>Investment Projects</h2>' +
       '<p style="color: var(--text-muted); margin-bottom: 2rem;">Browse and invest in local businesses and projects</p>' +
       
-      '<div class="filters" style="margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">' +
-        '<select id="category-filter" class="btn btn-outline" style="padding: 0.5rem 1rem;">' +
-          '<option value="">All Categories</option>' +
-          '<option value="technology">Technology</option>' +
-          '<option value="agriculture">Agriculture</option>' +
-          '<option value="real-estate">Real Estate</option>' +
-          '<option value="renewable-energy">Renewable Energy</option>' +
-          '<option value="food-beverage">Food & Beverage</option>' +
-          '<option value="retail">Retail</option>' +
-        '</select>' +
-        '<select id="sort-filter" class="btn btn-outline" style="padding: 0.5rem 1rem;">' +
+      // Modern Search Bar
+      '<div class="search-container" style="margin-bottom: 1.5rem;">' +
+        '<div style="position: relative; max-width: 500px;">' +
+          '<input type="text" id="project-search" placeholder="Search projects by name, category, or description..." ' +
+            'style="width: 100%; padding: 1rem 1rem 1rem 3rem; border: 2px solid var(--border-color); border-radius: 12px; font-size: 1rem; background: var(--card-bg); color: var(--text-color); transition: all 0.3s ease;">' +
+          '<svg style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>' +
+          '</svg>' +
+        '</div>' +
+      '</div>' +
+      
+      // Modern Category Pills
+      '<div class="category-pills" id="category-pills" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">' +
+        '<button class="category-pill active" data-category="" style="padding: 0.5rem 1.25rem; border: none; border-radius: 50px; background: var(--primary-color); color: white; cursor: pointer; font-weight: 500; transition: all 0.3s ease;">All Projects</button>' +
+      '</div>' +
+      
+      // Sort Filter
+      '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">' +
+        '<div id="project-count" style="color: var(--text-muted); font-size: 0.9rem;">Loading...</div>' +
+        '<select id="sort-filter" style="padding: 0.75rem 1.25rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color); cursor: pointer;">' +
           '<option value="newest">Newest First</option>' +
           '<option value="ending-soon">Ending Soon</option>' +
           '<option value="most-funded">Most Funded</option>' +
@@ -29,22 +38,76 @@ function renderProjects(container, api) {
     '</section>';
   
   container.innerHTML = html;
-  loadProjects(api);
   
-  document.getElementById('category-filter').addEventListener('change', function() { loadProjects(api); });
+  // Add CSS for category pills
+  var style = document.createElement('style');
+  style.textContent = 
+    '.category-pill { padding: 0.5rem 1.25rem; border: 2px solid var(--border-color); border-radius: 50px; background: var(--card-bg); color: var(--text-color); cursor: pointer; font-weight: 500; transition: all 0.3s ease; }' +
+    '.category-pill:hover { border-color: var(--primary-color); background: var(--primary-color-light, rgba(99, 102, 241, 0.1)); }' +
+    '.category-pill.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }' +
+    '#project-search:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }';
+  document.head.appendChild(style);
+  
+  loadProjects(api, true); // Load with categories
+  
+  // Search with debounce
+  var searchTimeout;
+  document.getElementById('project-search').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(function() { loadProjects(api); }, 300);
+  });
+  
   document.getElementById('sort-filter').addEventListener('change', function() { loadProjects(api); });
 }
 
-function loadProjects(api) {
+function loadProjects(api, loadCategories) {
   var projectsList = document.getElementById('projects-list');
-  var category = document.getElementById('category-filter').value;
-  var sort = document.getElementById('sort-filter').value;
+  var searchInput = document.getElementById('project-search');
+  var sortFilter = document.getElementById('sort-filter');
+  var activeCategory = document.querySelector('.category-pill.active');
+  
+  var category = activeCategory ? activeCategory.getAttribute('data-category') : '';
+  var sort = sortFilter ? sortFilter.value : 'newest';
+  var search = searchInput ? searchInput.value.trim() : '';
   
   projectsList.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem;">Loading projects...</div>';
   
-  api.getProjects({ category: category, sort: sort })
+  api.getProjects({ category: category, sort: sort, search: search })
     .then(function(response) {
       var projects = response.projects || response;
+      var categories = response.categories || [];
+      var pagination = response.pagination || { total: projects.length };
+      
+      // Update project count
+      var countEl = document.getElementById('project-count');
+      if (countEl) {
+        countEl.textContent = pagination.total + ' project' + (pagination.total !== 1 ? 's' : '') + ' found';
+      }
+      
+      // Populate category pills (only on first load)
+      if (loadCategories && categories.length > 0) {
+        var pillsContainer = document.getElementById('category-pills');
+        if (pillsContainer) {
+          var pillsHtml = '<button class="category-pill active" data-category="">All Projects</button>';
+          categories.forEach(function(cat) {
+            // Format category name for display
+            var displayName = cat.split('-').map(function(word) {
+              return word.charAt(0).toUpperCase() + word.slice(1);
+            }).join(' ');
+            pillsHtml += '<button class="category-pill" data-category="' + cat + '">' + displayName + '</button>';
+          });
+          pillsContainer.innerHTML = pillsHtml;
+          
+          // Add click handlers to pills
+          pillsContainer.querySelectorAll('.category-pill').forEach(function(pill) {
+            pill.addEventListener('click', function() {
+              pillsContainer.querySelectorAll('.category-pill').forEach(function(p) { p.classList.remove('active'); });
+              this.classList.add('active');
+              loadProjects(api, false);
+            });
+          });
+        }
+      }
       
       if (projects.length === 0) {
         projectsList.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem;">No projects found.</div>';

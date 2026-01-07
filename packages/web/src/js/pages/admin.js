@@ -488,22 +488,77 @@ function loadAdminTab(adminApi, api, tab) {
   
   // ========== ALL PROJECTS ==========
   else if (tab === 'all-projects') {
-    // Don't pass status filter to get ALL projects
-    adminApi.getProjects({})
-      .then(function(result) {
-        if (result.projects.length === 0) {
-          tabContent.innerHTML = '<div class="empty-state">No projects yet. Create your first project!</div>';
-          return;
-        }
+    // First show search/filter UI
+    tabContent.innerHTML = 
+      '<div class="admin-projects-header" style="margin-bottom: 1.5rem;">' +
+        '<div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">' +
+          '<div style="flex: 1; min-width: 250px; position: relative;">' +
+            '<input type="text" id="admin-project-search" placeholder="Search projects..." ' +
+              'style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color);">' +
+            '<svg style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+              '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>' +
+            '</svg>' +
+          '</div>' +
+          '<select id="admin-status-filter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color);">' +
+            '<option value="">All Status</option>' +
+            '<option value="active">Active</option>' +
+            '<option value="pending_review">Pending Review</option>' +
+            '<option value="inactive">Inactive</option>' +
+            '<option value="completed">Completed</option>' +
+            '<option value="rejected">Rejected</option>' +
+          '</select>' +
+          '<select id="admin-category-filter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color);">' +
+            '<option value="">All Categories</option>' +
+          '</select>' +
+        '</div>' +
+        '<div id="admin-project-count" style="color: var(--text-muted); font-size: 0.9rem;">Loading...</div>' +
+      '</div>' +
+      '<div id="admin-projects-grid" class="projects-grid">Loading projects...</div>';
+    
+    // Load projects function
+    function loadAdminProjects() {
+      var search = document.getElementById('admin-project-search').value.trim();
+      var status = document.getElementById('admin-status-filter').value;
+      var category = document.getElementById('admin-category-filter').value;
+      var grid = document.getElementById('admin-projects-grid');
+      
+      grid.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading projects...</div>';
+      
+      adminApi.getProjects({ search: search, status: status, category: category })
+        .then(function(result) {
+          // Update count
+          var countEl = document.getElementById('admin-project-count');
+          if (countEl) {
+            countEl.textContent = result.pagination.total + ' project' + (result.pagination.total !== 1 ? 's' : '') + ' found';
+          }
+          
+          // Populate categories dropdown (once)
+          if (result.categories && result.categories.length > 0) {
+            var catSelect = document.getElementById('admin-category-filter');
+            var currentVal = catSelect.value;
+            if (catSelect.options.length <= 1) {
+              result.categories.forEach(function(cat) {
+                var opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat.split('-').map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+                catSelect.appendChild(opt);
+              });
+            }
+            catSelect.value = currentVal;
+          }
+          
+          if (result.projects.length === 0) {
+            grid.innerHTML = '<div class="empty-state">No projects found matching your criteria.</div>';
+            return;
+          }
 
-        // Keep a lookup map for edit actions
-        window.__adminProjectsById = {};
-        result.projects.forEach(function(p) {
-          window.__adminProjectsById[p.id] = p;
-        });
-        
-        tabContent.innerHTML = '<div class="projects-grid">' + 
-          result.projects.map(function(project) {
+          // Keep a lookup map for edit actions
+          window.__adminProjectsById = {};
+          result.projects.forEach(function(p) {
+            window.__adminProjectsById[p.id] = p;
+          });
+          
+          grid.innerHTML = result.projects.map(function(project) {
             var statusColors = {
               'pending_review': 'badge-warning',
               'active': 'badge-success',
@@ -574,13 +629,27 @@ function loadAdminTab(adminApi, api, tab) {
                 '</div>' +
               '</div>' +
             '</div>';
-          }).join('') + '</div>';
+          }).join('');
         
         attachProjectListHandlers(adminApi, api);
       })
       .catch(function(err) {
-        tabContent.innerHTML = '<div class="error-state">⚠️ Error loading projects: ' + err.message + '</div>';
+        var grid = document.getElementById('admin-projects-grid');
+        if (grid) grid.innerHTML = '<div class="error-state">⚠️ Error loading projects: ' + err.message + '</div>';
       });
+    }
+    
+    // Initial load
+    loadAdminProjects();
+    
+    // Attach event listeners for search/filter
+    var searchTimeout;
+    document.getElementById('admin-project-search').addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(loadAdminProjects, 300);
+    });
+    document.getElementById('admin-status-filter').addEventListener('change', loadAdminProjects);
+    document.getElementById('admin-category-filter').addEventListener('change', loadAdminProjects);
   }
 }
 

@@ -258,12 +258,25 @@ router.post('/users/:id/status', async function(req, res) {
 router.get('/projects', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = parseInt(req.query.limit) || 20;
+    var limit = parseInt(req.query.limit) || 200; // Increased to show all projects
     var skip = (page - 1) * limit;
-    var status = req.query.status;
+    var status = req.query.status && req.query.status.trim() !== '' ? req.query.status.trim() : null;
+    var search = req.query.search && req.query.search.trim() !== '' ? req.query.search.trim() : null;
+    var category = req.query.category && req.query.category.trim() !== '' ? req.query.category.trim() : null;
     
     var filter = {};
     if (status) filter.status = status;
+    if (category) filter.category = category;
+    
+    // Add search functionality
+    if (search) {
+      var searchRegex = { $regex: search, $options: 'i' };
+      filter.$or = [
+        { name: searchRegex },
+        { description: searchRegex },
+        { category: searchRegex }
+      ];
+    }
     
     var database = await db.getDb();
     var projects = await database.collection('projects')
@@ -275,12 +288,16 @@ router.get('/projects', async function(req, res) {
     
     var total = await database.collection('projects').countDocuments(filter);
     
+    // Get unique categories for filtering
+    var allCategories = await database.collection('projects').distinct('category');
+    
     projects = projects.map(function(p) {
       return { ...p, id: p._id.toString() };
     });
     
     res.json({
       projects: projects,
+      categories: allCategories.filter(Boolean).sort(),
       pagination: { total: total, page: page, limit: limit, pages: Math.ceil(total / limit) }
     });
   } catch (err) {

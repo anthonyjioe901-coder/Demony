@@ -54,14 +54,28 @@ function normalizeProject(p) {
 router.get('/', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = parseInt(req.query.limit) || 10;
+    var limit = parseInt(req.query.limit) || 100; // Increased default to show all
     var skip = (page - 1) * limit;
-    var category = req.query.category;
+    var category = req.query.category && req.query.category.trim() !== '' ? req.query.category.trim() : null;
+    var search = req.query.search && req.query.search.trim() !== '' ? req.query.search.trim() : null;
     
     // Only show active projects to public
     var filter = { status: 'active' };
+    
+    // Add category filter
     if (category) {
       filter.category = category;
+    }
+    
+    // Add search functionality
+    if (search) {
+      var searchRegex = { $regex: search, $options: 'i' };
+      filter.$or = [
+        { name: searchRegex },
+        { description: searchRegex },
+        { category: searchRegex },
+        { tags: searchRegex }
+      ];
     }
     
     var database = await db.getDb();
@@ -75,8 +89,12 @@ router.get('/', async function(req, res) {
     
     var total = await database.collection('projects').countDocuments(filter);
     
+    // Get unique categories for filtering
+    var allCategories = await database.collection('projects').distinct('category', { status: 'active' });
+    
     res.json({
       projects: projects.map(normalizeProject),
+      categories: allCategories.filter(Boolean).sort(),
       pagination: {
         total: total,
         page: page,

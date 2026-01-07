@@ -4,7 +4,8 @@
   "main": "src/index.js",
   "scripts": {
     "setup": "node src/setup.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "seed:ghana": "node src/seed-ghana-projects.js"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

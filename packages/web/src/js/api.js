@@ -105,7 +105,16 @@ Api.prototype.getKYCStatus = function() {
 
 // Projects
 Api.prototype.getProjects = function(params) {
-  var query = params ? '?' + new URLSearchParams(params).toString() : '';
+  // Filter out empty values to avoid sending empty params
+  var cleanParams = {};
+  if (params) {
+    Object.keys(params).forEach(function(key) {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        cleanParams[key] = params[key];
+      }
+    });
+  }
+  var query = Object.keys(cleanParams).length > 0 ? '?' + new URLSearchParams(cleanParams).toString() : '';
   return this.request('/projects' + query);
 };
 
@@ -285,7 +294,16 @@ Api.prototype.getAdmin = function() {
     },
     
     getProjects: function(params) {
-      var query = params ? '?' + new URLSearchParams(params).toString() : '';
+      // Filter out empty values to avoid sending empty params
+      var cleanParams = {};
+      if (params) {
+        Object.keys(params).forEach(function(key) {
+          if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+            cleanParams[key] = params[key];
+          }
+        });
+      }
+      var query = Object.keys(cleanParams).length > 0 ? '?' + new URLSearchParams(cleanParams).toString() : '';
       return self.request('/admin/projects' + query);
     },
     
