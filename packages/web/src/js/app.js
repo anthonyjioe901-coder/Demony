@@ -701,10 +701,18 @@ function checkVerificationStatus() {
     
     // Auto-open login modal if not already logged in
     if (!localStorage.getItem('demony_user')) {
+      // First navigate to login page, then show notification
+      window.location.hash = '#login';
       setTimeout(function() {
         var loginBtn = document.getElementById('login-btn');
-        if (loginBtn) loginBtn.click();
-      }, 500);
+        if (loginBtn) {
+          loginBtn.click();
+        } else {
+          // If no login button, try to trigger the login form directly
+          var loginLink = document.querySelector('[data-nav="login"]') || document.querySelector('a[href="#login"]');
+          if (loginLink) loginLink.click();
+        }
+      }, 800);
     }
   }
 }

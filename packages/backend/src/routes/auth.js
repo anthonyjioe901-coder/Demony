@@ -186,9 +186,28 @@ router.post('/login', async function(req, res) {
     var skipVerification = process.env.NODE_ENV === 'development' || process.env.SKIP_EMAIL_VERIFICATION === 'true';
     
     if (!user.isVerified && !skipVerification) {
-      console.log('📧 User not verified, sending verification email to:', user.email);
+      console.log('📧 User not verified, checking rate limit for:', user.email);
       try {
         var database = await db.getDb();
+        
+        // Rate limit: max 3 verification emails per day
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var emailsSentToday = await database.collection('email_verifications').countDocuments({
+          userId: user._id.toString(),
+          createdAt: { $gte: today }
+        });
+        
+        if (emailsSentToday >= 3) {
+          console.log('⚠️ Rate limit reached for:', user.email, '- emails sent today:', emailsSentToday);
+          return res.status(429).json({ 
+            error: 'Too many verification emails requested today. Please check your inbox (including spam folder) or try again tomorrow.',
+            needsVerification: true,
+            email: user.email,
+            rateLimited: true
+          });
+        }
+        
         // Check for existing valid verification token
         var existing = await database.collection('email_verifications').findOne({
           userId: user._id.toString(),
@@ -213,7 +232,7 @@ router.post('/login', async function(req, res) {
         }
         
         var verifyUrlLogin = getApiBaseUrl() + '/auth/verify-email/' + tokenToSend;
-        console.log('📧 Sending verification email to:', user.email, '- URL:', verifyUrlLogin);
+        console.log('📧 Sending verification email to:', user.email);
         
         emailService.sendVerificationEmail(user, verifyUrlLogin).then(function(result) {
           console.log('✅ Verification email sent successfully:', result);

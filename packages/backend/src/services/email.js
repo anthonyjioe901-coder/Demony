@@ -150,7 +150,8 @@ var templates = {
                 <a class="cta" href="${data.verifyUrl}">Verify Email</a>
               </p>
               <p style="color: #6b7280; font-size: 14px;">If the button doesn't work, copy and paste this link into your browser:</p>
-              <div class="code-box">${data.verifyUrl}</div>
+              <div class="code-box">https://demony.tech/verify/${data.token || 'click-button-above'}</div>
+              <p style="color: #9ca3af; font-size: 12px; margin-top: 16px;">If you didn't create an account on Demony, you can safely ignore this email.</p>
             </div>
             <div class="footer">
               <p>© ${new Date().getFullYear()} Demony. All rights reserved.</p>
@@ -159,7 +160,7 @@ var templates = {
         </body>
         </html>
       `,
-      text: `Hi ${data.userName},\n\nVerify your Demony account: ${data.verifyUrl}\nThis link expires in 48 hours. If you didn't sign up, you can ignore this email.`
+      text: `Hi ${data.userName},\n\nVerify your Demony account by clicking the button in the email.\nThis link expires in 48 hours. If you didn't sign up, you can ignore this email.`
     };
   },
 
@@ -1009,10 +1010,15 @@ async function sendWelcomeEmail(user) {
 }
 
 async function sendVerificationEmail(user, verifyUrl) {
+  // Extract token from URL for display purposes (hide full API URL)
+  var token = verifyUrl.split('/').pop() || '';
+  var shortToken = token.substring(0, 8) + '...';
+  
   return sendEmail('verifyEmail', user.email, {
     userName: user.name || user.email.split('@')[0],
     verifyUrl: verifyUrl,
-    appUrl: process.env.APP_URL
+    token: shortToken,
+    appUrl: process.env.APP_URL || 'https://demony.tech'
   });
 }
 
