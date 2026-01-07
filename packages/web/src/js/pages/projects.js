@@ -3,32 +3,33 @@ function renderProjects(container, api) {
   var html = 
     '<section>' +
       '<h2>Investment Projects</h2>' +
-      '<p style="color: var(--text-muted); margin-bottom: 2rem;">Browse and invest in local businesses and projects</p>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1.5rem;">Browse and invest in local businesses and projects</p>' +
       
       // Modern Search Bar
-      '<div class="search-container" style="margin-bottom: 1.5rem;">' +
-        '<div style="position: relative; max-width: 500px;">' +
-          '<input type="text" id="project-search" placeholder="Search projects by name, category, or description..." ' +
-            'style="width: 100%; padding: 1rem 1rem 1rem 3rem; border: 2px solid var(--border-color); border-radius: 12px; font-size: 1rem; background: var(--card-bg); color: var(--text-color); transition: all 0.3s ease;">' +
-          '<svg style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<div class="search-container" style="margin-bottom: 1rem;">' +
+        '<div style="position: relative; max-width: 100%;">' +
+          '<input type="text" id="project-search" placeholder="Search projects..." ' +
+            'style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.75rem; border: 2px solid var(--border-color); border-radius: 10px; font-size: 0.95rem; background: var(--card-bg); color: var(--text-color); transition: all 0.3s ease;">' +
+          '<svg style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
             '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>' +
           '</svg>' +
         '</div>' +
       '</div>' +
       
-      // Modern Category Pills
-      '<div class="category-pills" id="category-pills" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">' +
-        '<button class="category-pill active" data-category="" style="padding: 0.5rem 1.25rem; border: none; border-radius: 50px; background: var(--primary-color); color: white; cursor: pointer; font-weight: 500; transition: all 0.3s ease;">All Projects</button>' +
+      // Horizontal Scrollable Category Pills
+      '<div class="category-scroll-container" style="margin-bottom: 1rem; position: relative;">' +
+        '<div class="category-pills" id="category-pills" style="display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.25rem 0; scrollbar-width: none; -ms-overflow-style: none;">' +
+          '<button class="category-pill active" data-category="">All</button>' +
+        '</div>' +
       '</div>' +
       
-      // Sort Filter
-      '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">' +
-        '<div id="project-count" style="color: var(--text-muted); font-size: 0.9rem;">Loading...</div>' +
-        '<select id="sort-filter" style="padding: 0.75rem 1.25rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color); cursor: pointer;">' +
-          '<option value="newest">Newest First</option>' +
+      // Sort and Count Row
+      '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">' +
+        '<div id="project-count" style="color: var(--text-muted); font-size: 0.85rem;">Loading...</div>' +
+        '<select id="sort-filter" style="padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg); color: var(--text-color); font-size: 0.85rem; cursor: pointer;">' +
+          '<option value="newest">Newest</option>' +
           '<option value="ending-soon">Ending Soon</option>' +
           '<option value="most-funded">Most Funded</option>' +
-          '<option value="least-funded">Least Funded</option>' +
         '</select>' +
       '</div>' +
       
@@ -39,13 +40,14 @@ function renderProjects(container, api) {
   
   container.innerHTML = html;
   
-  // Add CSS for category pills
+  // Add CSS for category pills - compact horizontal scroll
   var style = document.createElement('style');
   style.textContent = 
-    '.category-pill { padding: 0.5rem 1.25rem; border: 2px solid var(--border-color); border-radius: 50px; background: var(--card-bg); color: var(--text-color); cursor: pointer; font-weight: 500; transition: all 0.3s ease; }' +
-    '.category-pill:hover { border-color: var(--primary-color); background: var(--primary-color-light, rgba(99, 102, 241, 0.1)); }' +
+    '.category-pills::-webkit-scrollbar { display: none; }' +
+    '.category-pill { padding: 0.4rem 0.9rem; border: 1.5px solid var(--border-color); border-radius: 20px; background: var(--card-bg); color: var(--text-color); cursor: pointer; font-size: 0.8rem; font-weight: 500; white-space: nowrap; flex-shrink: 0; transition: all 0.2s ease; }' +
+    '.category-pill:hover { border-color: var(--primary-color); }' +
     '.category-pill.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }' +
-    '#project-search:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }';
+    '#project-search:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }';
   document.head.appendChild(style);
   
   loadProjects(api, true); // Load with categories
@@ -88,12 +90,18 @@ function loadProjects(api, loadCategories) {
       if (loadCategories && categories.length > 0) {
         var pillsContainer = document.getElementById('category-pills');
         if (pillsContainer) {
-          var pillsHtml = '<button class="category-pill active" data-category="">All Projects</button>';
+          var pillsHtml = '<button class="category-pill active" data-category="">All</button>';
           categories.forEach(function(cat) {
-            // Format category name for display
+            // Format category name for display - keep it short
             var displayName = cat.split('-').map(function(word) {
               return word.charAt(0).toUpperCase() + word.slice(1);
             }).join(' ');
+            // Shorten long names
+            if (displayName === 'Renewable Energy') displayName = 'Renewable';
+            if (displayName === 'Food Beverage') displayName = 'Food';
+            if (displayName === 'Financial Services') displayName = 'Finance';
+            if (displayName === 'Health Fitness') displayName = 'Fitness';
+            if (displayName === 'Telecommunications') displayName = 'Telecom';
             pillsHtml += '<button class="category-pill" data-category="' + cat + '">' + displayName + '</button>';
           });
           pillsContainer.innerHTML = pillsHtml;

@@ -17,6 +17,22 @@ function getApiBaseUrl() {
   return process.env.API_URL || process.env.API_BASE_URL || 'https://demony-api.onrender.com/api';
 }
 
+function getAppUrl() {
+  // Get frontend URL for redirects - always use the primary domain
+  // Handle case where multiple URLs might be concatenated (fix malformed env var)
+  var url = process.env.APP_URL || 'https://demony.tech';
+  // If multiple URLs are accidentally concatenated, just use the first one
+  if (url.includes(',')) {
+    url = url.split(',')[0].trim();
+  }
+  // Always prefer the main domain
+  if (url.includes('demony.tech') || url === 'https://demony.tech' || url === 'https://www.demony.tech') {
+    return 'https://demony.tech';
+  }
+  // Remove any trailing slashes
+  return url.replace(/\/+$/, '');
+}
+
 // Valid user roles
 var USER_ROLES = ['investor', 'business_owner', 'admin'];
 
@@ -305,7 +321,9 @@ router.post('/kyc/submit', authenticateToken, async function(req, res) {
 // Verify email
 router.get('/verify-email/:token', async function(req, res) {
   var token = req.params.token;
+  var appUrl = getAppUrl(); // Use helper function for clean URL
   console.log('📧 Verification attempt for token:', token ? token.substring(0, 10) + '...' : 'none');
+  console.log('📍 Redirect URL:', appUrl);
   
   if (!token) return res.status(400).json({ error: 'Verification token is required' });
   
@@ -317,19 +335,16 @@ router.get('/verify-email/:token', async function(req, res) {
     
     if (!record) {
       console.log('❌ Invalid verification token');
-      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
       return res.redirect(appUrl + '/#login?verified=invalid');
     }
     
     if (record.used) {
       console.log('⚠️ Token already used');
-      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
       return res.redirect(appUrl + '/#login?verified=already');
     }
     
     if (record.expiresAt && record.expiresAt < new Date()) {
       console.log('⏰ Token expired');
-      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
       return res.redirect(appUrl + '/#login?verified=expired');
     }
     
@@ -363,7 +378,6 @@ router.get('/verify-email/:token', async function(req, res) {
     
     if (updateResult.matchedCount === 0) {
       console.log('❌ User not found for userId:', userId);
-      var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
       return res.redirect(appUrl + '/#login?verified=usernotfound');
     }
     
@@ -375,11 +389,9 @@ router.get('/verify-email/:token', async function(req, res) {
     );
     
     // Redirect to login with success message
-    var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
     res.redirect(appUrl + '/#login?verified=success');
   } catch (err) {
     console.error('❌ Verification error:', err);
-    var appUrl = process.env.APP_URL || 'https://demony-web.onrender.com';
     res.redirect(appUrl + '/#login?verified=error');
   }
 });

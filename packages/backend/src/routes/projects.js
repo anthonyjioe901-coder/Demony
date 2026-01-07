@@ -67,14 +67,19 @@ router.get('/', async function(req, res) {
       filter.category = category;
     }
     
-    // Add search functionality
+    // Add search functionality - search all visible card fields
     if (search) {
       var searchRegex = { $regex: search, $options: 'i' };
       filter.$or = [
         { name: searchRegex },
         { description: searchRegex },
         { category: searchRegex },
-        { tags: searchRegex }
+        { tags: searchRegex },
+        { riskLevel: searchRegex },
+        { risk_level: searchRegex },
+        { targetReturn: searchRegex },
+        { target_return: searchRegex },
+        { ownerName: searchRegex }
       ];
     }
     
