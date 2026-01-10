@@ -55,6 +55,19 @@ Router.prototype.init = function(defaultRoute) {
 
 // Handle browser back/forward
 window.addEventListener('popstate', function(e) {
+  // First, close any open modals when back button is pressed
+  var openModals = document.querySelectorAll('.modal.active');
+  if (openModals.length > 0) {
+    openModals.forEach(function(modal) {
+      modal.remove();
+    });
+    // Prevent navigation if we just closed a modal - push state back
+    if (e.state && e.state.route) {
+      history.pushState(e.state, '', '#' + e.state.route);
+    }
+    return;
+  }
+  
   if (e.state && e.state.route && window.DemonyApp && window.DemonyApp.router) {
     window.DemonyApp.router.navigate(e.state.route, e.state.params, true);
   }

@@ -1,8 +1,13 @@
 package com.demony.invest.ui.screens.profile
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -11,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -26,9 +32,243 @@ fun ProfileScreen(
 ) {
     val user by viewModel.currentUser.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    
+    // KYC Dialog state
+    var showKycDialog by remember { mutableStateOf(false) }
+    var kycStep by remember { mutableStateOf(0) } // 0 = intro, 1 = ID upload, 2 = selfie, 3 = submitted
+    var selectedIdUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedSelfieUri by remember { mutableStateOf<Uri?>(null) }
+    
+    // Image pickers
+    val idDocumentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedIdUri = it }
+    }
+    
+    val selfiePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedSelfieUri = it }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.refreshUser()
+    }
+    
+    // KYC Verification Dialog
+    if (showKycDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showKycDialog = false
+                kycStep = 0
+                selectedIdUri = null
+                selectedSelfieUri = null
+            },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = when (kycStep) {
+                            0 -> "KYC Verification"
+                            1 -> "Upload ID Document"
+                            2 -> "Take a Selfie"
+                            else -> "Verification Submitted"
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = { 
+                        showKycDialog = false
+                        kycStep = 0
+                        selectedIdUri = null
+                        selectedSelfieUri = null
+                    }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    when (kycStep) {
+                        0 -> {
+                            // Introduction
+                            Icon(
+                                Icons.Default.VerifiedUser,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Complete your KYC verification to unlock all features",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "You will need:",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Badge, null, Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Valid Government ID (Ghana Card, Passport, etc.)")
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CameraAlt, null, Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("A clear selfie photo")
+                            }
+                        }
+                        1 -> {
+                            // ID Upload
+                            Icon(
+                                Icons.Default.Badge,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Upload a clear photo of your government-issued ID",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            if (selectedIdUri != null) {
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.secondary)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("ID Document selected")
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { idDocumentPicker.launch("image/*") }
+                            ) {
+                                Icon(Icons.Default.Upload, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (selectedIdUri == null) "Choose File" else "Change File")
+                            }
+                        }
+                        2 -> {
+                            // Selfie
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Upload a clear selfie photo for identity verification",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            if (selectedSelfieUri != null) {
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.secondary)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Selfie selected")
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { selfiePicker.launch("image/*") }
+                            ) {
+                                Icon(Icons.Default.Upload, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (selectedSelfieUri == null) "Choose Photo" else "Change Photo")
+                            }
+                        }
+                        else -> {
+                            // Submitted
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Your KYC verification has been submitted!",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "We'll review your documents and notify you within 24-48 hours.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                when (kycStep) {
+                    0 -> Button(onClick = { kycStep = 1 }) { Text("Start Verification") }
+                    1 -> Button(
+                        onClick = { kycStep = 2 },
+                        enabled = selectedIdUri != null
+                    ) { Text("Continue") }
+                    2 -> Button(
+                        onClick = { 
+                            // TODO: Upload documents to API
+                            kycStep = 3 
+                        },
+                        enabled = selectedSelfieUri != null
+                    ) { Text("Submit") }
+                    else -> Button(onClick = { 
+                        showKycDialog = false
+                        kycStep = 0
+                        selectedIdUri = null
+                        selectedSelfieUri = null
+                    }) { Text("Done") }
+                }
+            },
+            dismissButton = {
+                if (kycStep > 0 && kycStep < 3) {
+                    TextButton(onClick = { kycStep-- }) {
+                        Text("Back")
+                    }
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -230,7 +470,7 @@ fun ProfileScreen(
                             ProfileActionRow(
                                 icon = Icons.Default.Verified,
                                 label = "Complete KYC Verification",
-                                onClick = { /* Navigate to KYC */ }
+                                onClick = { showKycDialog = true }
                             )
                             Divider()
                             ProfileActionRow(

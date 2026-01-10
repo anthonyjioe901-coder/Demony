@@ -26,10 +26,6 @@ router.post('/', authenticateToken, async function(req, res) {
     return res.status(400).json({ error: 'Project ID and amount are required' });
   }
   
-  if (amount < 100) {
-    return res.status(400).json({ error: 'Minimum investment is 100' });
-  }
-  
   // Require risk acknowledgments
   if (!termsAccepted || !riskAcknowledged || !lossAcknowledged || !lockInAcknowledged) {
     return res.status(400).json({ 
@@ -57,8 +53,8 @@ router.post('/', authenticateToken, async function(req, res) {
     }
     
     // Check min investment
-    if (amount < (project.minInvestment || 100)) {
-      return res.status(400).json({ error: 'Minimum investment for this project is ' + (project.minInvestment || 100) });
+    if (amount < (project.minInvestment || 20)) {
+      return res.status(400).json({ error: 'Minimum investment for this project is ' + (project.minInvestment || 20) });
     }
     
     // Check user wallet balance

@@ -6,6 +6,9 @@ import com.demony.invest.data.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.Response
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -256,8 +259,14 @@ class DemonyRepository @Inject constructor(
                     
                     Result.failure(Exception(errorMessage))
                 }
+            } catch (e: UnknownHostException) {
+                Result.failure(Exception("No Internet Connection. Please check your network and try again."))
+            } catch (e: SocketTimeoutException) {
+                Result.failure(Exception("Connection timed out. Please try again."))
+            } catch (e: IOException) {
+                Result.failure(Exception("Network error. Please check your internet connection."))
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception("Something went wrong. Please try again."))
             }
         }
     }

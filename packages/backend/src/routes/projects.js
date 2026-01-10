@@ -15,7 +15,7 @@ function normalizeProject(p) {
     image_url: p.imageUrl || p.image_url || p.dataUrl || '',
     goal_amount: p.goalAmount || p.goal_amount || p.fundingGoal || 0,
     raised_amount: p.raisedAmount || p.raised_amount || p.currentFunding || p.current_funding || 0,
-    min_investment: p.minInvestment || p.min_investment || 100,
+    min_investment: p.minInvestment || p.min_investment || 20,
     target_return: p.targetReturn || p.target_return || '10-15%',
     duration: p.duration,
     risk_level: p.riskLevel || p.risk_level || 'medium',

@@ -171,7 +171,7 @@ function showSubmitProjectModal(api, existingProject) {
           '</div>' +
           '<div class="form-group">' +
             '<label for="min-investment">Min Investment (GH₵)</label>' +
-            '<input type="number" id="min-investment" min="100" step="50" value="' + (isEdit ? existingProject.min_investment : '100') + '">' +
+            '<input type="number" id="min-investment" min="20" step="10" value="' + (isEdit ? existingProject.min_investment : '20') + '">' +
           '</div>' +
         '</div>' +
         

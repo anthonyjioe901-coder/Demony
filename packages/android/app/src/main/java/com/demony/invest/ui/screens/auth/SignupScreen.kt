@@ -1,5 +1,6 @@
 package com.demony.invest.ui.screens.auth
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.demony.invest.ui.viewmodels.AuthViewModel
 
@@ -40,6 +42,12 @@ fun SignupScreen(
     var businessName by remember { mutableStateOf("") }
     var businessRegistration by remember { mutableStateOf("") }
     
+    // Dialog states
+    var showTermsDialog by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showVerificationDialog by remember { mutableStateOf(false) }
+    var verificationCode by remember { mutableStateOf("") }
+    
     val isLoading by authViewModel.isLoading.collectAsState()
     val error by authViewModel.error.collectAsState()
     
@@ -57,6 +65,103 @@ fun SignupScreen(
                       passwordsMatch &&
                       (selectedRole != "business_owner" || 
                        (businessName.isNotBlank() && businessRegistration.isNotBlank()))
+
+    // Terms of Service Dialog
+    if (showTermsDialog) {
+        TermsOfServiceDialog(onDismiss = { showTermsDialog = false })
+    }
+    
+    // Privacy Policy Dialog
+    if (showPrivacyDialog) {
+        PrivacyPolicyDialog(onDismiss = { showPrivacyDialog = false })
+    }
+    
+    // Email Verification Dialog
+    if (showVerificationDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Verify Your Email", fontWeight = FontWeight.Bold)
+                    IconButton(onClick = { 
+                        showVerificationDialog = false
+                        onSignupSuccess()
+                    }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.MarkEmailRead,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Verification email sent!",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "We've sent a verification code to:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = verificationCode,
+                        onValueChange = { if (it.length <= 6) verificationCode = it },
+                        label = { Text("Verification Code") },
+                        placeholder = { Text("Enter 6-digit code") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = { /* TODO: Resend code */ }) {
+                        Text("Didn't receive the code? Resend")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // TODO: Verify code with API
+                        showVerificationDialog = false
+                        onSignupSuccess()
+                    },
+                    enabled = verificationCode.length == 6
+                ) {
+                    Text("Verify")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showVerificationDialog = false
+                    onSignupSuccess()
+                }) {
+                    Text("Skip for now")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -326,7 +431,10 @@ fun SignupScreen(
                     businessName = businessName.takeIf { it.isNotBlank() },
                     businessRegistration = businessRegistration.takeIf { it.isNotBlank() },
                     referralCode = referralCode.takeIf { it.isNotBlank() },
-                    onSuccess = onSignupSuccess
+                    onSuccess = {
+                        // Show verification dialog after successful signup
+                        showVerificationDialog = true
+                    }
                 )
             },
             modifier = Modifier
@@ -366,13 +474,40 @@ fun SignupScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Info
-        Text(
-            text = "By creating an account, you agree to our Terms of Service and Privacy Policy",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+        // Info with clickable links
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "By creating an account, you agree to our",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Row(
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Terms of Service",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable { showTermsDialog = true }
+                )
+                Text(
+                    text = " and ",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Privacy Policy",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable { showPrivacyDialog = true }
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
     }

@@ -190,7 +190,7 @@ function loadProjects(api, loadCategories) {
             // Investment Terms Box
             '<div class="investment-terms">' +
               '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">' +
-                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> <span style="color: var(--text-muted);">Min:</span> <strong>GH₵' + (project.min_investment || 100) + '</strong></div>' +
+                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> <span style="color: var(--text-muted);">Min:</span> <strong>GH₵' + (project.min_investment || 20) + '</strong></div>' +
                 '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span style="color: var(--text-muted);">Profits:</span> <strong>' + frequencyDisplay + '</strong></div>' +
                 '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span style="color: var(--text-muted);">Investors:</span> <strong>' + investorCount + '</strong></div>' +
                 '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span style="color: var(--text-muted);">Share:</span> <strong>' + profitSharing.investor + '%</strong></div>' +
@@ -263,7 +263,7 @@ function showInvestModal(projectId, api) {
       profitSharing = { investor: 80, platform: 20 };
     }
     var riskLevel = project.risk_level || 'medium';
-    var minInvestment = project.min_investment || 100;
+    var minInvestment = project.min_investment || 20;
     
     var modal = document.createElement('div');
     modal.className = 'modal active';
@@ -275,7 +275,6 @@ function showInvestModal(projectId, api) {
         // Risk Disclosure Banner
         '<div style="background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">' +
           '<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">' +
-            '<span style="font-size: 1.5rem;">⚠️</span>' +
             '<strong style="color: #92400e;">Investment Risk Disclosure</strong>' +
           '</div>' +
           '<p style="font-size: 0.85rem; color: #78350f; margin: 0;">This is a <strong>' + riskLevel.toUpperCase() + ' RISK</strong> investment. Profits are NOT guaranteed and depend on actual project performance.</p>' +
@@ -308,27 +307,13 @@ function showInvestModal(projectId, api) {
             '<p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">Enter an amount to see projected returns</p>' +
           '</div>' +
           
-          // Required Acknowledgments
+          // Required Acknowledgment (single checkbox)
           '<div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">' +
-            '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #991b1b;">⚠️ Required Acknowledgments</h4>' +
-            '<div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">' +
-              '<label style="display: flex; gap: 0.5rem; cursor: pointer;">' +
-                '<input type="checkbox" id="terms-check" required style="margin-top: 2px;">' +
-                '<span>I have read and accept the <a href="#/legal" target="_blank">Terms & Conditions</a></span>' +
-              '</label>' +
-              '<label style="display: flex; gap: 0.5rem; cursor: pointer;">' +
-                '<input type="checkbox" id="risk-check" required style="margin-top: 2px;">' +
-                '<span>I understand that <strong>profits are NOT guaranteed</strong> and depend on actual project performance</span>' +
-              '</label>' +
-              '<label style="display: flex; gap: 0.5rem; cursor: pointer;">' +
-                '<input type="checkbox" id="loss-check" required style="margin-top: 2px;">' +
-                '<span>I understand and <strong>can afford to lose my entire investment</strong> if the project underperforms</span>' +
-              '</label>' +
-              '<label style="display: flex; gap: 0.5rem; cursor: pointer;">' +
-                '<input type="checkbox" id="lockin-check" required style="margin-top: 2px;">' +
-                '<span>I understand my principal (GH₵<span id="amount-display">0</span>) will be <strong>LOCKED for ' + lockInPeriod + ' months</strong></span>' +
-              '</label>' +
-            '</div>' +
+            '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #991b1b;">Required Acknowledgment</h4>' +
+            '<label style="display: flex; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">' +
+              '<input type="checkbox" id="master-acknowledgment" required style="margin-top: 2px; min-width: 18px; min-height: 18px;">' +
+              '<span>I have read and accept the <a href="#/legal" target="_blank">Terms & Conditions</a>. I understand that profits are NOT guaranteed, I can afford to lose my investment, and my principal (GH₵<span id="amount-display">0</span>) will be <strong>LOCKED for ' + lockInPeriod + ' months</strong>.</span>' +
+            '</label>' +
           '</div>' +
           
           '<div class="form-actions" style="display: flex; gap: 1rem;">' +
@@ -345,10 +330,7 @@ function showInvestModal(projectId, api) {
     var amountDisplay = document.getElementById('amount-display');
     var returnPreview = document.getElementById('return-preview');
     var confirmBtn = document.getElementById('confirm-invest-btn');
-    var termsCheck = document.getElementById('terms-check');
-    var riskCheck = document.getElementById('risk-check');
-    var lossCheck = document.getElementById('loss-check');
-    var lockinCheck = document.getElementById('lockin-check');
+    var masterAcknowledgment = document.getElementById('master-acknowledgment');
     
     // Update amount display and button state
     function updateUI() {
@@ -365,8 +347,8 @@ function showInvestModal(projectId, api) {
       // Update display (safe)
       amountDisplay.textContent = (isValidNumber && isPositive && amount !== null && !isNaN(amount)) ? amount.toLocaleString() : '0';
 
-      var allChecked = termsCheck.checked && riskCheck.checked && lossCheck.checked && lockinCheck.checked;
-      confirmBtn.disabled = !allChecked || !isValidAmount;
+      var isAcknowledged = masterAcknowledgment.checked;
+      confirmBtn.disabled = !isAcknowledged || !isValidAmount;
 
       // Show validation errors
       var errorMsg = '';
@@ -410,10 +392,7 @@ function showInvestModal(projectId, api) {
     if (investCurrency) {
       investCurrency.addEventListener('click', function() { amountInput.focus(); });
     }
-    termsCheck.addEventListener('change', updateUI);
-    riskCheck.addEventListener('change', updateUI);
-    lossCheck.addEventListener('change', updateUI);
-    lockinCheck.addEventListener('change', updateUI);
+    masterAcknowledgment.addEventListener('change', updateUI);
     
     document.getElementById('close-invest-modal').addEventListener('click', function() {
       modal.remove();
@@ -468,6 +447,7 @@ function showInvestModal(projectId, api) {
 // ROI Calculator Modal
 function showCalculatorModal(projectId, api) {
   api.getProject(projectId).then(function(project) {
+    var minInvestment = project.min_investment || 20;
     var modal = document.createElement('div');
     modal.className = 'modal active';
     
@@ -482,7 +462,7 @@ function showCalculatorModal(projectId, api) {
         
         '<div class="form-group">' +
           '<label for="calc-amount">Investment Amount (GH₵)</label>' +
-          '<input type="number" id="calc-amount" min="100" step="1" value="1000">' +
+          '<input type="number" id="calc-amount" min="' + minInvestment + '" step="1" value="1000">' +
         '</div>' +
         
         '<div id="calc-results" style="margin: 1.5rem 0;">' +
@@ -502,8 +482,8 @@ function showCalculatorModal(projectId, api) {
     
     function calculateAndDisplay() {
       var amount = parseFloat(calcAmount.value) || 0;
-      if (amount < 100) {
-        calcResults.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Minimum amount is GH₵100</div>';
+      if (amount < minInvestment) {
+        calcResults.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Minimum amount is GH₵' + minInvestment + '</div>';
         return;
       }
 
