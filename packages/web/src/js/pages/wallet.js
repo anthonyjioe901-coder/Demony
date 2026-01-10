@@ -163,7 +163,7 @@ function showDepositModal(api) {
           '<label for="deposit-amount">Amount (GH₵)</label>' +
           '<div style="display:flex; align-items:center; gap:0.5rem;">' +
             '<span id="deposit-currency" style="padding: 0.65rem 0.9rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--surface-color); cursor: pointer; user-select: none;">GH₵</span>' +
-            '<input type="number" id="deposit-amount" min="100" step="0.01" required placeholder="Enter amount (min 100)" style="flex:1;">' +
+            '<input type="number" id="deposit-amount" min="20" step="0.01" required placeholder="Enter amount (min 20)" style="flex:1;">' +
           '</div>' +
         '</div>' +
         '<div class="form-actions">' +
@@ -227,7 +227,7 @@ function showWithdrawModal(api) {
           '<label for="withdraw-amount">Amount (GH₵)</label>' +
           '<div style="display:flex; align-items:center; gap:0.5rem;">' +
             '<span id="withdraw-currency" style="padding: 0.65rem 0.9rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--surface-color); cursor: pointer; user-select: none;">GH₵</span>' +
-            '<input type="number" id="withdraw-amount" min="100" step="0.01" required placeholder="Enter amount (min 100)" style="flex:1;">' +
+            '<input type="number" id="withdraw-amount" min="20" step="0.01" required placeholder="Enter amount (min 20)" style="flex:1;">' +
           '</div>' +
         '</div>' +
         '<div id="bank-fields">' +

@@ -26,7 +26,7 @@ var faqData = [
     questions: [
       {
         q: 'How do I deposit money into my wallet?',
-        a: 'Go to the Wallet page and click "Deposit". Enter the amount you want to deposit (minimum GH₵100) and you\'ll be redirected to Paystack to complete the payment using your preferred method (card, mobile money, or bank transfer).'
+        a: 'Go to the Wallet page and click "Deposit". Enter the amount you want to deposit (minimum GH₵20) and you\'ll be redirected to Paystack to complete the payment using your preferred method (card, mobile money, or bank transfer).'
       },
       {
         q: 'How long do deposits take to reflect?',

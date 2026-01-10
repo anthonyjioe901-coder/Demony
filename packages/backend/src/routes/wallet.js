@@ -123,8 +123,8 @@ router.post('/deposit/initialize', async function(req, res) {
   try {
     var amount = parseFloat(req.body.amount);
     
-    if (!amount || amount < 100) {
-      return res.status(400).json({ error: 'Minimum deposit is 100' });
+    if (!amount || amount < 20) {
+      return res.status(400).json({ error: 'Minimum deposit is 20' });
     }
     
     var database = await db.getDb();
@@ -299,7 +299,7 @@ router.post('/withdraw', async function(req, res) {
     var momoNumber = req.body.momoNumber;
     
     if (!amount || amount < 100) {
-      return res.status(400).json({ error: 'Minimum withdrawal is 100' });
+      return res.status(400).json({ error: 'Minimum withdrawal is 20' });
     }
     
     if (method === 'bank') {
