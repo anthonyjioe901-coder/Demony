@@ -144,6 +144,17 @@ function loadProjects(api, loadCategories) {
         }
         var riskLevel = project.risk_level || 'medium';
         var investorCount = project.investor_count || 0;
+        var durationMonths = project.lock_in_period_months || project.duration || 12;
+        var targetReturn = project.target_return || '10-15%';
+
+        // Estimate returns for quick preview (for GH₵1,000)
+        var targetNumbers = (targetReturn || '').match(/\d+/g) || [];
+        var minReturnPercent = targetNumbers.length > 0 ? parseFloat(targetNumbers[0]) : 10;
+        var maxReturnPercent = targetNumbers.length > 1 ? parseFloat(targetNumbers[1]) : minReturnPercent;
+        var avgReturnPercent = (minReturnPercent + maxReturnPercent) / 2;
+        if (isNaN(avgReturnPercent) || avgReturnPercent <= 0) avgReturnPercent = 10;
+        var examplePrincipal = 1000;
+        var exampleAnnualProfit = Math.round(examplePrincipal * (avgReturnPercent / 100) * (profitSharing.investor / 100));
         
         // Format profit frequency for display
         var frequencyDisplay = {
@@ -192,12 +203,17 @@ function loadProjects(api, loadCategories) {
               '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">' +
                 '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> <span style="color: var(--text-muted);">Min:</span> <strong>GH₵' + (project.min_investment || 20) + '</strong></div>' +
                 '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span style="color: var(--text-muted);">Profits:</span> <strong>' + frequencyDisplay + '</strong></div>' +
+                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span style="color: var(--text-muted);">Target:</span> <strong>' + targetReturn + '</strong></div>' +
+                '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span style="color: var(--text-muted);">Duration:</span> <strong>' + durationMonths + ' mo</strong></div>' +
                 '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span style="color: var(--text-muted);">Investors:</span> <strong>' + investorCount + '</strong></div>' +
                 '<div style="display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span style="color: var(--text-muted);">Share:</span> <strong>' + profitSharing.investor + '%</strong></div>' +
               '</div>' +
               '<div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 6px;">' +
                 '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="' + riskColor + '" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
                 '<span style="color: var(--text-muted);">Risk:</span> <strong style="color: ' + riskColor + ';">' + riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + '</strong>' +
+              '</div>' +
+              '<div style="margin-top: 0.5rem; font-size: 0.78rem; color: var(--text-muted);">' +
+                'Est. annual profit on GH₵1,000: <strong>GH₵' + exampleAnnualProfit.toLocaleString() + '</strong> (not guaranteed)' +
               '</div>' +
             '</div>' +
             

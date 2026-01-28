@@ -141,15 +141,16 @@ router.post('/:id/calculate-returns', async function(req, res) {
     var amount = parseFloat(req.body.amount);
     var durationMonths = parseInt(req.body.durationMonths);
     
-    if (!amount || amount < 100) {
-      return res.status(400).json({ error: 'Amount must be at least 100' });
-    }
-    
     var database = await db.getDb();
     var project = await database.collection('projects').findOne({ _id: new ObjectId(id) });
     
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
+    }
+
+    var minInvestment = project.minInvestment || 20;
+    if (!amount || amount < minInvestment) {
+      return res.status(400).json({ error: 'Amount must be at least ' + minInvestment });
     }
     
     // Parse target return (handle various formats: "10-15%", "20% in 30 days", "25%", etc.)
