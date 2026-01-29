@@ -1213,6 +1213,365 @@ router.post('/projects/:id/cancel', async function(req, res) {
   }
 });
 
+// ==================== INVESTMENT LIFECYCLE MANAGEMENT ====================
+
+// Admin ends a specific investment (user-requested withdrawal)
+router.post('/investments/:id/withdraw', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    var applyPenalty = req.body.applyPenalty || false;
+    var penaltyPercent = parseFloat(req.body.penaltyPercent) || 10; // Default 10% penalty
+    var reason = req.body.reason || 'User requested withdrawal';
+    
+    // Get the investment
+    var investment = await database.collection('investments').findOne({ 
+      _id: new ObjectId(req.params.id) 
+    });
+    
+    if (!investment) {
+      return res.status(404).json({ error: 'Investment not found' });
+    }
+    
+    if (investment.status !== 'active') {
+      return res.status(400).json({ error: 'Only active investments can be withdrawn. Current status: ' + investment.status });
+    }
+    
+    // Calculate refund amount
+    var principalAmount = investment.amount;
+    var penaltyAmount = applyPenalty ? Math.round(principalAmount * (penaltyPercent / 100)) : 0;
+    var refundAmount = principalAmount - penaltyAmount;
+    
+    // Get the user
+    var user = await database.collection('users').findOne({ 
+      $or: [
+        { _id: toObjectId(investment.userId) },
+        { _id: investment.userId }
+      ]
+    });
+    
+    if (!user) {
+      return res.status(400).json({ error: 'User not found. Cannot process withdrawal for orphaned investment.' });
+    }
+    
+    // Update investment status to withdrawn
+    await database.collection('investments').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      {
+        $set: {
+          status: 'withdrawn',
+          withdrawnAt: new Date(),
+          withdrawnReason: reason,
+          withdrawnByAdmin: req.user.id,
+          penaltyApplied: applyPenalty,
+          penaltyPercent: applyPenalty ? penaltyPercent : 0,
+          penaltyAmount: penaltyAmount,
+          refundAmount: refundAmount,
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    // Credit user's wallet with refund
+    await database.collection('users').updateOne(
+      { _id: user._id },
+      {
+        $inc: { 
+          walletBalance: refundAmount,
+          totalInvested: -principalAmount
+        },
+        $set: { updatedAt: new Date() }
+      }
+    );
+    
+    // Record the transaction
+    await database.collection('transactions').insertOne({
+      userId: user._id.toString(),
+      type: 'investment_withdrawal',
+      amount: refundAmount,
+      investmentId: investment._id.toString(),
+      projectId: investment.projectId,
+      projectName: investment.projectName,
+      penaltyAmount: penaltyAmount,
+      status: 'success',
+      description: applyPenalty 
+        ? 'Investment withdrawal (principal: GH₵' + principalAmount + ', penalty: GH₵' + penaltyAmount + ')'
+        : 'Investment withdrawal (full principal returned)',
+      processedBy: req.user.id,
+      createdAt: new Date()
+    });
+    
+    // Recalculate project stats
+    var projectStats = await database.collection('investments').aggregate([
+      { $match: { projectId: investment.projectId, status: 'active' } },
+      { $group: { _id: null, totalAmount: { $sum: '$amount' }, count: { $sum: 1 } } }
+    ]).toArray();
+    
+    await database.collection('projects').updateOne(
+      { _id: new ObjectId(investment.projectId) },
+      {
+        $set: {
+          currentFunding: projectStats[0] ? projectStats[0].totalAmount : 0,
+          investorCount: projectStats[0] ? projectStats[0].count : 0,
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    // Send email notification
+    emailService.sendInvestmentWithdrawalEmail({
+      userName: user.name,
+      email: user.email,
+      projectName: investment.projectName,
+      principalAmount: principalAmount,
+      penaltyAmount: penaltyAmount,
+      refundAmount: refundAmount,
+      reason: reason
+    }).catch(function(err) {
+      console.error('Failed to send withdrawal email:', err);
+    });
+    
+    res.json({
+      message: 'Investment withdrawn successfully',
+      investmentId: req.params.id,
+      principalAmount: principalAmount,
+      penaltyAmount: penaltyAmount,
+      refundAmount: refundAmount,
+      newWalletBalance: (user.walletBalance || 0) + refundAmount
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get single investment details (for admin)
+router.get('/investments/:id', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    
+    var investment = await database.collection('investments').findOne({ 
+      _id: new ObjectId(req.params.id) 
+    });
+    
+    if (!investment) {
+      return res.status(404).json({ error: 'Investment not found' });
+    }
+    
+    // Get user details
+    var user = await database.collection('users').findOne({
+      $or: [
+        { _id: toObjectId(investment.userId) },
+        { _id: investment.userId }
+      ]
+    });
+    
+    // Get project details
+    var project = await database.collection('projects').findOne({
+      _id: new ObjectId(investment.projectId)
+    });
+    
+    res.json({
+      ...investment,
+      id: investment._id.toString(),
+      user: user ? { id: user._id.toString(), name: user.name, email: user.email } : null,
+      project: project ? { id: project._id.toString(), name: project.name, status: project.status } : null
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== USER DELETION WITH INVESTMENT HANDLING ====================
+
+// Delete user and handle their investments
+router.delete('/users/:id', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    var orphanInvestments = req.query.orphanInvestments !== 'false'; // Default: orphan investments
+    
+    // Get the user first
+    var user = await database.collection('users').findOne({ _id: new ObjectId(req.params.id) });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Prevent deleting admin users
+    if (user.role === 'admin') {
+      return res.status(403).json({ error: 'Cannot delete admin users' });
+    }
+    
+    var userId = req.params.id;
+    var investmentsHandled = 0;
+    var affectedProjects = [];
+    
+    // Handle investments
+    if (orphanInvestments) {
+      // Mark all active investments as orphaned
+      var investments = await database.collection('investments').find({
+        $or: [
+          { userId: userId },
+          { userId: new ObjectId(userId) }
+        ],
+        status: 'active'
+      }).toArray();
+      
+      if (investments.length > 0) {
+        var investmentIds = investments.map(function(inv) { return inv._id; });
+        affectedProjects = [...new Set(investments.map(function(inv) { return inv.projectId; }))];
+        
+        await database.collection('investments').updateMany(
+          { _id: { $in: investmentIds } },
+          {
+            $set: {
+              status: 'orphaned',
+              orphanedAt: new Date(),
+              orphanedReason: 'User account deleted by admin',
+              orphanedByAdmin: req.user.id,
+              updatedAt: new Date()
+            }
+          }
+        );
+        
+        investmentsHandled = investments.length;
+        
+        // Recalculate stats for affected projects
+        for (var i = 0; i < affectedProjects.length; i++) {
+          var projectId = affectedProjects[i];
+          var stats = await database.collection('investments').aggregate([
+            { $match: { projectId: projectId, status: 'active' } },
+            { $group: { _id: null, totalAmount: { $sum: '$amount' }, count: { $sum: 1 } } }
+          ]).toArray();
+          
+          await database.collection('projects').updateOne(
+            { _id: new ObjectId(projectId) },
+            {
+              $set: {
+                currentFunding: stats[0] ? stats[0].totalAmount : 0,
+                investorCount: stats[0] ? stats[0].count : 0,
+                updatedAt: new Date()
+              }
+            }
+          );
+        }
+      }
+    }
+    
+    // Delete the user
+    await database.collection('users').deleteOne({ _id: new ObjectId(req.params.id) });
+    
+    // Log the deletion
+    console.log('Admin deleted user:', user.email, '- Investments orphaned:', investmentsHandled);
+    
+    res.json({
+      message: 'User deleted successfully',
+      userId: userId,
+      userName: user.name,
+      userEmail: user.email,
+      investmentsOrphaned: investmentsHandled,
+      affectedProjects: affectedProjects.length
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Bulk delete users (with investment handling)
+router.post('/users/bulk-delete', async function(req, res) {
+  try {
+    var userIds = req.body.userIds;
+    
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'userIds array is required' });
+    }
+    
+    if (userIds.length > 500) {
+      return res.status(400).json({ error: 'Maximum 500 users can be deleted at once' });
+    }
+    
+    var database = await db.getDb();
+    var objectIds = userIds.map(function(id) { return new ObjectId(id); });
+    
+    // Don't delete admins
+    var admins = await database.collection('users').find({
+      _id: { $in: objectIds },
+      role: 'admin'
+    }).toArray();
+    
+    if (admins.length > 0) {
+      var adminIds = admins.map(function(a) { return a._id.toString(); });
+      objectIds = objectIds.filter(function(id) { 
+        return adminIds.indexOf(id.toString()) === -1; 
+      });
+    }
+    
+    // Mark all their active investments as orphaned
+    var investments = await database.collection('investments').find({
+      $or: userIds.map(function(id) {
+        return { $or: [{ userId: id }, { userId: new ObjectId(id) }] };
+      }).flat(),
+      status: 'active'
+    }).toArray();
+    
+    var affectedProjects = [];
+    if (investments.length > 0) {
+      var investmentIds = investments.map(function(inv) { return inv._id; });
+      affectedProjects = [...new Set(investments.map(function(inv) { return inv.projectId; }))];
+      
+      await database.collection('investments').updateMany(
+        { _id: { $in: investmentIds } },
+        {
+          $set: {
+            status: 'orphaned',
+            orphanedAt: new Date(),
+            orphanedReason: 'User account deleted by admin (bulk)',
+            orphanedByAdmin: req.user.id,
+            updatedAt: new Date()
+          }
+        }
+      );
+      
+      // Recalculate stats for affected projects
+      for (var i = 0; i < affectedProjects.length; i++) {
+        var projectId = affectedProjects[i];
+        var stats = await database.collection('investments').aggregate([
+          { $match: { projectId: projectId, status: 'active' } },
+          { $group: { _id: null, totalAmount: { $sum: '$amount' }, count: { $sum: 1 } } }
+        ]).toArray();
+        
+        await database.collection('projects').updateOne(
+          { _id: new ObjectId(projectId) },
+          {
+            $set: {
+              currentFunding: stats[0] ? stats[0].totalAmount : 0,
+              investorCount: stats[0] ? stats[0].count : 0,
+              updatedAt: new Date()
+            }
+          }
+        );
+      }
+    }
+    
+    // Delete the users
+    var result = await database.collection('users').deleteMany({ _id: { $in: objectIds } });
+    
+    console.log('Admin bulk deleted', result.deletedCount, 'users, orphaned', investments.length, 'investments');
+    
+    res.json({
+      message: 'Users deleted successfully',
+      deletedCount: result.deletedCount,
+      skippedAdmins: admins.length,
+      investmentsOrphaned: investments.length,
+      affectedProjects: affectedProjects.length
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Mark orphaned investments (user deleted) as orphaned
 router.post('/investments/cleanup-orphaned', async function(req, res) {
   try {

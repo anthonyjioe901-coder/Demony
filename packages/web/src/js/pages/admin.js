@@ -282,31 +282,114 @@ function loadAdminTab(adminApi, api, tab) {
 
   // ========== ALL INVESTMENTS ==========
   else if (tab === 'all-investments') {
-    adminApi.getInvestments({ limit: 100 })
-      .then(function(result) {
-        if (!result.investments || result.investments.length === 0) {
-          tabContent.innerHTML = '<div class="empty-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> No investments found</div>';
-          return;
-        }
-        
-        tabContent.innerHTML = '<div class="admin-list">' + result.investments.map(function(inv) {
-          var investorName = inv.user ? (inv.user.name || inv.user.email) : 'Unknown User';
-          var investorEmail = inv.user ? inv.user.email : '';
-          return '<div class="admin-list-item">' +
-            '<div class="item-main">' +
-              '<h4>GH₵' + (inv.amount || 0).toLocaleString() + ' • ' + (inv.projectName || 'Project') + '</h4>' +
-              '<p>' + investorName + (investorEmail ? ' (' + investorEmail + ')' : '') + '</p>' +
-              '<div class="badges">' +
-                '<span class="badge">' + (inv.status || 'unknown') + '</span>' +
-                '<span class="date">' + new Date(inv.createdAt).toLocaleDateString() + '</span>' +
+    // Show filters and search
+    tabContent.innerHTML = 
+      '<div class="admin-investments-header" style="margin-bottom: 1.5rem;">' +
+        '<div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">' +
+          '<select id="admin-inv-status-filter" style="padding: 0.75rem 1rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--card-bg); color: var(--text-color);">' +
+            '<option value="">All Statuses</option>' +
+            '<option value="active" selected>Active</option>' +
+            '<option value="completed">Completed</option>' +
+            '<option value="withdrawn">Withdrawn</option>' +
+            '<option value="orphaned">Orphaned</option>' +
+            '<option value="cancelled">Cancelled</option>' +
+          '</select>' +
+          '<button id="cleanup-orphaned-btn" class="btn-secondary" style="padding: 0.75rem 1rem;">🧹 Cleanup Orphaned</button>' +
+        '</div>' +
+        '<div id="admin-inv-count" style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;">Loading...</div>' +
+      '</div>' +
+      '<div id="admin-investments-list">Loading investments...</div>';
+    
+    // Load investments function
+    function loadInvestments() {
+      var status = document.getElementById('admin-inv-status-filter').value;
+      var listContainer = document.getElementById('admin-investments-list');
+      
+      listContainer.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading investments...</div>';
+      
+      adminApi.getInvestments({ limit: 100, status: status || undefined })
+        .then(function(result) {
+          // Update count
+          var countEl = document.getElementById('admin-inv-count');
+          if (countEl) {
+            countEl.innerHTML = '📊 Found: <strong>' + (result.investments ? result.investments.length : 0) + ' investments</strong>';
+          }
+          
+          if (!result.investments || result.investments.length === 0) {
+            listContainer.innerHTML = '<div class="empty-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> No investments found</div>';
+            return;
+          }
+          
+          listContainer.innerHTML = '<div class="admin-list">' + result.investments.map(function(inv) {
+            var investorName = inv.user ? (inv.user.name || inv.user.email) : 'Unknown User';
+            var investorEmail = inv.user ? inv.user.email : '';
+            var statusClass = inv.status === 'active' ? 'badge-success' : 
+                              inv.status === 'completed' ? 'badge-info' :
+                              inv.status === 'withdrawn' ? 'badge-warning' :
+                              inv.status === 'orphaned' ? 'badge-error' : '';
+            var canWithdraw = inv.status === 'active' && inv.user;
+            
+            return '<div class="admin-list-item" data-investment-id="' + (inv._id || inv.id) + '">' +
+              '<div class="item-main" style="flex: 1;">' +
+                '<h4>GH₵' + (inv.amount || 0).toLocaleString() + ' • ' + (inv.projectName || 'Project') + '</h4>' +
+                '<p>' + investorName + (investorEmail ? ' (' + investorEmail + ')' : '') + '</p>' +
+                '<div class="badges">' +
+                  '<span class="badge ' + statusClass + '">' + (inv.status || 'unknown') + '</span>' +
+                  '<span class="date">' + new Date(inv.createdAt).toLocaleDateString() + '</span>' +
+                '</div>' +
               '</div>' +
-            '</div>' +
-          '</div>';
-        }).join('') + '</div>';
-      })
-      .catch(function(err) {
-        tabContent.innerHTML = '<div class="alert-error">Error loading investments: ' + err.message + '</div>';
-      });
+              '<div class="item-actions">' +
+                (canWithdraw ? '<button class="btn-small btn-warning withdraw-investment-btn" data-id="' + (inv._id || inv.id) + '" data-amount="' + inv.amount + '" data-project="' + (inv.projectName || 'Project') + '" data-user="' + investorName + '">End Investment</button>' : '') +
+              '</div>' +
+            '</div>';
+          }).join('') + '</div>';
+          
+          // Add withdraw button handlers
+          document.querySelectorAll('.withdraw-investment-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              var id = this.getAttribute('data-id');
+              var amount = this.getAttribute('data-amount');
+              var project = this.getAttribute('data-project');
+              var user = this.getAttribute('data-user');
+              showWithdrawInvestmentModal(adminApi, id, amount, project, user, loadInvestments);
+            });
+          });
+        })
+        .catch(function(err) {
+          listContainer.innerHTML = '<div class="alert-error">Error loading investments: ' + err.message + '</div>';
+        });
+    }
+    
+    // Initial load
+    loadInvestments();
+    
+    // Filter change handler
+    document.getElementById('admin-inv-status-filter').addEventListener('change', loadInvestments);
+    
+    // Cleanup orphaned button
+    document.getElementById('cleanup-orphaned-btn').addEventListener('click', function() {
+      if (!confirm('This will mark investments with deleted users as "orphaned" and recalculate project stats. Continue?')) return;
+      
+      this.disabled = true;
+      this.textContent = 'Cleaning up...';
+      
+      adminApi.cleanupOrphanedInvestments()
+        .then(function(result) {
+          alert('Cleanup complete!\n\nOrphaned: ' + result.count + ' investments\nAffected Projects: ' + result.affectedProjects);
+          loadInvestments();
+        })
+        .catch(function(err) {
+          alert('Error: ' + err.message);
+        })
+        .finally(function() {
+          var btn = document.getElementById('cleanup-orphaned-btn');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🧹 Cleanup Orphaned';
+          }
+        });
+    });
   }
   
   // ========== ALL USERS ==========
@@ -1474,6 +1557,111 @@ function showPostUpdateModal(projectId, projectName, adminApi, api) {
         alert('❌ Error: ' + err.message);
         submitBtn.disabled = false;
         submitBtn.textContent = '📢 Post Update';
+      });
+  });
+}
+
+// Withdraw Investment Modal (Admin ends a user's investment)
+function showWithdrawInvestmentModal(adminApi, investmentId, amount, projectName, userName, onSuccess) {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 450px;">' +
+      '<h2>💸 End Investment</h2>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1rem;">User: <strong>' + userName + '</strong></p>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1rem;">Project: <strong>' + projectName + '</strong></p>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1rem;">Amount: <strong>GH₵' + parseFloat(amount).toLocaleString() + '</strong></p>' +
+      
+      '<div style="background: #fef3c7; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+        '<p style="margin: 0; font-size: 0.9rem;"><strong>ℹ️ This will:</strong></p>' +
+        '<ul style="margin: 0.5rem 0 0 1rem; padding: 0; font-size: 0.85rem;">' +
+          '<li>Mark the investment as "withdrawn"</li>' +
+          '<li>Refund the principal to user\'s wallet</li>' +
+          '<li>Optionally apply an early withdrawal penalty</li>' +
+          '<li>Send notification email to the user</li>' +
+        '</ul>' +
+      '</div>' +
+      
+      '<form id="withdraw-investment-form">' +
+        '<div class="form-group">' +
+          '<label>Reason for Withdrawal <span style="color: #ef4444;">*</span></label>' +
+          '<textarea id="withdraw-reason" rows="2" required placeholder="e.g., User requested to exit investment" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;"></textarea>' +
+        '</div>' +
+        
+        '<div class="form-group" style="margin-bottom: 1rem;">' +
+          '<label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">' +
+            '<input type="checkbox" id="apply-penalty" style="width: 18px; height: 18px;">' +
+            '<span>Apply early withdrawal penalty</span>' +
+          '</label>' +
+        '</div>' +
+        
+        '<div class="form-group" id="penalty-options" style="display: none; background: #fef2f2; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+          '<label>Penalty Percentage</label>' +
+          '<select id="penalty-percent" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">' +
+            '<option value="5">5%</option>' +
+            '<option value="10" selected>10%</option>' +
+            '<option value="15">15%</option>' +
+            '<option value="20">20%</option>' +
+          '</select>' +
+          '<p id="penalty-preview" style="margin-top: 0.5rem; font-size: 0.85rem; color: #ef4444;"></p>' +
+        '</div>' +
+        
+        '<div style="display: flex; gap: 1rem;">' +
+          '<button type="button" class="btn btn-outline close-modal" style="flex: 1;">Cancel</button>' +
+          '<button type="submit" class="btn btn-warning" id="submit-withdraw-btn" style="flex: 1;">💸 End Investment</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  var penaltyCheckbox = document.getElementById('apply-penalty');
+  var penaltyOptions = document.getElementById('penalty-options');
+  var penaltyPercent = document.getElementById('penalty-percent');
+  var penaltyPreview = document.getElementById('penalty-preview');
+  
+  function updatePenaltyPreview() {
+    var percent = parseInt(penaltyPercent.value);
+    var penalty = Math.round(parseFloat(amount) * (percent / 100));
+    var refund = parseFloat(amount) - penalty;
+    penaltyPreview.innerHTML = 'Penalty: <strong>-GH₵' + penalty.toLocaleString() + '</strong> | Refund: <strong>GH₵' + refund.toLocaleString() + '</strong>';
+  }
+  
+  penaltyCheckbox.addEventListener('change', function() {
+    penaltyOptions.style.display = this.checked ? 'block' : 'none';
+    if (this.checked) updatePenaltyPreview();
+  });
+  
+  penaltyPercent.addEventListener('change', updatePenaltyPreview);
+  
+  modal.querySelector('.close-modal').addEventListener('click', function() { modal.remove(); });
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+  
+  modal.querySelector('#withdraw-investment-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    var reason = document.getElementById('withdraw-reason').value;
+    var applyPenalty = penaltyCheckbox.checked;
+    var penaltyPct = applyPenalty ? parseInt(penaltyPercent.value) : 0;
+    var submitBtn = document.getElementById('submit-withdraw-btn');
+    
+    if (!confirm('Are you sure you want to end this investment? The principal will be refunded to the user\'s wallet.')) return;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing...';
+    
+    adminApi.withdrawInvestment(investmentId, { reason: reason, applyPenalty: applyPenalty, penaltyPercent: penaltyPct })
+      .then(function(result) {
+        alert('✅ Investment ended successfully!\n\nPrincipal: GH₵' + result.principalAmount.toLocaleString() + 
+              (result.penaltyAmount > 0 ? '\nPenalty: -GH₵' + result.penaltyAmount.toLocaleString() : '') +
+              '\nRefunded: GH₵' + result.refundAmount.toLocaleString());
+        modal.remove();
+        if (onSuccess) onSuccess();
+      })
+      .catch(function(err) {
+        alert('❌ Error: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '💸 End Investment';
       });
   });
 }

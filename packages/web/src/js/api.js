@@ -388,6 +388,38 @@ Api.prototype.getAdmin = function() {
       return self.request('/admin/investments/summary');
     },
     
+    // End a specific investment (user-requested withdrawal)
+    withdrawInvestment: function(investmentId, options) {
+      return self.request('/admin/investments/' + investmentId + '/withdraw', {
+        method: 'POST',
+        body: {
+          reason: options.reason,
+          applyPenalty: options.applyPenalty || false,
+          penaltyPercent: options.penaltyPercent || 10
+        }
+      });
+    },
+    
+    // Get single investment details
+    getInvestment: function(investmentId) {
+      return self.request('/admin/investments/' + investmentId);
+    },
+    
+    // Delete user (with investment handling)
+    deleteUser: function(userId) {
+      return self.request('/admin/users/' + userId, {
+        method: 'DELETE'
+      });
+    },
+    
+    // Bulk delete users
+    bulkDeleteUsers: function(userIds) {
+      return self.request('/admin/users/bulk-delete', {
+        method: 'POST',
+        body: { userIds: userIds }
+      });
+    },
+    
     // Project Updates (for investors)
     postProjectUpdate: function(projectId, title, message, type) {
       return self.request('/admin/projects/' + projectId + '/updates', {

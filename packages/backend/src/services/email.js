@@ -1029,6 +1029,94 @@ var templates = {
       `,
       text: `Project Cancelled: ${data.projectName}\n\nHi ${data.userName},\n\nThe project "${data.projectName}" has been cancelled.\n\nYour investment of GH₵${data.investmentAmount} has been fully refunded to your wallet.\n\nReason: ${data.cancellationReason}\n\nWe apologize for any inconvenience.`
     };
+  },
+  
+  // Investment withdrawal (user-requested)
+  investmentWithdrawal: function(data) {
+    var hasPenalty = data.penaltyAmount > 0;
+    return {
+      subject: hasPenalty 
+        ? '💸 Investment Withdrawn: ' + data.projectName + ' (with penalty)'
+        : '💸 Investment Withdrawn: ' + data.projectName,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .refund-box { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-radius: 12px; padding: 25px; margin: 20px 0; text-align: center; }
+            .refund-box h2 { color: #3730a3; margin: 0 0 10px; }
+            .amount { font-size: 32px; font-weight: bold; color: #6366f1; }
+            .details { background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0; }
+            .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+            .detail-row:last-child { border-bottom: none; }
+            .penalty-note { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; }
+            .reason { background: #f0f9ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; }
+            .cta-btn { display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>💸 Investment Withdrawn</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.userName},</p>
+              <p>Your investment in <strong>${data.projectName}</strong> has been withdrawn as requested.</p>
+              
+              <div class="refund-box">
+                <h2>Amount Refunded</h2>
+                <p class="amount">+GH₵${data.refundAmount.toLocaleString()}</p>
+                <p style="color: #3730a3;">Added to your wallet</p>
+              </div>
+              
+              <div class="details">
+                <div class="detail-row">
+                  <span>Original Investment</span>
+                  <strong>GH₵${data.principalAmount.toLocaleString()}</strong>
+                </div>
+                ${hasPenalty ? `
+                <div class="detail-row">
+                  <span>Early Withdrawal Penalty</span>
+                  <strong style="color: #ef4444;">-GH₵${data.penaltyAmount.toLocaleString()}</strong>
+                </div>
+                ` : ''}
+                <div class="detail-row">
+                  <span><strong>Final Refund</strong></span>
+                  <strong style="color: #6366f1;">GH₵${data.refundAmount.toLocaleString()}</strong>
+                </div>
+              </div>
+              
+              ${hasPenalty ? `
+              <div class="penalty-note">
+                <strong>Note:</strong> A penalty was applied because your investment was withdrawn before the project completed.
+              </div>
+              ` : ''}
+              
+              <div class="reason">
+                <strong>Reason:</strong> ${data.reason}
+              </div>
+              
+              <p>Your funds are now available in your wallet.</p>
+              
+              <p style="text-align: center;">
+                <a href="${data.appUrl || 'https://demony.com'}/#wallet" class="cta-btn">View Wallet</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Investment Withdrawn: ${data.projectName}\n\nHi ${data.userName},\n\nYour investment in "${data.projectName}" has been withdrawn.\n\nOriginal Investment: GH₵${data.principalAmount}\n${hasPenalty ? `Penalty: -GH₵${data.penaltyAmount}\n` : ''}Refunded: GH₵${data.refundAmount}\n\nReason: ${data.reason}\n\nYour funds are now available in your wallet.`
+    };
   }
 };
 
@@ -1281,6 +1369,19 @@ async function sendProjectCancellationEmail(user, project, investment, reason) {
   });
 }
 
+// Send investment withdrawal email (user-requested withdrawal)
+async function sendInvestmentWithdrawalEmail(data) {
+  return sendEmail('investmentWithdrawal', data.email, {
+    userName: data.userName,
+    projectName: data.projectName,
+    principalAmount: data.principalAmount,
+    penaltyAmount: data.penaltyAmount || 0,
+    refundAmount: data.refundAmount,
+    reason: data.reason,
+    appUrl: process.env.APP_URL
+  });
+}
+
 module.exports = {
   initTransporter: initTransporter,
   sendEmail: sendEmail,
@@ -1302,6 +1403,7 @@ module.exports = {
   sendSupportTicketNotificationEmail: sendSupportTicketNotificationEmail,
   sendProjectCompletionEmail: sendProjectCompletionEmail,
   sendProjectCancellationEmail: sendProjectCancellationEmail,
+  sendInvestmentWithdrawalEmail: sendInvestmentWithdrawalEmail,
   
   // Export templates for testing
   templates: templates
