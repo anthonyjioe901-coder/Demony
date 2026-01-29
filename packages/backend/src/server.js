@@ -95,6 +95,41 @@ app.get('/', function(req, res) {
   });
 });
 
+// Health check endpoint for keep-alive pings
+app.get('/health', function(req, res) {
+  res.json({ 
+    status: 'alive',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ========== KEEP-ALIVE MECHANISM ==========
+// Pings itself every 14 minutes to prevent Render free tier from sleeping
+var KEEP_ALIVE_URL = process.env.RENDER_EXTERNAL_URL || process.env.API_URL || 'https://demony-api.onrender.com';
+var KEEP_ALIVE_INTERVAL = 14 * 60 * 1000; // 14 minutes in milliseconds
+
+function keepAlive() {
+  var https = require('https');
+  var http = require('http');
+  var url = KEEP_ALIVE_URL + '/health';
+  var client = url.startsWith('https') ? https : http;
+  
+  client.get(url, function(res) {
+    console.log('[Keep-Alive] Ping successful at ' + new Date().toISOString() + ' - Status: ' + res.statusCode);
+  }).on('error', function(err) {
+    console.log('[Keep-Alive] Ping failed:', err.message);
+  });
+}
+
+// Start keep-alive only in production
+if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+  console.log('🔄 Keep-alive mechanism enabled - pinging every 14 minutes');
+  console.log('   Target URL: ' + KEEP_ALIVE_URL);
+  setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
+  // Initial ping after 1 minute to confirm it's working
+  setTimeout(keepAlive, 60000);
+}
+
 // Native addon test endpoint
 app.get('/api/native-test', function(req, res) {
   if (nativeAddon) {
