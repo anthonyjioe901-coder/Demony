@@ -40,6 +40,15 @@ function renderAdmin(container, api) {
             '<p>View all investors</p>' +
           '</div>' +
         '</div>' +
+
+        // Investments Card
+        '<div class="admin-action-card" data-action="all-investments">' +
+          '<div class="action-icon investments-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div>' +
+          '<div class="action-info">' +
+            '<h3>Investments</h3>' +
+            '<p>View latest investments</p>' +
+          '</div>' +
+        '</div>' +
         
         // Projects Card
         '<div class="admin-action-card active" data-action="all-projects">' +
@@ -168,6 +177,7 @@ function loadAdminTab(adminApi, api, tab) {
     'pending-projects': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/></svg>', title: 'Pending Project Approvals' },
     'pending-withdrawals': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', title: 'Pending Withdrawals' },
     'all-users': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', title: 'All Users' },
+    'all-investments': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>', title: 'All Investments' },
     'all-projects': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>', title: 'All Projects' },
     'create-project': { icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>', title: 'Create New Project' }
   };
@@ -267,6 +277,35 @@ function loadAdminTab(adminApi, api, tab) {
         }).join('') + '</div>';
         
         attachWithdrawalHandlers(adminApi, api);
+      });
+  }
+
+  // ========== ALL INVESTMENTS ==========
+  else if (tab === 'all-investments') {
+    adminApi.getInvestments({ limit: 100 })
+      .then(function(result) {
+        if (!result.investments || result.investments.length === 0) {
+          tabContent.innerHTML = '<div class="empty-state"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 8px; vertical-align: middle;"><path d="M20 6L9 17l-5-5"/></svg> No investments found</div>';
+          return;
+        }
+        
+        tabContent.innerHTML = '<div class="admin-list">' + result.investments.map(function(inv) {
+          var investorName = inv.user ? (inv.user.name || inv.user.email) : 'Unknown User';
+          var investorEmail = inv.user ? inv.user.email : '';
+          return '<div class="admin-list-item">' +
+            '<div class="item-main">' +
+              '<h4>GH₵' + (inv.amount || 0).toLocaleString() + ' • ' + (inv.projectName || 'Project') + '</h4>' +
+              '<p>' + investorName + (investorEmail ? ' (' + investorEmail + ')' : '') + '</p>' +
+              '<div class="badges">' +
+                '<span class="badge">' + (inv.status || 'unknown') + '</span>' +
+                '<span class="date">' + new Date(inv.createdAt).toLocaleDateString() + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('') + '</div>';
+      })
+      .catch(function(err) {
+        tabContent.innerHTML = '<div class="alert-error">Error loading investments: ' + err.message + '</div>';
       });
   }
   

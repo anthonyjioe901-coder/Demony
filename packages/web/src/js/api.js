@@ -356,6 +356,12 @@ Api.prototype.getAdmin = function() {
         body: { profitAmount: profitAmount, description: description }
       });
     },
+
+    // Investments
+    getInvestments: function(params) {
+      var query = params ? '?' + new URLSearchParams(params).toString() : '';
+      return self.request('/admin/investments' + query);
+    },
     
     // Project Updates (for investors)
     postProjectUpdate: function(projectId, title, message, type) {

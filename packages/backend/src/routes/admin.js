@@ -6,6 +6,20 @@ var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
 var router = express.Router();
 
+function toObjectId(value) {
+  if (!value) return null;
+  if (value instanceof ObjectId) return value;
+  if (ObjectId.isValid(value)) return new ObjectId(value);
+  return null;
+}
+
+function buildUserIdFilter(userId) {
+  var filters = [{ userId: userId }];
+  var asObjectId = toObjectId(userId);
+  if (asObjectId) filters.push({ userId: asObjectId });
+  return { $or: filters };
+}
+
 // Middleware to check admin role
 function requireAdmin(req, res, next) {
   if (req.user.role !== 'admin') {
@@ -62,6 +76,84 @@ router.get('/stats', async function(req, res) {
         pending: pendingWithdrawals,
         pendingAmount: withdrawalStats[0] ? withdrawalStats[0].totalAmount : 0
       }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== INVESTMENT MANAGEMENT ====================
+
+// Get all investments (with user details)
+router.get('/investments', async function(req, res) {
+  try {
+    var page = parseInt(req.query.page) || 1;
+    var limit = parseInt(req.query.limit) || 50;
+    var skip = (page - 1) * limit;
+    var status = req.query.status;
+    var projectId = req.query.projectId;
+    var userId = req.query.userId;
+    var from = req.query.from;
+    var to = req.query.to;
+    
+    var filter = {};
+    if (status) filter.status = status;
+    if (projectId) filter.projectId = projectId;
+    if (userId) Object.assign(filter, buildUserIdFilter(userId));
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(from);
+      if (to) filter.createdAt.$lte = new Date(to);
+    }
+    
+    var database = await db.getDb();
+    var investments = await database.collection('investments')
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+    
+    var total = await database.collection('investments').countDocuments(filter);
+    
+    var userIds = investments
+      .map(function(inv) { return inv.userId ? inv.userId.toString() : null; })
+      .filter(Boolean);
+    
+    var userObjectIds = userIds
+      .filter(function(id) { return ObjectId.isValid(id); })
+      .map(function(id) { return new ObjectId(id); });
+    
+    var users = userObjectIds.length > 0
+      ? await database.collection('users')
+          .find({ _id: { $in: userObjectIds } }, { projection: { password: 0 } })
+          .toArray()
+      : [];
+    
+    var userMap = {};
+    users.forEach(function(u) {
+      userMap[u._id.toString()] = {
+        id: u._id.toString(),
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        role: u.role
+      };
+    });
+    
+    investments = investments.map(function(inv) {
+      var invUserId = inv.userId ? inv.userId.toString() : null;
+      return {
+        ...inv,
+        id: inv._id.toString(),
+        user: invUserId ? (userMap[invUserId] || null) : null
+      };
+    });
+    
+    res.json({
+      investments: investments,
+      pagination: { total: total, page: page, limit: limit, pages: Math.ceil(total / limit) }
     });
   } catch (err) {
     console.error(err);
@@ -150,13 +242,13 @@ router.get('/users/:id', async function(req, res) {
     
     // Get user's investments
     var investments = await database.collection('investments')
-      .find({ userId: req.params.id })
+      .find(buildUserIdFilter(req.params.id))
       .sort({ createdAt: -1 })
       .toArray();
     
     // Get user's withdrawals
     var withdrawals = await database.collection('withdrawals')
-      .find({ userId: req.params.id })
+      .find(buildUserIdFilter(req.params.id))
       .sort({ createdAt: -1 })
       .toArray();
     
@@ -824,7 +916,9 @@ router.post('/projects/:id/updates', async function(req, res) {
     // Send email notifications to all investors of this project (async)
     database.collection('investments').find({ projectId: req.params.id }).toArray()
       .then(function(projectInvestments) {
-        var userIds = projectInvestments.map(function(inv) { return new ObjectId(inv.userId); });
+        var userIds = projectInvestments
+          .map(function(inv) { return toObjectId(inv.userId); })
+          .filter(Boolean);
         if (userIds.length === 0) return;
         
         return database.collection('users').find({ _id: { $in: userIds } }).toArray()

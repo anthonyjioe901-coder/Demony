@@ -6,6 +6,20 @@ var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
 var router = express.Router();
 
+function toObjectId(value) {
+  if (!value) return null;
+  if (value instanceof ObjectId) return value;
+  if (ObjectId.isValid(value)) return new ObjectId(value);
+  return null;
+}
+
+function buildUserIdFilter(userId) {
+  var filters = [{ userId: userId }];
+  var asObjectId = toObjectId(userId);
+  if (asObjectId) filters.push({ userId: asObjectId });
+  return { $or: filters };
+}
+
 // Import referral completion function
 var referralModule = require('./referrals');
 var completeReferral = referralModule.completeReferral;
@@ -336,6 +350,26 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
       );
       return res.status(400).json({ error: 'Payment failed' });
     }
+
+    var paidAmount = paystackRes.data.amount / 100;
+    if (paidAmount < investment.amount) {
+      await database.collection('investments').updateOne(
+        { paymentReference: reference },
+        { $set: { status: 'payment_failed', updatedAt: new Date(), paymentError: 'amount_mismatch' } }
+      );
+      return res.status(400).json({ error: 'Payment amount mismatch' });
+    }
+
+    if (paystackRes.data.metadata && paystackRes.data.metadata.userId) {
+      var metaUserId = paystackRes.data.metadata.userId.toString();
+      if (metaUserId !== investment.userId.toString()) {
+        await database.collection('investments').updateOne(
+          { paymentReference: reference },
+          { $set: { status: 'payment_failed', updatedAt: new Date(), paymentError: 'user_mismatch' } }
+        );
+        return res.status(400).json({ error: 'Payment user mismatch' });
+      }
+    }
     
     // Payment successful - activate investment
     // Calculate lock-in end date
@@ -344,8 +378,8 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
     var lockInEndDate = new Date();
     lockInEndDate.setMonth(lockInEndDate.getMonth() + lockInPeriodMonths);
     
-    await database.collection('investments').updateOne(
-      { paymentReference: reference },
+    var updateResult = await database.collection('investments').updateOne(
+      { paymentReference: reference, status: 'pending_payment' },
       { 
         $set: { 
           status: 'active', 
@@ -358,11 +392,18 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
       }
     );
     
+    if (updateResult.matchedCount === 0) {
+      return res.json({ status: investment.status, message: 'Already processed' });
+    }
+    
     // Update user totals
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(investment.userId) },
-      { $inc: { totalInvested: investment.amount }, $set: { updatedAt: new Date() } }
-    );
+    var userObjectId = toObjectId(investment.userId);
+    if (userObjectId) {
+      await database.collection('users').updateOne(
+        { _id: userObjectId },
+        { $inc: { totalInvested: investment.amount }, $set: { updatedAt: new Date() } }
+      );
+    }
     
     // Update project funding
     await database.collection('projects').updateOne(
@@ -400,18 +441,18 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
 
 // Get user investments
 router.get('/my', authenticateToken, async function(req, res) {
-  var userId = req.user.id;
+  var userId = req.user.userId || req.user.id;
   
   try {
     var database = await db.getDb();
     var investments = await database.collection('investments')
-      .find({ userId: userId })
+      .find(buildUserIdFilter(userId))
       .sort({ createdAt: -1 })
       .toArray();
     
     // Get all profit distributions for this user to calculate earnings per investment
     var allDistributions = await database.collection('profit_distributions')
-      .find({ userId: userId })
+      .find(buildUserIdFilter(userId))
       .toArray();
     
     // Create a map of investmentId -> total earnings
@@ -440,13 +481,13 @@ router.get('/my', authenticateToken, async function(req, res) {
 // Get single investment
 router.get('/:id', authenticateToken, async function(req, res) {
   var id = req.params.id;
-  var userId = req.user.id;
+  var userId = req.user.userId || req.user.id;
   
   try {
     var database = await db.getDb();
     var investment = await database.collection('investments').findOne({
       _id: new ObjectId(id),
-      userId: userId
+      ...buildUserIdFilter(userId)
     });
     
     if (!investment) {
@@ -466,7 +507,7 @@ router.get('/:id', authenticateToken, async function(req, res) {
 // Get profit distribution history for an investment
 router.get('/:id/profit-history', authenticateToken, async function(req, res) {
   var id = req.params.id;
-  var userId = req.user.id;
+  var userId = req.user.userId || req.user.id;
   
   try {
     var database = await db.getDb();
@@ -474,7 +515,7 @@ router.get('/:id/profit-history', authenticateToken, async function(req, res) {
     // Verify investment belongs to user
     var investment = await database.collection('investments').findOne({
       _id: new ObjectId(id),
-      userId: userId
+      ...buildUserIdFilter(userId)
     });
     
     if (!investment) {
@@ -520,7 +561,7 @@ router.get('/:id/profit-history', authenticateToken, async function(req, res) {
 // Accept investment terms and risk disclosure
 router.post('/:investmentId/accept-terms', authenticateToken, async function(req, res) {
   var investmentId = req.params.investmentId;
-  var userId = req.user.id;
+  var userId = req.user.userId || req.user.id;
   var riskDisclosureAccepted = req.body.riskDisclosureAccepted;
   var lockInAcknowledged = req.body.lockInAcknowledged;
   var profitNotGuaranteedAcknowledged = req.body.profitNotGuaranteedAcknowledged;
@@ -566,7 +607,7 @@ router.post('/:investmentId/accept-terms', authenticateToken, async function(req
 // Get project updates for an investment (only if user has invested in this project)
 router.get('/:id/project-updates', authenticateToken, async function(req, res) {
   var investmentId = req.params.id;
-  var userId = req.user.id;
+  var userId = req.user.userId || req.user.id;
   
   try {
     var database = await db.getDb();
@@ -574,7 +615,7 @@ router.get('/:id/project-updates', authenticateToken, async function(req, res) {
     // Verify user has invested in this project
     var investment = await database.collection('investments').findOne({
       _id: new ObjectId(investmentId),
-      userId: userId
+      ...buildUserIdFilter(userId)
     });
     
     if (!investment) {

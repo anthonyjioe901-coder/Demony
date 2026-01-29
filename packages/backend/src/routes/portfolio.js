@@ -3,17 +3,26 @@ var express = require('express');
 var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var router = express.Router();
+var ObjectId = require('mongodb').ObjectId;
+
+function buildUserIdFilter(userId) {
+  var filters = [{ userId: userId }];
+  if (ObjectId.isValid(userId)) {
+    filters.push({ userId: new ObjectId(userId) });
+  }
+  return { $or: filters };
+}
 
 // Get portfolio summary
 router.get('/', authenticateToken, async function(req, res) {
-  var userId = req.user.id;
+  var userId = req.user.userId || req.user.id;
   
   try {
     var database = await db.getDb();
     
     // Get all user investments
     var investments = await database.collection('investments')
-      .find({ userId: userId })
+      .find(buildUserIdFilter(userId))
       .toArray();
     
     // Calculate total invested
@@ -23,7 +32,7 @@ router.get('/', authenticateToken, async function(req, res) {
     
     // Get actual earnings from profit distributions
     var profitDistributions = await database.collection('profit_distributions')
-      .find({ userId: userId })
+      .find(buildUserIdFilter(userId))
       .toArray();
     
     var totalEarnings = profitDistributions.reduce(function(sum, dist) {

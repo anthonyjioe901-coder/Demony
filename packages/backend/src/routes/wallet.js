@@ -8,6 +8,13 @@ var router = express.Router();
 
 var PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
+function toObjectId(value) {
+  if (!value) return null;
+  if (value instanceof ObjectId) return value;
+  if (ObjectId.isValid(value)) return new ObjectId(value);
+  return null;
+}
+
 // Helper to make Paystack API calls
 function paystackRequest(method, path, data) {
   return new Promise(function(resolve, reject) {
@@ -210,21 +217,36 @@ router.get('/deposit/verify/:reference', async function(req, res) {
     }
     
     var amount = paystackRes.data.amount / 100; // Convert from kobo
+
+    if (amount < transaction.amount) {
+      await database.collection('transactions').updateOne(
+        { reference: reference },
+        { $set: { status: 'failed', updatedAt: new Date(), failureReason: 'amount_mismatch' } }
+      );
+      return res.status(400).json({ error: 'Payment amount mismatch' });
+    }
     
-    // Update transaction
-    await database.collection('transactions').updateOne(
-      { reference: reference },
-      { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date() } }
+    // Atomically mark as success if still pending
+    var updateResult = await database.collection('transactions').updateOne(
+      { reference: reference, status: 'pending' },
+      { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date(), paidAmount: amount } }
     );
+    
+    if (updateResult.matchedCount === 0) {
+      return res.json({ message: 'Already verified', status: transaction.status });
+    }
     
     // Credit user wallet
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(transaction.userId) },
-      { 
-        $inc: { walletBalance: amount },
-        $set: { updatedAt: new Date() }
-      }
-    );
+    var userObjectId = toObjectId(transaction.userId);
+    if (userObjectId) {
+      await database.collection('users').updateOne(
+        { _id: userObjectId },
+        { 
+          $inc: { walletBalance: amount },
+          $set: { updatedAt: new Date() }
+        }
+      );
+    }
     
     res.json({
       message: 'Deposit successful',
@@ -263,18 +285,30 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async functio
       if (transaction && transaction.status === 'pending') {
         var amount = data.amount / 100;
         
-        await database.collection('transactions').updateOne(
-          { reference: reference },
-          { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date() } }
-        );
-        
-        await database.collection('users').updateOne(
-          { _id: new ObjectId(transaction.userId) },
-          { 
-            $inc: { walletBalance: amount },
-            $set: { updatedAt: new Date() }
+        if (amount < transaction.amount) {
+          await database.collection('transactions').updateOne(
+            { reference: reference },
+            { $set: { status: 'failed', updatedAt: new Date(), failureReason: 'amount_mismatch' } }
+          );
+        } else {
+          var updateResult = await database.collection('transactions').updateOne(
+            { reference: reference, status: 'pending' },
+            { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date(), paidAmount: amount } }
+          );
+          
+          if (updateResult.matchedCount > 0) {
+            var webhookUserId = toObjectId(transaction.userId);
+            if (webhookUserId) {
+              await database.collection('users').updateOne(
+                { _id: webhookUserId },
+                { 
+                  $inc: { walletBalance: amount },
+                  $set: { updatedAt: new Date() }
+                }
+              );
+            }
           }
-        );
+        }
       }
     }
     
