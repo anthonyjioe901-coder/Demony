@@ -34,29 +34,28 @@ function loadInvestments(api) {
   
   api.getPortfolio()
     .then(function(portfolio) {
+      // Compact 2x2 grid for mobile - use stats-grid class
       summaryContainer.innerHTML = 
-        '<div class="card" style="margin-bottom: 2rem;">' +
-          '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem;">' +
-            '<div style="text-align: center;">' +
-              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Total Invested</p>' +
-              '<h2 style="color: var(--primary-color); margin: 0;">GH₵' + portfolio.totalInvested.toLocaleString() + '</h2>' +
-              '<p style="font-size: 0.75rem; color: #ef4444; margin: 0.25rem 0 0 0;">🔒 Locked</p>' +
-            '</div>' +
-            '<div style="text-align: center;">' +
-              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Total Earnings</p>' +
-              '<h2 style="color: var(--secondary-color); margin: 0;">GH₵' + portfolio.totalReturn.toLocaleString() + '</h2>' +
-              '<p style="font-size: 0.75rem; color: #10b981; margin: 0.25rem 0 0 0;">✓ Withdrawable</p>' +
-            '</div>' +
-            '<div style="text-align: center;">' +
-              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Portfolio Value</p>' +
-              '<h2 style="margin: 0;">GH₵' + portfolio.currentValue.toLocaleString() + '</h2>' +
-              '<p style="font-size: 0.75rem; color: var(--secondary-color); margin: 0.25rem 0 0 0;">+' + portfolio.returnPercent.toFixed(1) + '%</p>' +
-            '</div>' +
-            '<div style="text-align: center;">' +
-              '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.25rem;">Investments</p>' +
-              '<h2 style="margin: 0;">' + portfolio.activeInvestments + '</h2>' +
-              '<p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">Active</p>' +
-            '</div>' +
+        '<div class="stats-grid investment-stats">' +
+          '<div class="card stat-card">' +
+            '<div class="value" style="color: var(--primary-color) !important;">GH₵' + portfolio.totalInvested.toLocaleString() + '</div>' +
+            '<div class="label">Total Invested</div>' +
+            '<div class="stat-badge locked">🔒 Locked</div>' +
+          '</div>' +
+          '<div class="card stat-card">' +
+            '<div class="value" style="color: var(--secondary-color) !important;">GH₵' + portfolio.totalReturn.toLocaleString() + '</div>' +
+            '<div class="label">Total Earnings</div>' +
+            '<div class="stat-badge withdrawable">✓ Withdrawable</div>' +
+          '</div>' +
+          '<div class="card stat-card">' +
+            '<div class="value">GH₵' + portfolio.currentValue.toLocaleString() + '</div>' +
+            '<div class="label">Portfolio Value</div>' +
+            '<div class="stat-badge growth">+' + portfolio.returnPercent.toFixed(1) + '%</div>' +
+          '</div>' +
+          '<div class="card stat-card">' +
+            '<div class="value">' + portfolio.activeInvestments + '</div>' +
+            '<div class="label">Investments</div>' +
+            '<div class="stat-badge">Active</div>' +
           '</div>' +
         '</div>';
     })

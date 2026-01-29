@@ -354,12 +354,16 @@ function showAuthModal(type) {
       '</select>' +
     '</div>' : '';
   
+  // Phone field is required for all users on signup
+  var phoneField = type === 'signup' ?
+    '<div class="form-group">' +
+      '<label for="phone">Phone Number <span style="color: #ef4444;">*</span></label>' +
+      '<input type="tel" id="phone" required placeholder="+233 XX XXX XXXX" pattern="[+]?[0-9\\s\\-]{10,20}">' +
+      '<span style="font-size: 0.75rem; color: var(--text-muted);">International format (e.g., +233 24 123 4567)</span>' +
+    '</div>' : '';
+
   var businessFields = type === 'signup' ?
     '<div id="business-fields" style="display: none;">' +
-      '<div class="form-group">' +
-        '<label for="phone">Phone Number</label>' +
-        '<input type="tel" id="phone" placeholder="+1234567890">' +
-      '</div>' +
       '<div class="form-group">' +
         '<label for="businessName">Business Name</label>' +
         '<input type="text" id="businessName" placeholder="Your business name">' +
@@ -383,9 +387,10 @@ function showAuthModal(type) {
       '<form id="auth-form">' +
         (type === 'signup' ? '<div class="form-group"><label for="name">Full Name</label><input type="text" id="name" required placeholder="John Doe"></div>' : '') +
         '<div class="form-group">' +
-          '<label for="email">Email</label>' +
-          '<input type="email" id="email" required placeholder="you@example.com">' +
+          '<label for="email">' + (type === 'login' ? 'Email or Phone' : 'Email') + '</label>' +
+          '<input type="' + (type === 'login' ? 'text' : 'email') + '" id="email" required placeholder="' + (type === 'login' ? 'Email or phone number' : 'you@example.com') + '">' +
         '</div>' +
+        (type === 'signup' ? phoneField : '') +
         '<div class="form-group">' +
           '<label for="password">Password</label>' +
           '<input type="password" id="password" required placeholder="••••••••"' + (type === 'signup' ? ' minlength="8"' : '') + '>' +
@@ -425,21 +430,33 @@ function showAuthModal(type) {
   
   document.getElementById('auth-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    var email = document.getElementById('email').value;
+    var emailOrPhone = document.getElementById('email').value;
     var password = document.getElementById('password').value;
     var name = type === 'signup' ? document.getElementById('name').value : null;
     var role = type === 'signup' ? document.getElementById('role').value : null;
-    var phone = type === 'signup' ? (document.getElementById('phone').value || null) : null;
+    var phone = type === 'signup' ? document.getElementById('phone').value : null;
     var businessName = type === 'signup' ? (document.getElementById('businessName').value || null) : null;
+    
+    // For signup, email is in the email field and phone is separate
+    // For login, emailOrPhone could be either
     
     if (type === 'login') {
       // Login flow - no agreement needed
-      api.login({ email: email, password: password })
-        .then(function() {
+      // Determine if it's email or phone
+      var isPhone = /^[+]?[0-9\s\-]{10,20}$/.test(emailOrPhone.replace(/\s/g, ''));
+      var loginData = isPhone ? { phone: emailOrPhone, password: password } : { email: emailOrPhone, password: password };
+      api.login(loginData)
+        .then(function(result) {
           modal.remove();
           updateAuthState();
           Analytics.trackLogin();
-          navigateAfterAuth();
+          
+          // Check if user needs to add phone number
+          if (result.user && result.user.needsPhone) {
+            showAddPhoneModal();
+          } else {
+            navigateAfterAuth();
+          }
         })
         .catch(function(err) {
           // Check if it's a verification error
@@ -455,10 +472,10 @@ function showAuthModal(type) {
       // Signup flow - show agreement modal first
       var signupData = {
         name: name,
-        email: email,
+        email: emailOrPhone,
         password: password,
         role: role,
-        phone: phone,
+        phone: phone, // Required for all users now
         businessName: businessName,
         agreedToTerms: true,
         agreedToPrivacy: true,
@@ -549,6 +566,61 @@ function showWelcomeMessage(name) {
     toast.classList.remove('show');
     setTimeout(function() { toast.remove(); }, 300);
   }, 4000);
+}
+
+// Phone number prompt modal for existing users
+function showAddPhoneModal() {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.id = 'phone-modal';
+  
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 400px;">' +
+      '<div style="text-align: center; margin-bottom: 1.5rem;">' +
+        '<span style="font-size: 2.5rem;">📱</span>' +
+        '<h2 style="margin-top: 0.5rem;">Add Your Phone Number</h2>' +
+        '<p style="color: var(--text-muted); font-size: 0.9rem;">We now require a phone number for all accounts. Please add yours to continue.</p>' +
+      '</div>' +
+      '<form id="phone-form">' +
+        '<div class="form-group">' +
+          '<label for="add-phone">Phone Number</label>' +
+          '<input type="tel" id="add-phone" required placeholder="+233 XX XXX XXXX" pattern="[+]?[0-9\\s\\-]{10,20}">' +
+          '<span style="font-size: 0.75rem; color: var(--text-muted);">International format (e.g., +233 24 123 4567)</span>' +
+        '</div>' +
+        '<div class="form-actions" style="margin-top: 1.5rem;">' +
+          '<button type="button" class="btn btn-outline" id="skip-phone">Skip for now</button>' +
+          '<button type="submit" class="btn btn-primary">Save Phone</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  document.getElementById('skip-phone').addEventListener('click', function() {
+    modal.remove();
+    navigateAfterAuth();
+    showNotification('You can add your phone number later in Profile settings.', 'info');
+  });
+  
+  document.getElementById('phone-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var phone = document.getElementById('add-phone').value;
+    var btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    
+    api.updatePhone(phone)
+      .then(function() {
+        modal.remove();
+        showNotification('Phone number added successfully!', 'success');
+        navigateAfterAuth();
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Save Phone';
+        showNotification(err.message || 'Failed to update phone number', 'error');
+      });
+  });
 }
 
 // Footer link handlers

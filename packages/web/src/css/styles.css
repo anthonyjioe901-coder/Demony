@@ -1060,6 +1060,42 @@ select:focus {
     font-weight: 400;
   }
   
+  /* Stat badge for compact cards */
+  .stat-badge {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+  .stat-badge.locked { color: #ef4444; }
+  .stat-badge.withdrawable { color: #10b981; }
+  .stat-badge.growth { color: var(--secondary-color); }
+  
+  /* Wallet stats - 3 column on mobile */
+  #wallet-balance.stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  #wallet-balance .stat-card {
+    padding: 0.75rem 0.5rem;
+  }
+  #wallet-balance .stat-card .value {
+    font-size: 1rem;
+  }
+  #wallet-balance .stat-card .label {
+    font-size: 0.65rem;
+  }
+  
+  /* Investment stats - 2x2 grid */
+  .investment-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .investment-stats .stat-card {
+    padding: 0.85rem;
+    text-align: center;
+  }
+
   /* Mobile Project Items */
   .project-item {
     display: flex;

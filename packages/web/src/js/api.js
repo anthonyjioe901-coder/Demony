@@ -97,6 +97,23 @@ Api.prototype.submitKyc = function(data) {
   });
 };
 
+// Update phone number
+Api.prototype.updatePhone = function(phone) {
+  var self = this;
+  return this.request('/auth/update-phone', {
+    method: 'POST',
+    body: { phone: phone }
+  }).then(function(result) {
+    // Update local user data
+    if (self.user) {
+      self.user.phone = result.phone;
+      self.user.needsPhone = false;
+      localStorage.setItem('demony_user', JSON.stringify(self.user));
+    }
+    return result;
+  });
+};
+
 Api.prototype.getKYCStatus = function() {
   return this.getMe().then(function(user) {
     return { status: user.kycStatus };

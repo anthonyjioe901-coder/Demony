@@ -84,33 +84,34 @@ function loadWalletBalance(api) {
   
   api.getWalletBalance()
     .then(function(data) {
+      // Compact 3-card grid for mobile
       balanceContainer.innerHTML = 
         '<div class="card stat-card">' +
-          '<div class="value" style="color: var(--secondary-color) !important;">GH₵' + data.balance.toLocaleString() + '</div>' +
-          '<div class="label">Available Balance</div>' +
+          '<div class="value" style="color: #f59e0b !important;">GH₵' + data.totalEarnings.toLocaleString() + '</div>' +
+          '<div class="label">Earnings</div>' +
         '</div>' +
         '<div class="card stat-card">' +
           '<div class="value" style="color: var(--primary-color) !important;">GH₵' + data.totalInvested.toLocaleString() + '</div>' +
-          '<div class="label">Total Invested</div>' +
+          '<div class="label">Invested</div>' +
         '</div>' +
         '<div class="card stat-card">' +
-          '<div class="value" style="color: #f59e0b !important;">GH₵' + data.totalEarnings.toLocaleString() + '</div>' +
-          '<div class="label">Total Earnings</div>' +
+          '<div class="value" style="color: var(--secondary-color) !important;">GH₵' + data.balance.toLocaleString() + '</div>' +
+          '<div class="label">Balance</div>' +
         '</div>';
     })
     .catch(function(err) {
       balanceContainer.innerHTML = 
         '<div class="card stat-card">' +
-          '<div class="value" style="color: var(--secondary-color) !important;">GH₵0</div>' +
-          '<div class="label">Available Balance</div>' +
+          '<div class="value" style="color: #f59e0b !important;">GH₵0</div>' +
+          '<div class="label">Earnings</div>' +
         '</div>' +
         '<div class="card stat-card">' +
           '<div class="value" style="color: var(--primary-color) !important;">GH₵0</div>' +
-          '<div class="label">Total Invested</div>' +
+          '<div class="label">Invested</div>' +
         '</div>' +
         '<div class="card stat-card">' +
-          '<div class="value" style="color: #f59e0b !important;">GH₵0</div>' +
-          '<div class="label">Total Earnings</div>' +
+          '<div class="value" style="color: var(--secondary-color) !important;">GH₵0</div>' +
+          '<div class="label">Balance</div>' +
         '</div>';
     });
 }

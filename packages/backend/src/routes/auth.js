@@ -50,6 +50,17 @@ router.post('/signup', async function(req, res) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
   }
   
+  // Phone is now required for all users
+  if (!phone) {
+    return res.status(400).json({ error: 'Phone number is required' });
+  }
+  
+  // Validate phone format (international format: +country code, 10-20 digits)
+  var phoneClean = phone.replace(/[\s\-]/g, '');
+  if (!/^[+]?[0-9]{10,20}$/.test(phoneClean)) {
+    return res.status(400).json({ error: 'Invalid phone format. Use international format (e.g., +233 24 123 4567)' });
+  }
+  
   if (USER_ROLES.indexOf(role) === -1 || role === 'admin') {
     return res.status(400).json({ error: 'Invalid role. Choose investor or business_owner' });
   }
@@ -62,7 +73,13 @@ router.post('/signup', async function(req, res) {
   try {
     var userCheck = await db.query('users', 'findOne', { filter: { email: email } });
     if (userCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: 'User already exists with this email' });
+    }
+    
+    // Also check for duplicate phone number
+    var phoneCheck = await db.query('users', 'findOne', { filter: { phone: phoneClean } });
+    if (phoneCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'Phone number already registered' });
     }
     
     var hashedPassword = await bcrypt.hash(password, 10);
@@ -72,7 +89,7 @@ router.post('/signup', async function(req, res) {
       email: email,
       password: hashedPassword,
       role: role,
-      phone: phone || null,
+      phone: phoneClean, // Store cleaned phone number
       
       // KYC fields
       kyc: {
@@ -158,15 +175,33 @@ router.post('/signup', async function(req, res) {
 // Login
 router.post('/login', async function(req, res) {
   var email = req.body.email;
+  var phone = req.body.phone;
   var password = req.body.password;
   
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+  // Must have either email or phone
+  if ((!email && !phone) || !password) {
+    return res.status(400).json({ error: 'Email or phone and password are required' });
   }
   
   try {
-    var result = await db.query('users', 'findOne', { filter: { email: email } });
-    var user = result.rows[0];
+    var user;
+    
+    // Find user by email or phone
+    if (email) {
+      var result = await db.query('users', 'findOne', { filter: { email: email } });
+      user = result.rows[0];
+    } else if (phone) {
+      // Clean phone number for lookup
+      var phoneClean = phone.replace(/[\s\-]/g, '');
+      var result = await db.query('users', 'findOne', { filter: { phone: phoneClean } });
+      user = result.rows[0];
+      
+      // If not found with cleaned phone, try original
+      if (!user) {
+        result = await db.query('users', 'findOne', { filter: { phone: phone } });
+        user = result.rows[0];
+      }
+    }
     
     if (!user) {
       return res.status(400).json({ error: 'Invalid credentials' });
@@ -256,6 +291,9 @@ router.post('/login', async function(req, res) {
       { expiresIn: '7d' }
     );
     
+    // Check if existing user needs to add phone number
+    var needsPhone = !user.phone;
+    
     res.json({
       message: 'Login successful',
       token: token,
@@ -263,10 +301,12 @@ router.post('/login', async function(req, res) {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
+        phone: user.phone || null,
         role: user.role || 'investor',
         isVerified: user.isVerified || false,
         kycStatus: user.kyc ? user.kyc.status : 'pending',
-        walletBalance: user.walletBalance || 0
+        walletBalance: user.walletBalance || 0,
+        needsPhone: needsPhone
       }
     });
   } catch (err) {
@@ -299,6 +339,50 @@ router.get('/me', authenticateToken, async function(req, res) {
       business: user.business || null,
       createdAt: user.createdAt
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update phone number (for existing users who don't have one)
+router.post('/update-phone', authenticateToken, async function(req, res) {
+  var phone = req.body.phone;
+  
+  if (!phone) {
+    return res.status(400).json({ error: 'Phone number is required' });
+  }
+  
+  // Validate phone format
+  var phoneClean = phone.replace(/[\s\-]/g, '');
+  if (!/^[+]?[0-9]{10,20}$/.test(phoneClean)) {
+    return res.status(400).json({ error: 'Invalid phone format. Use international format (e.g., +233 24 123 4567)' });
+  }
+  
+  try {
+    var database = await db.getDb();
+    
+    // Check if phone is already in use
+    var existingUser = await database.collection('users').findOne({ 
+      phone: phoneClean,
+      _id: { $ne: new ObjectId(req.user.id) }
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ error: 'Phone number already registered to another account' });
+    }
+    
+    await database.collection('users').updateOne(
+      { _id: new ObjectId(req.user.id) },
+      {
+        $set: {
+          phone: phoneClean,
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    res.json({ message: 'Phone number updated successfully', phone: phoneClean });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
