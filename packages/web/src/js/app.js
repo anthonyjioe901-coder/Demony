@@ -63,6 +63,17 @@ window.DemonyApp = {
   api: api
 };
 
+// Handle Paystack callback (ensure wallet route loads with reference)
+function handlePaymentCallback() {
+  var params = new URLSearchParams(window.location.search);
+  var status = params.get('status');
+  var reference = params.get('reference') || params.get('trxref');
+  if (status === 'success' && reference) {
+    var newHash = '#wallet?status=success&reference=' + encodeURIComponent(reference);
+    history.replaceState({ route: 'wallet' }, '', window.location.pathname + newHash);
+  }
+}
+
 // Navigation event listeners (delegated so new links work too)
 var navLinksEl = document.getElementById('nav-links');
 if (navLinksEl) {
@@ -718,6 +729,7 @@ function checkVerificationStatus() {
 }
 
 // Initial navigation - honor current hash
+handlePaymentCallback();
 router.init('home');
 checkReferralCode();
 checkVerificationStatus();

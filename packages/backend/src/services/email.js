@@ -913,6 +913,122 @@ var templates = {
       `,
       text: `New Support Ticket: ${data.ticketId}\n\nCustomer: ${data.userName} (${data.userEmail})\nCategory: ${data.category}\nSubject: ${data.subject}\nPriority: ${data.priority || 'Normal'}\n\nMessage:\n${data.message}`
     };
+  },
+
+  // Project completion email
+  projectCompletion: function(data) {
+    return {
+      subject: '✅ Project Completed: ' + data.projectName,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #10b981, #059669); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .completion-box { background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 12px; padding: 25px; margin: 20px 0; text-align: center; }
+            .completion-box h2 { color: #065f46; margin: 0 0 10px; }
+            .amount { font-size: 32px; font-weight: bold; color: #059669; }
+            .details { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .cta-btn { display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>✅ Project Completed</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.userName},</p>
+              
+              <div class="completion-box">
+                <h2>${data.projectName}</h2>
+                <p>This project has been successfully completed!</p>
+                ${data.principalReturned ? `<p class="amount">GH₵${data.investmentAmount.toLocaleString()}</p><p style="color: #065f46;">Principal returned to your wallet</p>` : '<p style="color: #065f46;">Your investment cycle is complete.</p>'}
+              </div>
+              
+              <div class="details">
+                <p><strong>Investment Amount:</strong> GH₵${data.investmentAmount.toLocaleString()}</p>
+                <p><strong>Principal Returned:</strong> ${data.principalReturned ? 'Yes - credited to wallet' : 'No'}</p>
+              </div>
+              
+              <p>Thank you for investing with Demony. Check your wallet for the updated balance.</p>
+              
+              <p style="text-align: center;">
+                <a href="${data.appUrl || 'https://demony.com'}/#wallet" class="cta-btn">View Wallet</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Project Completed: ${data.projectName}\n\nHi ${data.userName},\n\nThe project "${data.projectName}" has been completed.\n\nInvestment Amount: GH₵${data.investmentAmount}\nPrincipal Returned: ${data.principalReturned ? 'Yes' : 'No'}\n\nThank you for investing with Demony!`
+    };
+  },
+
+  // Project cancellation email
+  projectCancellation: function(data) {
+    return {
+      subject: '⚠️ Project Cancelled: ' + data.projectName + ' - Full Refund Issued',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #f59e0b, #d97706); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .refund-box { background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 12px; padding: 25px; margin: 20px 0; text-align: center; }
+            .refund-box h2 { color: #92400e; margin: 0 0 10px; }
+            .amount { font-size: 32px; font-weight: bold; color: #d97706; }
+            .reason { background: #fefce8; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; }
+            .cta-btn { display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 15px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⚠️ Project Cancelled</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.userName},</p>
+              
+              <div class="refund-box">
+                <h2>${data.projectName}</h2>
+                <p>This project has been cancelled. Your full investment has been refunded.</p>
+                <p class="amount">+GH₵${data.investmentAmount.toLocaleString()}</p>
+                <p style="color: #92400e;">Refunded to your wallet</p>
+              </div>
+              
+              <div class="reason">
+                <strong>Reason:</strong> ${data.cancellationReason}
+              </div>
+              
+              <p>We apologize for any inconvenience. Your funds are now available in your wallet for withdrawal or reinvestment.</p>
+              
+              <p style="text-align: center;">
+                <a href="${data.appUrl || 'https://demony.com'}/#projects" class="cta-btn">Browse Projects</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Project Cancelled: ${data.projectName}\n\nHi ${data.userName},\n\nThe project "${data.projectName}" has been cancelled.\n\nYour investment of GH₵${data.investmentAmount} has been fully refunded to your wallet.\n\nReason: ${data.cancellationReason}\n\nWe apologize for any inconvenience.`
+    };
   }
 };
 
@@ -1143,6 +1259,28 @@ async function sendSupportTicketNotificationEmail(user, ticket) {
   });
 }
 
+// Send project completion email
+async function sendProjectCompletionEmail(user, project, investment, principalReturned) {
+  return sendEmail('projectCompletion', user.email, {
+    userName: user.name || user.email.split('@')[0],
+    projectName: project.name,
+    investmentAmount: investment.amount,
+    principalReturned: principalReturned,
+    appUrl: process.env.APP_URL
+  });
+}
+
+// Send project cancellation email
+async function sendProjectCancellationEmail(user, project, investment, reason) {
+  return sendEmail('projectCancellation', user.email, {
+    userName: user.name || user.email.split('@')[0],
+    projectName: project.name,
+    investmentAmount: investment.amount,
+    cancellationReason: reason,
+    appUrl: process.env.APP_URL
+  });
+}
+
 module.exports = {
   initTransporter: initTransporter,
   sendEmail: sendEmail,
@@ -1162,6 +1300,8 @@ module.exports = {
   sendDepositEmail: sendDepositEmail,
   sendSupportTicketConfirmationEmail: sendSupportTicketConfirmationEmail,
   sendSupportTicketNotificationEmail: sendSupportTicketNotificationEmail,
+  sendProjectCompletionEmail: sendProjectCompletionEmail,
+  sendProjectCancellationEmail: sendProjectCancellationEmail,
   
   // Export templates for testing
   templates: templates

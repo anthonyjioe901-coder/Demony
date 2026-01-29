@@ -91,6 +91,35 @@ router.get('/', async function(req, res) {
       .skip(skip)
       .limit(limit)
       .toArray();
+
+    // Recalculate funding/investor stats based on ACTIVE investments with ACTIVE users
+    var projectIds = projects.map(function(p) { return p._id.toString(); });
+    var statsByProjectId = {};
+    if (projectIds.length > 0) {
+      var investmentStats = await database.collection('investments').aggregate([
+        { $match: { projectId: { $in: projectIds }, status: 'active' } },
+        { $lookup: {
+            from: 'users',
+            let: { invUserId: '$userId' },
+            pipeline: [
+              { $match: { $expr: { $eq: [ { $toString: '$_id' }, { $toString: '$$invUserId' } ] } } },
+              { $match: { isActive: { $ne: false } } },
+              { $project: { _id: 1 } }
+            ],
+            as: 'user'
+        }},
+        { $match: { user: { $ne: [] } } },
+        { $group: { _id: '$projectId', totalAmount: { $sum: '$amount' }, investorCount: { $sum: 1 } } }
+      ]).toArray();
+      investmentStats.forEach(function(stat) {
+        statsByProjectId[stat._id.toString()] = stat;
+      });
+      projects.forEach(function(p) {
+        var stat = statsByProjectId[p._id.toString()];
+        p.currentFunding = stat ? stat.totalAmount : 0;
+        p.investorCount = stat ? stat.investorCount : 0;
+      });
+    }
     
     var total = await database.collection('projects').countDocuments(filter);
     
@@ -125,6 +154,30 @@ router.get('/:id', async function(req, res) {
       return res.status(404).json({ error: 'Project not found' });
     }
     
+    // Recalculate stats for this project using ACTIVE investments with ACTIVE users
+    var investmentStats = await database.collection('investments').aggregate([
+      { $match: { projectId: id, status: 'active' } },
+      { $lookup: {
+          from: 'users',
+          let: { invUserId: '$userId' },
+          pipeline: [
+            { $match: { $expr: { $eq: [ { $toString: '$_id' }, { $toString: '$$invUserId' } ] } } },
+            { $match: { isActive: { $ne: false } } },
+            { $project: { _id: 1 } }
+          ],
+          as: 'user'
+      }},
+      { $match: { user: { $ne: [] } } },
+      { $group: { _id: '$projectId', totalAmount: { $sum: '$amount' }, investorCount: { $sum: 1 } } }
+    ]).toArray();
+    if (investmentStats[0]) {
+      project.currentFunding = investmentStats[0].totalAmount;
+      project.investorCount = investmentStats[0].investorCount;
+    } else {
+      project.currentFunding = 0;
+      project.investorCount = 0;
+    }
+
     res.json(normalizeProject(project));
   } catch (err) {
     console.error(err);

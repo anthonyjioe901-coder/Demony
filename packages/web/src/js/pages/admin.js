@@ -715,6 +715,9 @@ function loadAdminTab(adminApi, api, tab) {
                   '<button class="btn btn-sm btn-danger remove-project-btn" data-id="' + project.id + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Remove</button>' +
                   (project.status === 'active' ? 
                     '<button class="btn btn-sm btn-outline distribute-btn" data-id="' + project.id + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Distribute</button>' : '') +
+                  (project.status === 'active' ? 
+                    '<button class="btn btn-sm btn-success complete-project-btn" data-id="' + project.id + '" data-name="' + encodeURIComponent(project.name) + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> End</button>' +
+                    '<button class="btn btn-sm btn-warning cancel-project-btn" data-id="' + project.id + '" data-name="' + encodeURIComponent(project.name) + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Cancel</button>' : '') +
                   '<button class="btn btn-sm btn-outline post-update-btn" data-id="' + project.id + '" data-name="' + project.name + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Update</button>' +
                   '<button class="btn btn-sm ' + (project.featured ? 'btn-warning' : 'btn-outline') + ' toggle-featured-btn" data-id="' + project.id + '" data-featured="' + project.featured + '">' + 
                     (project.featured ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Unfeature' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Feature') + 
@@ -1244,6 +1247,24 @@ function attachProjectListHandlers(adminApi, api) {
     });
   });
   
+  // Complete Project handlers
+  document.querySelectorAll('.complete-project-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var name = decodeURIComponent(this.getAttribute('data-name'));
+      showCompleteProjectModal(id, name, adminApi, api);
+    });
+  });
+  
+  // Cancel Project handlers
+  document.querySelectorAll('.cancel-project-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var name = decodeURIComponent(this.getAttribute('data-name'));
+      showCancelProjectModal(id, name, adminApi, api);
+    });
+  });
+  
   // Post Update handlers
   document.querySelectorAll('.post-update-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -1251,6 +1272,138 @@ function attachProjectListHandlers(adminApi, api) {
       var name = this.getAttribute('data-name');
       showPostUpdateModal(id, name, adminApi, api);
     });
+  });
+}
+
+// Complete Project Modal
+function showCompleteProjectModal(projectId, projectName, adminApi, api) {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 450px;">' +
+      '<h2>✅ Complete Project</h2>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1rem;">Project: <strong>' + projectName + '</strong></p>' +
+      
+      '<div style="background: #d1fae5; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+        '<p style="margin: 0; font-size: 0.9rem;"><strong>This will:</strong></p>' +
+        '<ul style="margin: 0.5rem 0 0 1rem; padding: 0; font-size: 0.85rem;">' +
+          '<li>Mark all investments as completed</li>' +
+          '<li>Return principal to investors (if selected)</li>' +
+          '<li>Close the project to new investments</li>' +
+          '<li>Send completion emails to all investors</li>' +
+        '</ul>' +
+      '</div>' +
+      
+      '<form id="complete-project-form">' +
+        '<div class="form-group">' +
+          '<label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">' +
+            '<input type="checkbox" id="return-principal" checked>' +
+            '<span>Return principal to investors\' wallets</span>' +
+          '</label>' +
+        '</div>' +
+        
+        '<div class="form-group">' +
+          '<label>Completion Note (optional)</label>' +
+          '<textarea id="completion-note" rows="2" placeholder="e.g., Project completed successfully after 12 months" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;"></textarea>' +
+        '</div>' +
+        
+        '<div style="display: flex; gap: 1rem;">' +
+          '<button type="button" class="btn btn-outline close-modal" style="flex: 1;">Cancel</button>' +
+          '<button type="submit" class="btn btn-success" id="submit-complete-btn" style="flex: 1;">✅ Complete Project</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  modal.querySelector('.close-modal').addEventListener('click', function() { modal.remove(); });
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+  
+  modal.querySelector('#complete-project-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    var returnPrincipal = document.getElementById('return-principal').checked;
+    var note = document.getElementById('completion-note').value || 'Project completed successfully';
+    var submitBtn = document.getElementById('submit-complete-btn');
+    
+    if (!confirm('Are you sure you want to complete this project? This action cannot be undone.')) return;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing...';
+    
+    adminApi.completeProject(projectId, returnPrincipal, note)
+      .then(function(result) {
+        alert('✅ Project completed! ' + result.investorCount + ' investors notified. Principal returned: GH₵' + (result.totalPrincipalReturned || 0).toLocaleString());
+        modal.remove();
+        loadAdminTab(adminApi, api, 'all-projects');
+      })
+      .catch(function(err) {
+        alert('❌ Error: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✅ Complete Project';
+      });
+  });
+}
+
+// Cancel Project Modal
+function showCancelProjectModal(projectId, projectName, adminApi, api) {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 450px;">' +
+      '<h2>⚠️ Cancel Project</h2>' +
+      '<p style="color: var(--text-muted); margin-bottom: 1rem;">Project: <strong>' + projectName + '</strong></p>' +
+      
+      '<div style="background: #fef3c7; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
+        '<p style="margin: 0; font-size: 0.9rem;"><strong>⚠️ Warning - This will:</strong></p>' +
+        '<ul style="margin: 0.5rem 0 0 1rem; padding: 0; font-size: 0.85rem;">' +
+          '<li>Cancel all investments</li>' +
+          '<li>Refund ALL principals to investors</li>' +
+          '<li>Reset project funding to 0</li>' +
+          '<li>Send cancellation emails to all investors</li>' +
+        '</ul>' +
+      '</div>' +
+      
+      '<form id="cancel-project-form">' +
+        '<div class="form-group">' +
+          '<label>Cancellation Reason <span style="color: #ef4444;">*</span></label>' +
+          '<textarea id="cancellation-reason" rows="3" required placeholder="e.g., Project owner unable to continue operations" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;"></textarea>' +
+        '</div>' +
+        
+        '<div style="display: flex; gap: 1rem;">' +
+          '<button type="button" class="btn btn-outline close-modal" style="flex: 1;">Cancel</button>' +
+          '<button type="submit" class="btn btn-danger" id="submit-cancel-btn" style="flex: 1;">⚠️ Cancel & Refund</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  modal.querySelector('.close-modal').addEventListener('click', function() { modal.remove(); });
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+  
+  modal.querySelector('#cancel-project-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    var reason = document.getElementById('cancellation-reason').value;
+    var submitBtn = document.getElementById('submit-cancel-btn');
+    
+    if (!confirm('FINAL WARNING: This will refund ALL investments and cancel the project permanently. Continue?')) return;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Cancelling...';
+    
+    adminApi.cancelProject(projectId, reason)
+      .then(function(result) {
+        alert('✅ Project cancelled. ' + result.investorCount + ' investors refunded. Total: GH₵' + (result.totalRefunded || 0).toLocaleString());
+        modal.remove();
+        loadAdminTab(adminApi, api, 'all-projects');
+      })
+      .catch(function(err) {
+        alert('❌ Error: ' + err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '⚠️ Cancel & Refund';
+      });
   });
 }
 

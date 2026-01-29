@@ -363,6 +363,31 @@ Api.prototype.getAdmin = function() {
       return self.request('/admin/investments' + query);
     },
     
+    // Investment Lifecycle Management
+    completeProject: function(projectId, returnPrincipal, note) {
+      return self.request('/admin/projects/' + projectId + '/complete', {
+        method: 'POST',
+        body: { returnPrincipal: returnPrincipal, note: note }
+      });
+    },
+    
+    cancelProject: function(projectId, reason) {
+      return self.request('/admin/projects/' + projectId + '/cancel', {
+        method: 'POST',
+        body: { reason: reason }
+      });
+    },
+    
+    cleanupOrphanedInvestments: function() {
+      return self.request('/admin/investments/cleanup-orphaned', {
+        method: 'POST'
+      });
+    },
+    
+    getInvestmentsSummary: function() {
+      return self.request('/admin/investments/summary');
+    },
+    
     // Project Updates (for investors)
     postProjectUpdate: function(projectId, title, message, type) {
       return self.request('/admin/projects/' + projectId + '/updates', {

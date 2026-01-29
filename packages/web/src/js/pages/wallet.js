@@ -52,8 +52,15 @@ function renderWallet(container, api) {
   loadWalletBalance(api);
   loadTransactions(api);
   
-  // Check for payment callback
+  // Check for payment callback (query or hash query)
   var urlParams = new URLSearchParams(window.location.search);
+  if (!urlParams.get('status')) {
+    var hash = window.location.hash || '';
+    var queryIndex = hash.indexOf('?');
+    if (queryIndex !== -1) {
+      urlParams = new URLSearchParams(hash.slice(queryIndex + 1));
+    }
+  }
   var status = urlParams.get('status');
   var reference = urlParams.get('reference') || urlParams.get('trxref');
   

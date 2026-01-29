@@ -980,6 +980,348 @@ router.delete('/projects/:id/updates/:updateId', async function(req, res) {
   }
 });
 
+// ==================== INVESTMENT LIFECYCLE MANAGEMENT ====================
+
+// Complete/close a project and return principal to investors
+router.post('/projects/:id/complete', async function(req, res) {
+  var returnPrincipal = req.body.returnPrincipal !== false; // Default true
+  var completionNote = req.body.note || 'Project completed successfully';
+  
+  try {
+    var database = await db.getDb();
+    
+    var project = await database.collection('projects').findOne({
+      _id: new ObjectId(req.params.id)
+    });
+    
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    
+    if (project.status === 'completed') {
+      return res.status(400).json({ error: 'Project is already completed' });
+    }
+    
+    // Get all active investments for this project
+    var investments = await database.collection('investments')
+      .find({ projectId: req.params.id, status: 'active' })
+      .toArray();
+    
+    var totalPrincipalReturned = 0;
+    var investorCount = investments.length;
+    
+    // Process each investment
+    for (var i = 0; i < investments.length; i++) {
+      var inv = investments[i];
+      
+      // Mark investment as completed
+      await database.collection('investments').updateOne(
+        { _id: inv._id },
+        {
+          $set: {
+            status: 'completed',
+            completedAt: new Date(),
+            completionNote: completionNote,
+            principalReturned: returnPrincipal,
+            updatedAt: new Date()
+          }
+        }
+      );
+      
+      // Return principal to wallet if requested
+      if (returnPrincipal) {
+        var userObjectId = toObjectId(inv.userId);
+        if (userObjectId) {
+          await database.collection('users').updateOne(
+            { _id: userObjectId },
+            {
+              $inc: { walletBalance: inv.amount },
+              $set: { updatedAt: new Date() }
+            }
+          );
+          totalPrincipalReturned += inv.amount;
+          
+          // Record transaction
+          await database.collection('transactions').insertOne({
+            userId: inv.userId,
+            type: 'principal_return',
+            amount: inv.amount,
+            status: 'success',
+            reference: 'PRIN_' + inv._id.toString() + '_' + Date.now(),
+            description: 'Principal returned from ' + project.name,
+            projectId: req.params.id,
+            investmentId: inv._id.toString(),
+            createdAt: new Date()
+          });
+        }
+      }
+    }
+    
+    // Mark project as completed
+    await database.collection('projects').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      {
+        $set: {
+          status: 'completed',
+          completedAt: new Date(),
+          completionNote: completionNote,
+          principalReturned: returnPrincipal,
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    // Send completion emails to investors (async)
+    investments.forEach(function(inv) {
+      database.collection('users').findOne({ _id: toObjectId(inv.userId) })
+        .then(function(user) {
+          if (user && user.email) {
+            emailService.sendProjectCompletionEmail(user, project, inv, returnPrincipal).catch(function(err) {
+              console.error('Failed to send completion email:', err);
+            });
+          }
+        })
+        .catch(function(err) {
+          console.error('Failed to get user for completion email:', err);
+        });
+    });
+    
+    res.json({
+      message: 'Project completed successfully',
+      projectId: req.params.id,
+      investorCount: investorCount,
+      principalReturned: returnPrincipal,
+      totalPrincipalReturned: totalPrincipalReturned
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Cancel a project and refund all investments
+router.post('/projects/:id/cancel', async function(req, res) {
+  var cancellationReason = req.body.reason || 'Project cancelled by admin';
+  
+  try {
+    var database = await db.getDb();
+    
+    var project = await database.collection('projects').findOne({
+      _id: new ObjectId(req.params.id)
+    });
+    
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    
+    if (project.status === 'cancelled' || project.status === 'completed') {
+      return res.status(400).json({ error: 'Project is already ' + project.status });
+    }
+    
+    // Get all active investments
+    var investments = await database.collection('investments')
+      .find({ projectId: req.params.id, status: 'active' })
+      .toArray();
+    
+    var totalRefunded = 0;
+    var investorCount = investments.length;
+    
+    // Refund each investment
+    for (var i = 0; i < investments.length; i++) {
+      var inv = investments[i];
+      
+      // Mark investment as cancelled
+      await database.collection('investments').updateOne(
+        { _id: inv._id },
+        {
+          $set: {
+            status: 'cancelled',
+            cancelledAt: new Date(),
+            cancellationReason: cancellationReason,
+            refunded: true,
+            updatedAt: new Date()
+          }
+        }
+      );
+      
+      // Refund to wallet
+      var userObjectId = toObjectId(inv.userId);
+      if (userObjectId) {
+        await database.collection('users').updateOne(
+          { _id: userObjectId },
+          {
+            $inc: { walletBalance: inv.amount, totalInvested: -inv.amount },
+            $set: { updatedAt: new Date() }
+          }
+        );
+        totalRefunded += inv.amount;
+        
+        // Record refund transaction
+        await database.collection('transactions').insertOne({
+          userId: inv.userId,
+          type: 'refund',
+          amount: inv.amount,
+          status: 'success',
+          reference: 'REF_' + inv._id.toString() + '_' + Date.now(),
+          description: 'Refund from cancelled project: ' + project.name,
+          projectId: req.params.id,
+          investmentId: inv._id.toString(),
+          createdAt: new Date()
+        });
+      }
+    }
+    
+    // Mark project as cancelled
+    await database.collection('projects').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      {
+        $set: {
+          status: 'cancelled',
+          cancelledAt: new Date(),
+          cancellationReason: cancellationReason,
+          currentFunding: 0,
+          investorCount: 0,
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    // Send cancellation emails (async)
+    investments.forEach(function(inv) {
+      database.collection('users').findOne({ _id: toObjectId(inv.userId) })
+        .then(function(user) {
+          if (user && user.email) {
+            emailService.sendProjectCancellationEmail(user, project, inv, cancellationReason).catch(function(err) {
+              console.error('Failed to send cancellation email:', err);
+            });
+          }
+        })
+        .catch(function(err) {
+          console.error('Failed to get user for cancellation email:', err);
+        });
+    });
+    
+    res.json({
+      message: 'Project cancelled and investments refunded',
+      projectId: req.params.id,
+      investorCount: investorCount,
+      totalRefunded: totalRefunded
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Mark orphaned investments (user deleted) as orphaned
+router.post('/investments/cleanup-orphaned', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    
+    // Find investments where user no longer exists
+    var orphanedInvestments = await database.collection('investments').aggregate([
+      { $match: { status: 'active' } },
+      {
+        $lookup: {
+          from: 'users',
+          let: { invUserId: '$userId' },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: '$_id' }, { $toString: '$$invUserId' }] } } },
+            { $project: { _id: 1 } }
+          ],
+          as: 'user'
+        }
+      },
+      { $match: { user: { $size: 0 } } },
+      { $project: { _id: 1, userId: 1, projectId: 1, amount: 1 } }
+    ]).toArray();
+    
+    if (orphanedInvestments.length === 0) {
+      return res.json({ message: 'No orphaned investments found', count: 0 });
+    }
+    
+    // Mark them as orphaned
+    var ids = orphanedInvestments.map(function(inv) { return inv._id; });
+    var result = await database.collection('investments').updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          status: 'orphaned',
+          orphanedAt: new Date(),
+          orphanedReason: 'User account deleted',
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    // Recalculate project stats for affected projects
+    var projectIds = [...new Set(orphanedInvestments.map(function(inv) { return inv.projectId; }))];
+    for (var i = 0; i < projectIds.length; i++) {
+      var projectId = projectIds[i];
+      var stats = await database.collection('investments').aggregate([
+        { $match: { projectId: projectId, status: 'active' } },
+        { $group: { _id: null, totalAmount: { $sum: '$amount' }, count: { $sum: 1 } } }
+      ]).toArray();
+      
+      await database.collection('projects').updateOne(
+        { _id: new ObjectId(projectId) },
+        {
+          $set: {
+            currentFunding: stats[0] ? stats[0].totalAmount : 0,
+            investorCount: stats[0] ? stats[0].count : 0,
+            updatedAt: new Date()
+          }
+        }
+      );
+    }
+    
+    res.json({
+      message: 'Orphaned investments cleaned up',
+      count: result.modifiedCount,
+      affectedProjects: projectIds.length
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get investment status summary
+router.get('/investments/summary', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    
+    var summary = await database.collection('investments').aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
+        }
+      }
+    ]).toArray();
+    
+    var result = {
+      active: { count: 0, amount: 0 },
+      completed: { count: 0, amount: 0 },
+      cancelled: { count: 0, amount: 0 },
+      orphaned: { count: 0, amount: 0 },
+      pending_payment: { count: 0, amount: 0 }
+    };
+    
+    summary.forEach(function(s) {
+      if (result[s._id]) {
+        result[s._id] = { count: s.count, amount: s.totalAmount };
+      }
+    });
+    
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ==================== FINANCIAL REPORTS ====================
 
 router.get('/reports/financial', async function(req, res) {

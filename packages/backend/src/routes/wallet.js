@@ -145,11 +145,12 @@ router.post('/deposit/initialize', async function(req, res) {
     var reference = 'DEP_' + req.user.userId + '_' + Date.now();
     
     // Initialize Paystack transaction (amount in kobo/cents)
+    var appUrl = process.env.WEB_URL || process.env.APP_URL || '';
     var paystackData = {
       email: user.email,
       amount: Math.round(amount * 100), // Convert to kobo
       reference: reference,
-      callback_url: process.env.WEB_URL + '/wallet?status=success',
+      callback_url: appUrl + '/#wallet?status=success',
       metadata: {
         userId: req.user.userId,
         type: 'deposit',
