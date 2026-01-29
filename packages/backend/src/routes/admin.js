@@ -1743,4 +1743,394 @@ router.get('/reports/financial', async function(req, res) {
   }
 });
 
+// ==================== CREDIT USER WALLET ====================
+
+router.post('/wallet/credit', async function(req, res) {
+  try {
+    var { userId, email, amount, reason } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Valid amount required' });
+    }
+    
+    var database = await db.getDb();
+    var user = null;
+    
+    // Find user by ID or email
+    if (userId) {
+      user = await database.collection('users').findOne({ 
+        $or: [
+          { _id: toObjectId(userId) },
+          { id: userId }
+        ]
+      });
+    } else if (email) {
+      user = await database.collection('users').findOne({ email: email.toLowerCase() });
+    }
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    var currentBalance = user.walletBalance || 0;
+    var newBalance = currentBalance + amount;
+    
+    // Update user wallet
+    await database.collection('users').updateOne(
+      { _id: user._id },
+      { $set: { walletBalance: newBalance } }
+    );
+    
+    // Record transaction
+    await database.collection('transactions').insertOne({
+      userId: user._id.toString(),
+      type: 'admin_credit',
+      amount: amount,
+      reason: reason || 'Admin credit',
+      adminId: req.user.userId,
+      adminName: req.user.name || req.user.email,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      createdAt: new Date()
+    });
+    
+    // Log to audit
+    await database.collection('audit_log').insertOne({
+      action: 'wallet_credit',
+      adminId: req.user.userId,
+      adminName: req.user.name || req.user.email,
+      targetType: 'user',
+      targetId: user._id.toString(),
+      details: 'Credited GH₵' + amount + ' - ' + (reason || 'No reason'),
+      createdAt: new Date()
+    });
+    
+    res.json({ 
+      success: true, 
+      newBalance: newBalance,
+      userName: user.name || user.email
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== BROADCAST EMAIL ====================
+
+router.post('/email/broadcast', async function(req, res) {
+  try {
+    var { target, subject, message } = req.body;
+    
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Subject and message required' });
+    }
+    
+    var database = await db.getDb();
+    var filter = { role: { $ne: 'admin' } };
+    
+    // Build filter based on target
+    if (target === 'investors') {
+      filter.role = 'investor';
+    } else if (target === 'verified') {
+      filter.isVerified = true;
+    } else if (target === 'business_owners') {
+      filter.role = 'business_owner';
+    }
+    
+    var users = await database.collection('users').find(filter, { projection: { email: 1, name: 1 } }).toArray();
+    
+    // Send emails (in background, don't wait)
+    var sentCount = 0;
+    for (var user of users) {
+      try {
+        if (emailService.sendEmail) {
+          await emailService.sendEmail(user.email, subject, message);
+          sentCount++;
+        }
+      } catch (e) {
+        console.error('Failed to send to', user.email, e.message);
+      }
+    }
+    
+    // Log to audit
+    await database.collection('audit_log').insertOne({
+      action: 'broadcast_email',
+      adminId: req.user.userId,
+      adminName: req.user.name || req.user.email,
+      targetType: 'users',
+      details: 'Sent "' + subject + '" to ' + sentCount + ' users (target: ' + target + ')',
+      createdAt: new Date()
+    });
+    
+    res.json({ success: true, sentCount: sentCount, totalTargeted: users.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== VERIFY USER EMAIL ====================
+
+router.post('/users/:id/verify-email', async function(req, res) {
+  try {
+    var userId = req.params.id;
+    var database = await db.getDb();
+    
+    var result = await database.collection('users').updateOne(
+      { $or: [{ _id: toObjectId(userId) }, { id: userId }] },
+      { $set: { isVerified: true, verifiedAt: new Date(), verifiedBy: 'admin' } }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Log to audit
+    await database.collection('audit_log').insertOne({
+      action: 'verify_email',
+      adminId: req.user.userId,
+      adminName: req.user.name || req.user.email,
+      targetType: 'user',
+      targetId: userId,
+      details: 'Email verified by admin',
+      createdAt: new Date()
+    });
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== SUPPORT TICKETS ====================
+
+router.get('/support/tickets', async function(req, res) {
+  try {
+    var status = req.query.status;
+    var limit = parseInt(req.query.limit) || 100;
+    
+    var database = await db.getDb();
+    var filter = {};
+    
+    if (status) {
+      filter.status = status;
+    }
+    
+    var tickets = await database.collection('support_tickets')
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+    
+    res.json({ tickets: tickets });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/support/tickets/:id', async function(req, res) {
+  try {
+    var ticketId = req.params.id;
+    var database = await db.getDb();
+    
+    var ticket = await database.collection('support_tickets').findOne({
+      $or: [
+        { _id: toObjectId(ticketId) },
+        { ticketId: ticketId }
+      ]
+    });
+    
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    res.json(ticket);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/support/tickets/:id/resolve', async function(req, res) {
+  try {
+    var ticketId = req.params.id;
+    var { resolution } = req.body;
+    var database = await db.getDb();
+    
+    var result = await database.collection('support_tickets').updateOne(
+      { $or: [{ _id: toObjectId(ticketId) }, { ticketId: ticketId }] },
+      { 
+        $set: { 
+          status: 'resolved',
+          resolution: resolution,
+          resolvedAt: new Date(),
+          resolvedBy: req.user.userId
+        }
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/support/tickets/:id/reply', async function(req, res) {
+  try {
+    var ticketId = req.params.id;
+    var { message } = req.body;
+    var database = await db.getDb();
+    
+    var reply = {
+      message: message,
+      adminId: req.user.userId,
+      adminName: req.user.name || req.user.email,
+      createdAt: new Date()
+    };
+    
+    var result = await database.collection('support_tickets').updateOne(
+      { $or: [{ _id: toObjectId(ticketId) }, { ticketId: ticketId }] },
+      { 
+        $push: { replies: reply },
+        $set: { status: 'in_progress', updatedAt: new Date() }
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== REFERRALS ====================
+
+router.get('/referrals', async function(req, res) {
+  try {
+    var limit = parseInt(req.query.limit) || 100;
+    var database = await db.getDb();
+    
+    var referrals = await database.collection('referrals')
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+    
+    // Enrich with user info
+    var enrichedReferrals = [];
+    for (var ref of referrals) {
+      var referrer = await database.collection('users').findOne(
+        { $or: [{ _id: toObjectId(ref.referrerId) }, { id: ref.referrerId }] },
+        { projection: { email: 1, name: 1 } }
+      );
+      var referred = await database.collection('users').findOne(
+        { $or: [{ _id: toObjectId(ref.referredId) }, { id: ref.referredId }] },
+        { projection: { email: 1, name: 1 } }
+      );
+      
+      enrichedReferrals.push({
+        ...ref,
+        referrerEmail: referrer ? referrer.email : 'Unknown',
+        referrerName: referrer ? referrer.name : null,
+        referredEmail: referred ? referred.email : 'Unknown',
+        referredName: referred ? referred.name : null
+      });
+    }
+    
+    res.json({ referrals: enrichedReferrals });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== TRANSACTIONS ====================
+
+router.get('/transactions', async function(req, res) {
+  try {
+    var limit = parseInt(req.query.limit) || 100;
+    var type = req.query.type;
+    var userId = req.query.userId;
+    
+    var database = await db.getDb();
+    var filter = {};
+    
+    if (type) filter.type = type;
+    if (userId) filter.userId = userId;
+    
+    var transactions = await database.collection('transactions')
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+    
+    res.json({ transactions: transactions });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== AUDIT LOG ====================
+
+router.get('/audit-log', async function(req, res) {
+  try {
+    var limit = parseInt(req.query.limit) || 100;
+    var action = req.query.action;
+    
+    var database = await db.getDb();
+    var filter = {};
+    
+    if (action) filter.action = action;
+    
+    var logs = await database.collection('audit_log')
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+    
+    res.json({ logs: logs });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== GET SINGLE PROJECT ====================
+
+router.get('/projects/:id', async function(req, res) {
+  try {
+    var projectId = req.params.id;
+    var database = await db.getDb();
+    
+    var project = await database.collection('projects').findOne({
+      $or: [
+        { _id: toObjectId(projectId) },
+        { id: projectId }
+      ]
+    });
+    
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    
+    res.json(project);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

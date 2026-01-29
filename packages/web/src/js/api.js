@@ -445,6 +445,101 @@ Api.prototype.getAdmin = function() {
       if (endDate) params.endDate = endDate;
       var query = '?' + new URLSearchParams(params).toString();
       return self.request('/admin/reports/financial' + query);
+    },
+    
+    // Get single project
+    getProject: function(projectId) {
+      return self.request('/admin/projects/' + projectId);
+    },
+    
+    // KYC Management
+    reviewKyc: function(userId, action, reason) {
+      return self.request('/admin/users/' + userId + '/kyc', {
+        method: 'POST',
+        body: { action: action, reason: reason }
+      });
+    },
+    
+    // Verify user email (admin action)
+    verifyUserEmail: function(userId) {
+      return self.request('/admin/users/' + userId + '/verify-email', {
+        method: 'POST'
+      });
+    },
+    
+    // Credit user wallet (manual deposit)
+    creditUserWallet: function(options) {
+      return self.request('/admin/wallet/credit', {
+        method: 'POST',
+        body: {
+          userId: options.userId,
+          email: options.email,
+          amount: options.amount,
+          reason: options.reason
+        }
+      });
+    },
+    
+    // Send broadcast email
+    sendBroadcastEmail: function(options) {
+      return self.request('/admin/email/broadcast', {
+        method: 'POST',
+        body: {
+          target: options.target,
+          subject: options.subject,
+          message: options.message
+        }
+      });
+    },
+    
+    // Support Tickets
+    getSupportTickets: function(params) {
+      var cleanParams = {};
+      if (params) {
+        Object.keys(params).forEach(function(key) {
+          if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+            cleanParams[key] = params[key];
+          }
+        });
+      }
+      var query = Object.keys(cleanParams).length > 0 ? '?' + new URLSearchParams(cleanParams).toString() : '';
+      return self.request('/admin/support/tickets' + query);
+    },
+    
+    getTicketDetail: function(ticketId) {
+      return self.request('/admin/support/tickets/' + ticketId);
+    },
+    
+    resolveTicket: function(ticketId, resolution) {
+      return self.request('/admin/support/tickets/' + ticketId + '/resolve', {
+        method: 'POST',
+        body: { resolution: resolution }
+      });
+    },
+    
+    replyToTicket: function(ticketId, message) {
+      return self.request('/admin/support/tickets/' + ticketId + '/reply', {
+        method: 'POST',
+        body: { message: message }
+      });
+    },
+    
+    // Referrals Management
+    getReferrals: function(params) {
+      var query = params ? '?' + new URLSearchParams(params).toString() : '';
+      return self.request('/admin/referrals' + query);
+    },
+    
+    // Transactions
+    getTransactions: function(params) {
+      var query = params ? '?' + new URLSearchParams(params).toString() : '';
+      return self.request('/admin/transactions' + query);
+    },
+    
+    // Audit Log
+    getAuditLog: function(params) {
+      var query = params ? '?' + new URLSearchParams(params).toString() : '';
+      return self.request('/admin/audit-log' + query);
     }
   };
 };
