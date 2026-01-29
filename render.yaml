@@ -27,6 +27,16 @@ services:
         value: https://demony-web.onrender.com
     healthCheckPath: /
 
+  # Keep-Alive Cron Job - Pings the API every 14 minutes to prevent sleep
+  - type: cron
+    name: demony-keepalive
+    env: node
+    region: oregon
+    plan: free
+    schedule: "*/14 * * * *"  # Every 14 minutes
+    buildCommand: echo "Keep-alive job ready"
+    startCommand: curl -s https://demony-api.onrender.com/health || echo "Ping sent"
+
   # Web Frontend (Static Site)
   - type: web
     name: demony-web
