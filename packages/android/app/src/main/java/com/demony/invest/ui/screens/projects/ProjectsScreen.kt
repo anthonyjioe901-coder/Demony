@@ -5,13 +5,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -31,25 +35,92 @@ fun ProjectsScreen(
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val error by viewModel.error.collectAsState()
+    
+    var showSearchBar by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showSortDialog by remember { mutableStateOf(false) }
+    var selectedSort by remember { mutableStateOf("newest") }
+    val focusManager = LocalFocusManager.current
+    
+    val sortOptions = listOf(
+        "newest" to "Newest First",
+        "oldest" to "Oldest First",
+        "returns-high" to "Highest Returns",
+        "returns-low" to "Lowest Returns",
+        "min-investment-low" to "Lowest Min Investment",
+        "min-investment-high" to "Highest Min Investment"
+    )
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Investment Projects",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO: Search */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+            if (showSearchBar) {
+                TopAppBar(
+                    title = {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search projects...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = {
+                                    viewModel.searchProjects(searchQuery)
+                                    focusManager.clearFocus()
+                                }
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { 
+                            showSearchBar = false
+                            if (searchQuery.isNotEmpty()) {
+                                searchQuery = ""
+                                viewModel.clearSearch()
+                            }
+                        }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { 
+                                searchQuery = ""
+                                viewModel.clearSearch()
+                            }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                        IconButton(onClick = { 
+                            viewModel.searchProjects(searchQuery)
+                            focusManager.clearFocus()
+                        }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
                     }
-                    IconButton(onClick = { /* TODO: Filter */ }) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Investment Projects",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = { showSearchBar = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                        IconButton(onClick = { showSortDialog = true }) {
+                            Icon(Icons.Default.FilterList, contentDescription = "Sort")
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         bottomBar = {
             BottomNavigationBar(navController = navController)
@@ -175,6 +246,42 @@ fun ProjectsScreen(
                     }
                 }
             }
+        }
+        
+        // Sort Dialog
+        if (showSortDialog) {
+            AlertDialog(
+                onDismissRequest = { showSortDialog = false },
+                title = { Text("Sort Projects") },
+                text = {
+                    Column {
+                        sortOptions.forEach { (value, label) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedSort == value,
+                                    onClick = { 
+                                        selectedSort = value
+                                        viewModel.setSortOrder(value)
+                                        showSortDialog = false
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(label)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSortDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }

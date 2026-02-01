@@ -39,6 +39,8 @@ fun LoginScreen(
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var forgotPasswordEmail by remember { mutableStateOf("") }
     var forgotPasswordSent by remember { mutableStateOf(false) }
+    var forgotPasswordLoading by remember { mutableStateOf(false) }
+    var forgotPasswordError by remember { mutableStateOf<String?>(null) }
     var showTermsDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     
@@ -59,6 +61,7 @@ fun LoginScreen(
                 showForgotPasswordDialog = false
                 forgotPasswordSent = false
                 forgotPasswordEmail = ""
+                forgotPasswordError = null
             },
             title = { 
                 Row(
@@ -71,6 +74,7 @@ fun LoginScreen(
                         showForgotPasswordDialog = false
                         forgotPasswordSent = false
                         forgotPasswordEmail = ""
+                        forgotPasswordError = null
                     }) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
@@ -107,13 +111,25 @@ fun LoginScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         OutlinedTextField(
                             value = forgotPasswordEmail,
-                            onValueChange = { forgotPasswordEmail = it },
+                            onValueChange = { 
+                                forgotPasswordEmail = it
+                                forgotPasswordError = null
+                            },
                             label = { Text("Email") },
                             leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             singleLine = true,
+                            isError = forgotPasswordError != null,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        if (forgotPasswordError != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = forgotPasswordError!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             },
@@ -123,18 +139,35 @@ fun LoginScreen(
                         showForgotPasswordDialog = false
                         forgotPasswordSent = false
                         forgotPasswordEmail = ""
+                        forgotPasswordError = null
                     }) {
                         Text("Done")
                     }
                 } else {
                     Button(
                         onClick = {
-                            // TODO: Call API to send reset email
-                            forgotPasswordSent = true
+                            forgotPasswordLoading = true
+                            forgotPasswordError = null
+                            authViewModel.forgotPassword(forgotPasswordEmail) { success, error ->
+                                forgotPasswordLoading = false
+                                if (success) {
+                                    forgotPasswordSent = true
+                                } else {
+                                    forgotPasswordError = error ?: "Failed to send reset email"
+                                }
+                            }
                         },
-                        enabled = forgotPasswordEmail.isNotBlank() && forgotPasswordEmail.contains("@")
+                        enabled = forgotPasswordEmail.isNotBlank() && forgotPasswordEmail.contains("@") && !forgotPasswordLoading
                     ) {
-                        Text("Send Reset Link")
+                        if (forgotPasswordLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Send Reset Link")
+                        }
                     }
                 }
             },
@@ -143,6 +176,7 @@ fun LoginScreen(
                     TextButton(onClick = { 
                         showForgotPasswordDialog = false
                         forgotPasswordEmail = ""
+                        forgotPasswordError = null
                     }) {
                         Text("Cancel")
                     }

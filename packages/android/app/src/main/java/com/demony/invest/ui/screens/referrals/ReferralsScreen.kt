@@ -31,6 +31,7 @@ fun ReferralsScreen(
 ) {
     val referralCode by viewModel.referralCode.collectAsState()
     val history by viewModel.referralHistory.collectAsState()
+    val leaderboard by viewModel.leaderboard.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     
@@ -82,6 +83,33 @@ fun ReferralsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
+            }
+        } else if (error != null && referralCode == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = error ?: "An error occurred",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Button(onClick = { viewModel.refresh() }) {
+                        Text("Retry")
+                    }
+                }
             }
         } else {
             LazyColumn(
@@ -264,7 +292,111 @@ fun ReferralsScreen(
                         ReferralHistoryItem(referral = referral)
                     }
                 }
+                
+                // Leaderboard Section
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "🏆 Top Referrers",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                if (leaderboard.isEmpty()) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "No leaderboard data yet",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                leaderboard.forEachIndexed { index, leader ->
+                                    LeaderboardItem(
+                                        rank = index + 1,
+                                        name = leader["name"] as? String ?: "Anonymous",
+                                        totalReferrals = (leader["totalReferrals"] as? Number)?.toInt() ?: 0,
+                                        totalEarned = (leader["totalEarned"] as? Number)?.toDouble() ?: 0.0
+                                    )
+                                    if (index < leaderboard.size - 1) {
+                                        Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun LeaderboardItem(
+    rank: Int,
+    name: String,
+    totalReferrals: Int,
+    totalEarned: Double
+) {
+    val medal = when (rank) {
+        1 -> "🥇"
+        2 -> "🥈"
+        3 -> "🥉"
+        else -> rank.toString()
+    }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Rank
+        Text(
+            text = medal,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.width(40.dp)
+        )
+        
+        // Name
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        
+        // Stats
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "$totalReferrals referrals",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            Text(
+                text = "GH₵ %.2f earned".format(totalEarned),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

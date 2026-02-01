@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.demony.invest.data.models.Bank
 import com.demony.invest.data.models.Transaction
 import com.demony.invest.ui.components.BottomNavigationBar
 import com.demony.invest.ui.viewmodels.WalletViewModel
@@ -32,6 +33,7 @@ fun WalletScreen(
 ) {
     val walletBalance by viewModel.walletBalance.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
+    val banks by viewModel.banks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val successMessage by viewModel.successMessage.collectAsState()
@@ -342,27 +344,21 @@ fun WalletScreen(
             )
         }
         
-        // Withdraw Dialog (simplified)
+        // Withdraw Dialog (full implementation)
         if (showWithdrawDialog) {
-            AlertDialog(
-                onDismissRequest = { showWithdrawDialog = false },
-                title = { Text("Withdraw Funds") },
-                text = {
-                    Text(
-                        "Withdrawal feature allows you to transfer funds to your bank account. " +
-                        "You'll need to provide your bank details and the amount to withdraw."
-                    )
+            WithdrawDialog(
+                banks = banks,
+                onLoadBanks = { viewModel.loadBanks() },
+                onVerifyAccount = { accountNumber, bankCode, callback ->
+                    viewModel.verifyBankAccount(accountNumber, bankCode, callback)
                 },
-                confirmButton = {
-                    Button(onClick = { showWithdrawDialog = false }) {
-                        Text("Got it")
-                    }
+                onSubmit = { amount, bankCode, accountNumber, accountName ->
+                    viewModel.requestWithdrawal(amount, bankCode, accountNumber, accountName)
+                    showWithdrawDialog = false
                 },
-                dismissButton = {
-                    TextButton(onClick = { showWithdrawDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
+                onDismiss = { showWithdrawDialog = false },
+                isLoading = isLoading,
+                availableBalance = walletBalance?.availableForWithdrawal ?: walletBalance?.balance ?: 0.0
             )
         }
     }
@@ -555,4 +551,238 @@ fun PaystackWebViewScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WithdrawDialog(
+    banks: List<Bank>,
+    onLoadBanks: () -> Unit,
+    onVerifyAccount: (String, String, (String?) -> Unit) -> Unit,
+    onSubmit: (Double, String, String, String) -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean,
+    availableBalance: Double
+) {
+    var withdrawAmount by remember { mutableStateOf("") }
+    var selectedBank by remember { mutableStateOf<Bank?>(null) }
+    var accountNumber by remember { mutableStateOf("") }
+    var accountName by remember { mutableStateOf<String?>(null) }
+    var isVerifying by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    var withdrawMethod by remember { mutableStateOf("bank") } // "bank" or "momo"
+    
+    // Load banks when dialog opens
+    LaunchedEffect(Unit) {
+        onLoadBanks()
+    }
+    
+    // Auto-verify account when both bank and account number are filled
+    LaunchedEffect(selectedBank, accountNumber) {
+        if (selectedBank != null && accountNumber.length >= 10) {
+            isVerifying = true
+            accountName = null
+            onVerifyAccount(accountNumber, selectedBank!!.code) { name ->
+                accountName = name
+                isVerifying = false
+            }
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Withdraw Funds") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Available Balance Info
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Available Balance", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "GH₵ %.2f".format(availableBalance),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+                
+                // Method Selection
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = withdrawMethod == "bank",
+                        onClick = { withdrawMethod = "bank" },
+                        label = { Text("Bank Transfer") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = withdrawMethod == "momo",
+                        onClick = { withdrawMethod = "momo" },
+                        label = { Text("Mobile Money") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                // Amount Field
+                OutlinedTextField(
+                    value = withdrawAmount,
+                    onValueChange = { withdrawAmount = it },
+                    label = { Text("Amount (GH₵)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { Text("Minimum withdrawal: GH₵ 20") }
+                )
+                
+                // Bank Selection
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedBank?.name ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(if (withdrawMethod == "bank") "Select Bank" else "Select Network") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        if (banks.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("Loading...") },
+                                onClick = {}
+                            )
+                        } else {
+                            banks.forEach { bank ->
+                                DropdownMenuItem(
+                                    text = { Text(bank.name) },
+                                    onClick = {
+                                        selectedBank = bank
+                                        expanded = false
+                                        accountName = null
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Account Number
+                OutlinedTextField(
+                    value = accountNumber,
+                    onValueChange = { 
+                        accountNumber = it
+                        accountName = null
+                    },
+                    label = { Text(if (withdrawMethod == "bank") "Account Number" else "Phone Number") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Account Name (auto-verified)
+                if (isVerifying) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Verifying account...", style = MaterialTheme.typography.bodySmall)
+                    }
+                } else if (accountName != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Account Name",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    accountName!!,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Warning
+                Text(
+                    text = "• Withdrawals are processed within 24-48 hours\n• Please ensure your account details are correct",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = withdrawAmount.toDoubleOrNull()
+                    if (amount != null && selectedBank != null && accountName != null) {
+                        onSubmit(amount, selectedBank!!.code, accountNumber, accountName!!)
+                    }
+                },
+                enabled = !isLoading && 
+                          !isVerifying &&
+                          (withdrawAmount.toDoubleOrNull() ?: 0.0) >= 20 &&
+                          (withdrawAmount.toDoubleOrNull() ?: Double.MAX_VALUE) <= availableBalance &&
+                          selectedBank != null &&
+                          accountName != null
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Submit Withdrawal")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

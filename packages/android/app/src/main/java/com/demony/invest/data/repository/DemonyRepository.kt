@@ -72,6 +72,17 @@ class DemonyRepository @Inject constructor(
         }
     }
 
+    suspend fun forgotPassword(email: String): Result<MessageResponse> = safeApiCall {
+        apiService.forgotPassword(mapOf("email" to email))
+    }
+
+    suspend fun changePassword(currentPassword: String, newPassword: String): Result<MessageResponse> = safeApiCall {
+        apiService.changePassword(mapOf(
+            "currentPassword" to currentPassword,
+            "newPassword" to newPassword
+        ))
+    }
+
     fun logout() {
         tokenManager.clearAll()
     }
@@ -86,9 +97,10 @@ class DemonyRepository @Inject constructor(
         page: Int = 1,
         limit: Int = 10,
         category: String? = null,
-        sort: String? = null
+        sort: String? = null,
+        search: String? = null
     ): Result<ProjectsResponse> = safeApiCall {
-        apiService.getProjects(page, limit, category, sort)
+        apiService.getProjects(page, limit, category, sort, search)
     }
 
     suspend fun getProject(id: String): Result<Project> = safeApiCall {
@@ -205,6 +217,12 @@ class DemonyRepository @Inject constructor(
 
     suspend fun getSystemStatus(): Result<Map<String, Any>> = safeApiCall {
         apiService.getSystemStatus()
+    }
+
+    // ==================== KYC ====================
+
+    suspend fun submitKyc(kycData: Map<String, Any>): Result<MessageResponse> = safeApiCall {
+        apiService.submitKyc(kycData)
     }
 
     // ==================== UPLOAD ====================

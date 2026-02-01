@@ -32,6 +32,9 @@ interface DemonyApiService {
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body data: Map<String, String>): Response<MessageResponse>
     
+    @POST("auth/change-password")
+    suspend fun changePassword(@Body data: Map<String, String>): Response<MessageResponse>
+    
     // ==================== PROJECTS ====================
     
     @GET("projects")
@@ -39,7 +42,8 @@ interface DemonyApiService {
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 10,
         @Query("category") category: String? = null,
-        @Query("sort") sort: String? = null
+        @Query("sort") sort: String? = null,
+        @Query("search") search: String? = null
     ): Response<ProjectsResponse>
     
     @GET("projects/{id}")

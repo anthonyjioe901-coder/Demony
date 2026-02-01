@@ -35,18 +35,28 @@ fun SettingsScreen(
     val biometricEnabled by settingsViewModel.biometricLogin.collectAsState()
     val darkModeEnabled by settingsViewModel.darkMode.collectAsState()
     val showToast by settingsViewModel.showToast.collectAsState()
+    val isChangingPassword by settingsViewModel.isChangingPassword.collectAsState()
     
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
 
-    // Show toast messages
+    // Show toast messages and handle password change success
     LaunchedEffect(showToast) {
         showToast?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             settingsViewModel.clearToast()
+            // Close dialog on success
+            if (message.contains("successfully", ignoreCase = true)) {
+                showPasswordDialog = false
+                currentPassword = ""
+                newPassword = ""
+                confirmPassword = ""
+                passwordError = null
+            }
         }
     }
 
@@ -260,24 +270,40 @@ fun SettingsScreen(
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 title = { Text("Delete Account?") },
                 text = {
-                    Text(
-                        "This action cannot be undone. All your data, including investments and earnings, will be permanently deleted."
-                    )
+                    Column {
+                        Text(
+                            "This action cannot be undone. All your data, including investments and earnings, will be permanently deleted."
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "To delete your account, please contact our support team who will verify your identity and process your request.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
                             showDeleteDialog = false
-                            Toast.makeText(context, "Account deletion coming soon. Contact support.", Toast.LENGTH_LONG).show()
+                            // Open email to support
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:support@demony.app")
+                                putExtra(Intent.EXTRA_SUBJECT, "Account Deletion Request")
+                                putExtra(Intent.EXTRA_TEXT, "I would like to request the deletion of my Demony account.\n\nRegistered email: \n\nReason for deletion: ")
+                            }
+                            context.startActivity(intent)
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("Delete Account")
+                        Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Contact Support")
                     }
                 },
                 dismissButton = {
@@ -292,59 +318,110 @@ fun SettingsScreen(
         if (showPasswordDialog) {
             AlertDialog(
                 onDismissRequest = { 
-                    showPasswordDialog = false
-                    currentPassword = ""
-                    newPassword = ""
-                    confirmPassword = ""
+                    if (!isChangingPassword) {
+                        showPasswordDialog = false
+                        currentPassword = ""
+                        newPassword = ""
+                        confirmPassword = ""
+                        passwordError = null
+                    }
                 },
                 title = { Text("Change Password") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = currentPassword,
-                            onValueChange = { currentPassword = it },
+                            onValueChange = { 
+                                currentPassword = it
+                                passwordError = null
+                            },
                             label = { Text("Current Password") },
+                            enabled = !isChangingPassword,
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = newPassword,
-                            onValueChange = { newPassword = it },
+                            onValueChange = { 
+                                newPassword = it
+                                passwordError = null
+                            },
                             label = { Text("New Password") },
+                            enabled = !isChangingPassword,
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = confirmPassword,
-                            onValueChange = { confirmPassword = it },
+                            onValueChange = { 
+                                confirmPassword = it
+                                passwordError = null
+                            },
                             label = { Text("Confirm New Password") },
+                            enabled = !isChangingPassword,
+                            isError = confirmPassword.isNotEmpty() && newPassword != confirmPassword,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        if (confirmPassword.isNotEmpty() && newPassword != confirmPassword) {
+                            Text(
+                                text = "Passwords do not match",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        if (newPassword.isNotEmpty() && newPassword.length < 6) {
+                            Text(
+                                text = "Password must be at least 6 characters",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        if (passwordError != null) {
+                            Text(
+                                text = passwordError!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
-                            if (newPassword == confirmPassword && newPassword.length >= 6) {
-                                settingsViewModel.changePassword(currentPassword, newPassword)
-                                showPasswordDialog = false
-                                currentPassword = ""
-                                newPassword = ""
-                                confirmPassword = ""
-                            } else {
-                                Toast.makeText(context, "Passwords must match and be at least 6 characters", Toast.LENGTH_SHORT).show()
+                            when {
+                                newPassword != confirmPassword -> {
+                                    passwordError = "Passwords do not match"
+                                }
+                                newPassword.length < 6 -> {
+                                    passwordError = "Password must be at least 6 characters"
+                                }
+                                else -> {
+                                    settingsViewModel.changePassword(currentPassword, newPassword)
+                                }
                             }
                         },
-                        enabled = currentPassword.isNotEmpty() && newPassword.isNotEmpty() && confirmPassword.isNotEmpty()
+                        enabled = currentPassword.isNotEmpty() && newPassword.isNotEmpty() && confirmPassword.isNotEmpty() && !isChangingPassword
                     ) {
-                        Text("Change Password")
+                        if (isChangingPassword) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Change Password")
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { 
-                        showPasswordDialog = false
-                        currentPassword = ""
-                        newPassword = ""
-                        confirmPassword = ""
-                    }) {
+                    TextButton(
+                        onClick = { 
+                            showPasswordDialog = false
+                            currentPassword = ""
+                            newPassword = ""
+                            confirmPassword = ""
+                            passwordError = null
+                        },
+                        enabled = !isChangingPassword
+                    ) {
                         Text("Cancel")
                     }
                 }

@@ -1,5 +1,7 @@
 package com.demony.invest.ui.screens.support
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,13 +12,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.demony.invest.ui.components.BottomNavigationBar
+import com.demony.invest.ui.viewmodels.SupportViewModel
 
-data class SupportTicket(
+data class LocalSupportTicket(
     val id: String,
     val subject: String,
     val message: String,
@@ -33,17 +38,28 @@ data class FAQ(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportScreen(
-    navController: NavController
+    navController: NavController,
+    viewModel: SupportViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val successMessage by viewModel.successMessage.collectAsState()
+    
     var selectedTab by remember { mutableIntStateOf(0) }
     var showNewTicketDialog by remember { mutableStateOf(false) }
     var ticketSubject by remember { mutableStateOf("") }
     var ticketMessage by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("General") }
     
-    // Sample data - in real app, this would come from ViewModel
-    val tickets = remember {
-        listOf<SupportTicket>()
+    // Show success message and close dialog
+    LaunchedEffect(successMessage) {
+        if (successMessage != null) {
+            showNewTicketDialog = false
+            ticketSubject = ""
+            ticketMessage = ""
+            selectedCategory = "General"
+        }
     }
     
     val faqs = remember {
@@ -89,12 +105,29 @@ fun SupportScreen(
         bottomBar = {
             BottomNavigationBar(navController = navController)
         },
-        floatingActionButton = {
-            if (selectedTab == 1) {
-                FloatingActionButton(
-                    onClick = { showNewTicketDialog = true }
+        snackbarHost = {
+            successMessage?.let { message ->
+                Snackbar(
+                    action = {
+                        TextButton(onClick = { viewModel.clearMessages() }) {
+                            Text("Dismiss")
+                        }
+                    }
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "New Ticket")
+                    Text(message)
+                }
+            }
+            error?.let { errorMessage ->
+                Snackbar(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    action = {
+                        TextButton(onClick = { viewModel.clearMessages() }) {
+                            Text("Dismiss")
+                        }
+                    }
+                ) {
+                    Text(errorMessage)
                 }
             }
         }
@@ -115,7 +148,7 @@ fun SupportScreen(
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("My Tickets") },
+                    text = { Text("Submit Ticket") },
                     icon = { Icon(Icons.Default.SupportAgent, contentDescription = null) }
                 )
             }
@@ -181,7 +214,13 @@ fun SupportScreen(
                             ) {
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Open email */ }
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                            data = Uri.parse("mailto:support@demony.app")
+                                            putExtra(Intent.EXTRA_SUBJECT, "Support Request")
+                                        }
+                                        context.startActivity(intent)
+                                    }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(16.dp),
@@ -202,7 +241,12 @@ fun SupportScreen(
                                 
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Open phone */ }
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_DIAL).apply {
+                                            data = Uri.parse("tel:+233200000000")
+                                        }
+                                        context.startActivity(intent)
+                                    }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(16.dp),
@@ -223,7 +267,13 @@ fun SupportScreen(
                                 
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Open chat */ }
+                                    onClick = {
+                                        // Open WhatsApp for live chat
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            data = Uri.parse("https://wa.me/233200000000?text=Hi,%20I%20need%20help%20with%20my%20Demony%20account")
+                                        }
+                                        context.startActivity(intent)
+                                    }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(16.dp),
@@ -246,132 +296,194 @@ fun SupportScreen(
                     }
                 }
                 1 -> {
-                    // My Tickets
-                    if (tickets.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
+                    // Submit Ticket Form
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                )
                             ) {
-                                Icon(
-                                    Icons.Default.SupportAgent,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(64.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = "No support tickets",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Text(
-                                    text = "Create a ticket if you need help",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { showNewTicketDialog = true }) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Create Ticket")
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.SupportAgent,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Need Help?",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Submit a support ticket and we'll get back to you within 24 hours",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                        )
+                                    }
                                 }
                             }
                         }
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(tickets) { ticket ->
-                                TicketItem(ticket = ticket)
+                        
+                        item {
+                            // Category Dropdown
+                            var expanded by remember { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(
+                                expanded = expanded,
+                                onExpandedChange = { expanded = !expanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedCategory,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Category") },
+                                    leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = expanded,
+                                    onDismissRequest = { expanded = false }
+                                ) {
+                                    listOf("General", "Investment", "Withdrawal", "Technical", "Account").forEach { category ->
+                                        DropdownMenuItem(
+                                            text = { Text(category) },
+                                            onClick = {
+                                                selectedCategory = category
+                                                expanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
+                        item {
+                            OutlinedTextField(
+                                value = ticketSubject,
+                                onValueChange = { ticketSubject = it },
+                                label = { Text("Subject") },
+                                leadingIcon = { Icon(Icons.Default.Subject, contentDescription = null) },
+                                placeholder = { Text("Brief description of your issue") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        
+                        item {
+                            OutlinedTextField(
+                                value = ticketMessage,
+                                onValueChange = { ticketMessage = it },
+                                label = { Text("Message") },
+                                leadingIcon = { Icon(Icons.Default.Message, contentDescription = null) },
+                                placeholder = { Text("Describe your issue in detail...") },
+                                minLines = 5,
+                                maxLines = 10,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        
+                        item {
+                            Button(
+                                onClick = {
+                                    viewModel.submitTicket(selectedCategory, ticketSubject, ticketMessage)
+                                },
+                                enabled = ticketSubject.isNotBlank() && ticketMessage.isNotBlank() && !isLoading,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Submitting...")
+                                } else {
+                                    Icon(Icons.Default.Send, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Submit Ticket")
+                                }
+                            }
+                        }
+                        
+                        item {
+                            Divider()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Or contact us directly:",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedCard(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                            data = Uri.parse("mailto:support@demony.app")
+                                            putExtra(Intent.EXTRA_SUBJECT, "Support Request: $ticketSubject")
+                                            putExtra(Intent.EXTRA_TEXT, ticketMessage)
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Email,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text("Email", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
+                                
+                                OutlinedCard(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            data = Uri.parse("https://wa.me/233200000000?text=Hi,%20I%20need%20help")
+                                        }
+                                        context.startActivity(intent)
+                                    }
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Chat,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text("WhatsApp", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        
-        // New Ticket Dialog
-        if (showNewTicketDialog) {
-            AlertDialog(
-                onDismissRequest = { showNewTicketDialog = false },
-                title = { Text("Create Support Ticket") },
-                text = {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Category
-                        var expanded by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = expanded,
-                            onExpandedChange = { expanded = !expanded }
-                        ) {
-                            OutlinedTextField(
-                                value = selectedCategory,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Category") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                listOf("General", "Investment", "Withdrawal", "Technical", "Account").forEach { category ->
-                                    DropdownMenuItem(
-                                        text = { Text(category) },
-                                        onClick = {
-                                            selectedCategory = category
-                                            expanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        
-                        OutlinedTextField(
-                            value = ticketSubject,
-                            onValueChange = { ticketSubject = it },
-                            label = { Text("Subject") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                        )
-                        
-                        OutlinedTextField(
-                            value = ticketMessage,
-                            onValueChange = { ticketMessage = it },
-                            label = { Text("Message") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(150.dp),
-                            maxLines = 5
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            // Submit ticket
-                            showNewTicketDialog = false
-                            ticketSubject = ""
-                            ticketMessage = ""
-                        },
-                        enabled = ticketSubject.isNotBlank() && ticketMessage.isNotBlank()
-                    ) {
-                        Text("Submit")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showNewTicketDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
         }
     }
 }
@@ -394,18 +506,16 @@ private fun FAQItem(faq: FAQ) {
                 Text(
                     text = faq.question,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand"
+                    contentDescription = null
                 )
             }
             
             if (expanded) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Divider()
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = faq.answer,
@@ -413,65 +523,6 @@ private fun FAQItem(faq: FAQ) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun TicketItem(ticket: SupportTicket) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = ticket.subject,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = ticket.category,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                Surface(
-                    color = when (ticket.status) {
-                        "open" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                        "pending" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
-                        "resolved" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = ticket.status.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = ticket.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Created: ${ticket.createdAt}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
         }
     }
 }

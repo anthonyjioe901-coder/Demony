@@ -43,6 +43,12 @@ class ProjectsViewModel @Inject constructor(
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow<String?>(null)
+    val searchQuery: StateFlow<String?> = _searchQuery.asStateFlow()
+
+    private val _sortOrder = MutableStateFlow("newest")
+    val sortOrder: StateFlow<String> = _sortOrder.asStateFlow()
+
     private var currentPage = 1
     private var totalPages = 1
     private var hasMorePages = true
@@ -77,11 +83,15 @@ class ProjectsViewModel @Inject constructor(
             _error.value = null
 
             val category = _selectedCategory.value?.takeIf { it != "All" }
+            val search = _searchQuery.value
+            val sort = _sortOrder.value
             
             repository.getProjects(
                 page = currentPage,
                 limit = 10,
-                category = category
+                category = category,
+                sort = sort,
+                search = search
             )
                 .onSuccess { response ->
                     _projects.value = response.projects
@@ -106,11 +116,15 @@ class ProjectsViewModel @Inject constructor(
             currentPage++
 
             val category = _selectedCategory.value?.takeIf { it != "All" }
+            val search = _searchQuery.value
+            val sort = _sortOrder.value
             
             repository.getProjects(
                 page = currentPage,
                 limit = 10,
-                category = category
+                category = category,
+                sort = sort,
+                search = search
             )
                 .onSuccess { response ->
                     _projects.value = _projects.value + response.projects
@@ -138,6 +152,21 @@ class ProjectsViewModel @Inject constructor(
 
     fun selectCategory(category: String) {
         _selectedCategory.value = category
+        loadProjects(forceRefresh = true)
+    }
+
+    fun searchProjects(query: String) {
+        _searchQuery.value = query.takeIf { it.isNotBlank() }
+        loadProjects(forceRefresh = true)
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = null
+        loadProjects(forceRefresh = true)
+    }
+
+    fun setSortOrder(sort: String) {
+        _sortOrder.value = sort
         loadProjects(forceRefresh = true)
     }
 

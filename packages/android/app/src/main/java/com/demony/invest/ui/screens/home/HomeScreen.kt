@@ -1,5 +1,6 @@
 package com.demony.invest.ui.screens.home
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,6 +33,7 @@ fun HomeScreen(
     projectsViewModel: ProjectsViewModel = hiltViewModel(),
     walletViewModel: WalletViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val featuredProjects by projectsViewModel.featuredProjects.collectAsState()
     val isLoading by projectsViewModel.isLoading.collectAsState()
     val walletBalance by walletViewModel.walletBalance.collectAsState()
@@ -53,7 +56,9 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Notifications */ }) {
+                    IconButton(onClick = { 
+                        Toast.makeText(context, "No new notifications", Toast.LENGTH_SHORT).show()
+                    }) {
                         Icon(Icons.Default.Notifications, contentDescription = "Notifications")
                     }
                 }

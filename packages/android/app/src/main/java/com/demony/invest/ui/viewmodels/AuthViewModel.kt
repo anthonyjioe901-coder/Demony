@@ -119,6 +119,102 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    private val _kycSubmitSuccess = MutableStateFlow(false)
+    val kycSubmitSuccess: StateFlow<Boolean> = _kycSubmitSuccess.asStateFlow()
+
+    fun submitKyc(
+        idDocumentBase64: String, 
+        selfieBase64: String, 
+        idType: String = "Ghana Card",
+        idNumber: String = "",
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            // First upload the ID document
+            val idUploadResult = repository.uploadImage(idDocumentBase64, "kyc_id_document.jpg")
+            var idDocumentUrl: String? = null
+            
+            idUploadResult.onSuccess { result ->
+                idDocumentUrl = result["url"]
+            }.onFailure { exception ->
+                _error.value = "Failed to upload ID document: ${exception.message}"
+                _isLoading.value = false
+                onResult(false, "Failed to upload ID document")
+                return@launch
+            }
+
+            // Then upload the selfie
+            val selfieUploadResult = repository.uploadImage(selfieBase64, "kyc_selfie.jpg")
+            var selfieUrl: String? = null
+            
+            selfieUploadResult.onSuccess { result ->
+                selfieUrl = result["url"]
+            }.onFailure { exception ->
+                _error.value = "Failed to upload selfie: ${exception.message}"
+                _isLoading.value = false
+                onResult(false, "Failed to upload selfie")
+                return@launch
+            }
+
+            // Now submit KYC with the uploaded URLs
+            if (idDocumentUrl != null && selfieUrl != null) {
+                // Call KYC submit endpoint
+                val kycData = mapOf<String, Any>(
+                    "idType" to idType,
+                    "idNumber" to idNumber,
+                    "idDocument" to (idDocumentUrl ?: ""),
+                    "selfie" to (selfieUrl ?: "")
+                )
+                
+                repository.submitKyc(kycData)
+                    .onSuccess {
+                        _kycSubmitSuccess.value = true
+                        refreshUser() // Refresh user to get updated KYC status
+                        onResult(true, null)
+                    }
+                    .onFailure { exception ->
+                        _error.value = "Failed to submit KYC: ${exception.message}"
+                        onResult(false, exception.message ?: "Failed to submit KYC")
+                    }
+            }
+
+            _isLoading.value = false
+        }
+    }
+
+    fun clearKycSubmitSuccess() {
+        _kycSubmitSuccess.value = false
+    }
+
+    private val _forgotPasswordSuccess = MutableStateFlow(false)
+    val forgotPasswordSuccess: StateFlow<Boolean> = _forgotPasswordSuccess.asStateFlow()
+
+    fun forgotPassword(email: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            repository.forgotPassword(email)
+                .onSuccess {
+                    _forgotPasswordSuccess.value = true
+                    onResult(true, null)
+                }
+                .onFailure { exception ->
+                    _error.value = exception.message
+                    onResult(false, exception.message ?: "Failed to send reset email")
+                }
+
+            _isLoading.value = false
+        }
+    }
+
+    fun clearForgotPasswordSuccess() {
+        _forgotPasswordSuccess.value = false
+    }
+
     fun clearError() {
         _error.value = null
     }

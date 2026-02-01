@@ -49,6 +49,9 @@ class SettingsViewModel @Inject constructor(
     private val _showToast = MutableStateFlow<String?>(null)
     val showToast: StateFlow<String?> = _showToast.asStateFlow()
 
+    private val _isChangingPassword = MutableStateFlow(false)
+    val isChangingPassword: StateFlow<Boolean> = _isChangingPassword.asStateFlow()
+
     init {
         loadSettings()
     }
@@ -120,9 +123,18 @@ class SettingsViewModel @Inject constructor(
 
     fun changePassword(currentPassword: String, newPassword: String) {
         viewModelScope.launch {
-            // TODO: Call API to change password
-            _showPasswordDialog.value = false
-            _showToast.value = "Password change feature coming soon"
+            _isChangingPassword.value = true
+            
+            repository.changePassword(currentPassword, newPassword)
+                .onSuccess {
+                    _showPasswordDialog.value = false
+                    _showToast.value = "Password changed successfully"
+                }
+                .onFailure { exception ->
+                    _showToast.value = exception.message ?: "Failed to change password"
+                }
+            
+            _isChangingPassword.value = false
         }
     }
 

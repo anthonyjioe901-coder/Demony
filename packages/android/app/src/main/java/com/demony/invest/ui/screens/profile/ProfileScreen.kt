@@ -1,6 +1,10 @@
 package com.demony.invest.ui.screens.profile
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -15,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -23,6 +28,21 @@ import androidx.navigation.NavController
 import com.demony.invest.ui.components.BottomNavigationBar
 import com.demony.invest.ui.navigation.Screen
 import com.demony.invest.ui.viewmodels.AuthViewModel
+import java.io.ByteArrayOutputStream
+
+// Helper function to convert Uri to Base64
+fun uriToBase64(context: Context, uri: Uri): String? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri)
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+        val bytes = outputStream.toByteArray()
+        "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+    } catch (e: Exception) {
+        null
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,14 +50,31 @@ fun ProfileScreen(
     navController: NavController,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val user by viewModel.currentUser.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val kycSubmitSuccess by viewModel.kycSubmitSuccess.collectAsState()
     
     // KYC Dialog state
     var showKycDialog by remember { mutableStateOf(false) }
-    var kycStep by remember { mutableStateOf(0) } // 0 = intro, 1 = ID upload, 2 = selfie, 3 = submitted
+    var kycStep by remember { mutableStateOf(0) } // 0 = intro, 1 = ID type & number, 2 = ID upload, 3 = selfie, 4 = submitting, 5 = submitted
+    var selectedIdType by remember { mutableStateOf("Ghana Card") }
+    var idNumber by remember { mutableStateOf("") }
     var selectedIdUri by remember { mutableStateOf<Uri?>(null) }
     var selectedSelfieUri by remember { mutableStateOf<Uri?>(null) }
+    var kycError by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    
+    val idTypes = listOf("Ghana Card", "Passport", "Driver's License", "Voter's ID")
+    
+    // Watch for KYC submit success
+    LaunchedEffect(kycSubmitSuccess) {
+        if (kycSubmitSuccess) {
+            kycStep = 5
+            isSubmitting = false
+            viewModel.clearKycSubmitSuccess()
+        }
+    }
     
     // Image pickers
     val idDocumentPicker = rememberLauncherForActivityResult(
@@ -60,10 +97,15 @@ fun ProfileScreen(
     if (showKycDialog) {
         AlertDialog(
             onDismissRequest = { 
-                showKycDialog = false
-                kycStep = 0
-                selectedIdUri = null
-                selectedSelfieUri = null
+                if (!isSubmitting) {
+                    showKycDialog = false
+                    kycStep = 0
+                    selectedIdType = "Ghana Card"
+                    idNumber = ""
+                    selectedIdUri = null
+                    selectedSelfieUri = null
+                    kycError = null
+                }
             },
             title = {
                 Row(
@@ -74,19 +116,26 @@ fun ProfileScreen(
                     Text(
                         text = when (kycStep) {
                             0 -> "KYC Verification"
-                            1 -> "Upload ID Document"
-                            2 -> "Take a Selfie"
+                            1 -> "ID Information"
+                            2 -> "Upload ID Document"
+                            3 -> "Take a Selfie"
+                            4 -> "Submitting..."
                             else -> "Verification Submitted"
                         },
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = { 
-                        showKycDialog = false
-                        kycStep = 0
-                        selectedIdUri = null
-                        selectedSelfieUri = null
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    if (!isSubmitting) {
+                        IconButton(onClick = { 
+                            showKycDialog = false
+                            kycStep = 0
+                            selectedIdType = "Ghana Card"
+                            idNumber = ""
+                            selectedIdUri = null
+                            selectedSelfieUri = null
+                            kycError = null
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
                     }
                 }
             },
@@ -95,6 +144,23 @@ fun ProfileScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    // Show error if any
+                    kycError?.let { error ->
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = error,
+                                modifier = Modifier.padding(12.dp),
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    
                     when (kycStep) {
                         0 -> {
                             // Introduction
@@ -130,6 +196,65 @@ fun ProfileScreen(
                             }
                         }
                         1 -> {
+                            // ID Type and Number
+                            Icon(
+                                Icons.Default.Badge,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Enter your ID details",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // ID Type Dropdown
+                            var idTypeExpanded by remember { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(
+                                expanded = idTypeExpanded,
+                                onExpandedChange = { idTypeExpanded = !idTypeExpanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedIdType,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("ID Type") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = idTypeExpanded) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = idTypeExpanded,
+                                    onDismissRequest = { idTypeExpanded = false }
+                                ) {
+                                    idTypes.forEach { type ->
+                                        DropdownMenuItem(
+                                            text = { Text(type) },
+                                            onClick = {
+                                                selectedIdType = type
+                                                idTypeExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            OutlinedTextField(
+                                value = idNumber,
+                                onValueChange = { idNumber = it },
+                                label = { Text("ID Number") },
+                                placeholder = { Text("Enter your ID number") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        2 -> {
                             // ID Upload
                             Icon(
                                 Icons.Default.Badge,
@@ -139,7 +264,7 @@ fun ProfileScreen(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Upload a clear photo of your government-issued ID",
+                                text = "Upload a clear photo of your $selectedIdType",
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center
                             )
@@ -171,7 +296,7 @@ fun ProfileScreen(
                                 Text(if (selectedIdUri == null) "Choose File" else "Change File")
                             }
                         }
-                        2 -> {
+                        3 -> {
                             // Selfie
                             Icon(
                                 Icons.Default.CameraAlt,
@@ -213,6 +338,24 @@ fun ProfileScreen(
                                 Text(if (selectedSelfieUri == null) "Choose Photo" else "Change Photo")
                             }
                         }
+                        4 -> {
+                            // Submitting
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Uploading documents...",
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "Please wait while we upload your documents.",
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         else -> {
                             // Submitted
                             Icon(
@@ -244,25 +387,59 @@ fun ProfileScreen(
                     0 -> Button(onClick = { kycStep = 1 }) { Text("Start Verification") }
                     1 -> Button(
                         onClick = { kycStep = 2 },
-                        enabled = selectedIdUri != null
+                        enabled = idNumber.isNotBlank()
                     ) { Text("Continue") }
                     2 -> Button(
+                        onClick = { kycStep = 3 },
+                        enabled = selectedIdUri != null
+                    ) { Text("Continue") }
+                    3 -> Button(
                         onClick = { 
-                            // TODO: Upload documents to API
-                            kycStep = 3 
+                            // Convert URIs to Base64 and submit
+                            kycStep = 4
+                            isSubmitting = true
+                            kycError = null
+                            
+                            val idBase64 = selectedIdUri?.let { uriToBase64(context, it) }
+                            val selfieBase64 = selectedSelfieUri?.let { uriToBase64(context, it) }
+                            
+                            if (idBase64 != null && selfieBase64 != null) {
+                                viewModel.submitKyc(
+                                    idDocumentBase64 = idBase64, 
+                                    selfieBase64 = selfieBase64,
+                                    idType = selectedIdType,
+                                    idNumber = idNumber
+                                ) { success, error ->
+                                    if (success) {
+                                        kycStep = 5
+                                    } else {
+                                        kycStep = 3
+                                        kycError = error ?: "Failed to submit KYC"
+                                    }
+                                    isSubmitting = false
+                                }
+                            } else {
+                                kycStep = 3
+                                kycError = "Failed to process images. Please try again."
+                                isSubmitting = false
+                            }
                         },
-                        enabled = selectedSelfieUri != null
+                        enabled = selectedSelfieUri != null && !isSubmitting
                     ) { Text("Submit") }
+                    4 -> { /* Show nothing while submitting */ }
                     else -> Button(onClick = { 
                         showKycDialog = false
                         kycStep = 0
+                        selectedIdType = "Ghana Card"
+                        idNumber = ""
                         selectedIdUri = null
                         selectedSelfieUri = null
+                        kycError = null
                     }) { Text("Done") }
                 }
             },
             dismissButton = {
-                if (kycStep > 0 && kycStep < 3) {
+                if (kycStep > 0 && kycStep < 4 && !isSubmitting) {
                     TextButton(onClick = { kycStep-- }) {
                         Text("Back")
                     }

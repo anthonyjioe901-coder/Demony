@@ -46,7 +46,6 @@ fun SignupScreen(
     var showTermsDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showVerificationDialog by remember { mutableStateOf(false) }
-    var verificationCode by remember { mutableStateOf("") }
     
     val isLoading by authViewModel.isLoading.collectAsState()
     val error by authViewModel.error.collectAsState()
@@ -87,17 +86,12 @@ fun SignupScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Verify Your Email", fontWeight = FontWeight.Bold)
-                    IconButton(onClick = { 
-                        showVerificationDialog = false
-                        onSignupSuccess()
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
                 }
             },
             text = {
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
                         Icons.Default.MarkEmailRead,
@@ -114,7 +108,7 @@ fun SignupScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "We've sent a verification code to:",
+                        text = "We've sent a verification link to:",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center
                     )
@@ -125,41 +119,50 @@ fun SignupScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = verificationCode,
-                        onValueChange = { if (it.length <= 6) verificationCode = it },
-                        label = { Text("Verification Code") },
-                        placeholder = { Text("Enter 6-digit code") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        ),
                         modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { /* TODO: Resend code */ }) {
-                        Text("Didn't receive the code? Resend")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "📧 Check your inbox",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Click the verification link in the email to activate your account. The link expires in 48 hours.",
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Don't see it? Check your spam folder.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        // TODO: Verify code with API
                         showVerificationDialog = false
                         onSignupSuccess()
-                    },
-                    enabled = verificationCode.length == 6
+                    }
                 ) {
-                    Text("Verify")
+                    Text("Continue to Login")
                 }
             },
-            dismissButton = {
-                TextButton(onClick = {
-                    showVerificationDialog = false
-                    onSignupSuccess()
-                }) {
-                    Text("Skip for now")
-                }
-            }
+            dismissButton = null
         )
     }
 

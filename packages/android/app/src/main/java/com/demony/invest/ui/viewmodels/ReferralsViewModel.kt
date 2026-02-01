@@ -27,6 +27,9 @@ class ReferralsViewModel @Inject constructor(
     private val _referralHistory = MutableStateFlow<List<ReferralHistory>>(emptyList())
     val referralHistory: StateFlow<List<ReferralHistory>> = _referralHistory.asStateFlow()
 
+    private val _leaderboard = MutableStateFlow<List<Map<String, Any>>>(emptyList())
+    val leaderboard: StateFlow<List<Map<String, Any>>> = _leaderboard.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -55,6 +58,12 @@ class ReferralsViewModel @Inject constructor(
             repository.getReferralHistory()
                 .onSuccess { response ->
                     _referralHistory.value = response.referrals
+                }
+
+            // Load leaderboard
+            repository.getReferralLeaderboard()
+                .onSuccess { leaders ->
+                    _leaderboard.value = leaders
                 }
 
             _isLoading.value = false
