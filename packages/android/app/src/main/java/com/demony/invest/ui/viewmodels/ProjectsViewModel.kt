@@ -43,6 +43,9 @@ class ProjectsViewModel @Inject constructor(
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
+    private val _totalProjects = MutableStateFlow(0)
+    val totalProjects: StateFlow<Int> = _totalProjects.asStateFlow()
+
     private var currentPage = 1
     private var totalPages = 1
     private var hasMorePages = true
@@ -88,6 +91,7 @@ class ProjectsViewModel @Inject constructor(
                     response.pagination?.let { pagination ->
                         totalPages = pagination.pages
                         hasMorePages = currentPage < totalPages
+                        _totalProjects.value = pagination.total
                     }
                 }
                 .onFailure { exception ->

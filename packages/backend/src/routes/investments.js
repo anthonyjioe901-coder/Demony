@@ -126,55 +126,76 @@ router.post('/', authenticateToken, async function(req, res) {
       updatedAt: new Date()
     };
     
-    var result = await database.collection('investments').insertOne(investment);
+    // ========== TRANSACTION: All-or-nothing financial operation ==========
+    // If any step fails, everything is rolled back. No partial state.
+    var client = db.getClient();
+    var session = client.startSession();
     
-    // Also record in separate collection for audit trail
-    await database.collection('investment_terms_acceptance').insertOne({
-      userId: userId,
-      investmentId: result.insertedId.toString(),
-      projectId: projectId,
-      amount: amount,
-      termsVersion: '1.0',
-      termsAccepted: true,
-      riskAcknowledged: true,
-      lossAcknowledged: true,
-      lockInAcknowledged: true,
-      ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown',
-      acceptedAt: new Date()
-    });
-    
-    // Deduct from wallet
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(userId) },
-      { 
-        $inc: { walletBalance: -amount, totalInvested: amount },
-        $set: { updatedAt: new Date() }
-      }
-    );
-    
-    // Update project funding
-    await database.collection('projects').updateOne(
-      { _id: new ObjectId(projectId) },
-      { 
-        $inc: { currentFunding: amount, investorCount: 1 },
-        $set: { updatedAt: new Date() }
-      }
-    );
-    
-    // Record transaction
-    await database.collection('transactions').insertOne({
-      userId: userId,
-      type: 'investment',
-      amount: -amount,
-      status: 'success',
-      reference: 'INV_' + result.insertedId.toString(),
-      description: 'Investment in ' + project.name,
-      projectId: projectId,
-      investmentId: result.insertedId.toString(),
-      createdAt: new Date()
-    });
-    
-    investment.id = result.insertedId.toString();
+    try {
+      await session.withTransaction(async function() {
+        // Step 1: Atomically deduct from wallet (only if balance sufficient)
+        var deductResult = await database.collection('users').updateOne(
+          { _id: new ObjectId(userId), walletBalance: { $gte: amount } },
+          { 
+            $inc: { walletBalance: -amount, totalInvested: amount },
+            $set: { updatedAt: new Date() }
+          },
+          { session: session }
+        );
+        
+        if (deductResult.modifiedCount === 0) {
+          throw new Error('Insufficient wallet balance (concurrent transaction)');
+        }
+        
+        // Step 2: Insert investment
+        var result = await database.collection('investments').insertOne(investment, { session: session });
+        investment.id = result.insertedId.toString();
+        
+        // Step 3: Record audit trail for terms acceptance
+        await database.collection('investment_terms_acceptance').insertOne({
+          userId: userId,
+          investmentId: investment.id,
+          projectId: projectId,
+          amount: amount,
+          termsVersion: '1.0',
+          termsAccepted: true,
+          riskAcknowledged: true,
+          lossAcknowledged: true,
+          lockInAcknowledged: true,
+          ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown',
+          acceptedAt: new Date()
+        }, { session: session });
+        
+        // Step 4: Update project funding
+        await database.collection('projects').updateOne(
+          { _id: new ObjectId(projectId) },
+          { 
+            $inc: { currentFunding: amount, investorCount: 1 },
+            $set: { updatedAt: new Date() }
+          },
+          { session: session }
+        );
+        
+        // Step 5: Record transaction
+        await database.collection('transactions').insertOne({
+          userId: userId,
+          type: 'investment',
+          amount: -amount,
+          status: 'success',
+          reference: 'INV_' + investment.id,
+          description: 'Investment in ' + project.name,
+          projectId: projectId,
+          investmentId: investment.id,
+          createdAt: new Date()
+        }, { session: session });
+      });
+    } catch (txErr) {
+      console.error('Investment transaction failed (rolled back):', txErr.message);
+      return res.status(400).json({ error: txErr.message || 'Investment failed. No funds were deducted.' });
+    } finally {
+      await session.endSession();
+    }
+    // ========== END TRANSACTION ==========
     
     // Check and complete any pending referral for this user
     try {
@@ -222,8 +243,12 @@ router.post('/pay', authenticateToken, async function(req, res) {
   var amount = parseFloat(req.body.amount);
   var userId = req.user.userId || req.user.id;
   
-  if (!projectId || !amount || amount < 100) {
+  if (!projectId || !amount || amount < 100 || !isFinite(amount)) {
     return res.status(400).json({ error: 'Valid project ID and amount (min 100) required' });
+  }
+  
+  if (amount > 1000000) {
+    return res.status(400).json({ error: 'Maximum investment is GH₵1,000,000' });
   }
   
   try {
@@ -394,6 +419,11 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
     
     if (updateResult.matchedCount === 0) {
       return res.json({ status: investment.status, message: 'Already processed' });
+    }
+    
+    // SAFETY: Only proceed if we actually changed the status (prevents double-processing)
+    if (updateResult.modifiedCount === 0) {
+      return res.json({ status: 'active', message: 'Already processed' });
     }
     
     // Update user totals

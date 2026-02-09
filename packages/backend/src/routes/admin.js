@@ -6,6 +6,11 @@ var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
 var router = express.Router();
 
+// Escape regex special chars to prevent ReDoS attacks from user-supplied search input
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function toObjectId(value) {
   if (!value) return null;
   if (value instanceof ObjectId) return value;
@@ -38,24 +43,35 @@ router.get('/stats', async function(req, res) {
   try {
     var database = await db.getDb();
     
-    var totalUsers = await database.collection('users').countDocuments();
-    var verifiedUsers = await database.collection('users').countDocuments({ isVerified: true });
-    var pendingKyc = await database.collection('users').countDocuments({ 'kyc.status': 'submitted' });
+    // Run all independent stats queries in parallel (was 9 sequential queries)
+    var results = await Promise.all([
+      database.collection('users').countDocuments(),
+      database.collection('users').countDocuments({ isVerified: true }),
+      database.collection('users').countDocuments({ 'kyc.status': 'submitted' }),
+      database.collection('projects').countDocuments(),
+      database.collection('projects').countDocuments({ status: 'pending_review' }),
+      database.collection('projects').countDocuments({ status: 'active' }),
+      database.collection('investments').countDocuments(),
+      database.collection('investments').aggregate([
+        { $group: { _id: null, totalAmount: { $sum: '$amount' } } }
+      ]).toArray(),
+      database.collection('withdrawals').countDocuments({ status: 'pending' }),
+      database.collection('withdrawals').aggregate([
+        { $match: { status: 'pending' } },
+        { $group: { _id: null, totalAmount: { $sum: '$amount' } } }
+      ]).toArray()
+    ]);
     
-    var totalProjects = await database.collection('projects').countDocuments();
-    var pendingProjects = await database.collection('projects').countDocuments({ status: 'pending_review' });
-    var activeProjects = await database.collection('projects').countDocuments({ status: 'active' });
-    
-    var totalInvestments = await database.collection('investments').countDocuments();
-    var investmentStats = await database.collection('investments').aggregate([
-      { $group: { _id: null, totalAmount: { $sum: '$amount' } } }
-    ]).toArray();
-    
-    var pendingWithdrawals = await database.collection('withdrawals').countDocuments({ status: 'pending' });
-    var withdrawalStats = await database.collection('withdrawals').aggregate([
-      { $match: { status: 'pending' } },
-      { $group: { _id: null, totalAmount: { $sum: '$amount' } } }
-    ]).toArray();
+    var totalUsers = results[0];
+    var verifiedUsers = results[1];
+    var pendingKyc = results[2];
+    var totalProjects = results[3];
+    var pendingProjects = results[4];
+    var activeProjects = results[5];
+    var totalInvestments = results[6];
+    var investmentStats = results[7];
+    var pendingWithdrawals = results[8];
+    var withdrawalStats = results[9];
     
     res.json({
       users: {
@@ -182,7 +198,8 @@ router.get('/users', async function(req, res) {
     
     // Add search functionality
     if (search) {
-      var searchRegex = { $regex: search, $options: 'i' };
+      var escapedSearch = escapeRegex(search);
+      var searchRegex = { $regex: escapedSearch, $options: 'i' };
       filter.$or = [
         { name: searchRegex },
         { email: searchRegex },
@@ -205,7 +222,7 @@ router.get('/users', async function(req, res) {
     var database = await db.getDb();
     var users = await database.collection('users')
       .find(filter)
-      .project({ password: 0 }) // Exclude password
+      .project({ password: 0, 'kyc.idDocument': 0, 'kyc.selfie': 0 }) // Exclude password and large KYC base64 images
       .sort(sortOptions)
       .skip(skip)
       .limit(limit)
@@ -386,7 +403,8 @@ router.get('/projects', async function(req, res) {
     
     // Add search functionality
     if (search) {
-      var searchRegex = { $regex: search, $options: 'i' };
+      var escapedSearch = escapeRegex(search);
+      var searchRegex = { $regex: escapedSearch, $options: 'i' };
       filter.$or = [
         { name: searchRegex },
         { description: searchRegex },
@@ -791,20 +809,24 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
     // Distribute investor profit pool proportionally
     var distributions = [];
     
+    // Build distributions array and wallet updates in parallel (was sequential per-investor)
+    var walletUpdates = [];
     for (var i = 0; i < investments.length; i++) {
       var inv = investments[i];
       var sharePercent = inv.amount / totalInvested;
       var profitShare = investorProfitPool * sharePercent; // Share of INVESTOR pool, not gross
       
-      // Add to user wallet
-      await database.collection('users').updateOne(
-        { _id: new ObjectId(inv.userId) },
-        {
-          $inc: {
-            walletBalance: profitShare,
-            totalEarnings: profitShare
+      // Queue wallet update for parallel execution
+      walletUpdates.push(
+        database.collection('users').updateOne(
+          { _id: new ObjectId(inv.userId) },
+          {
+            $inc: {
+              walletBalance: profitShare,
+              totalEarnings: profitShare
+            }
           }
-        }
+        )
       );
       
       // Record distribution
@@ -823,8 +845,11 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
       distributions.push(distribution);
     }
     
-    // Save all distributions
-    await database.collection('profit_distributions').insertMany(distributions);
+    // Execute all wallet credits + distribution insert in parallel
+    await Promise.all([
+      Promise.all(walletUpdates),
+      database.collection('profit_distributions').insertMany(distributions)
+    ]);
     
     // Update project total distributed (track investor portion actually paid out)
     await database.collection('projects').updateOne(
@@ -1402,6 +1427,25 @@ router.delete('/users/:id', async function(req, res) {
       return res.status(403).json({ error: 'Cannot delete admin users' });
     }
     
+    // SAFEGUARD: Block deletion if user has active investments with real money
+    var activeInvestments = await database.collection('investments').find({
+      $or: [{ userId: req.params.id }, { userId: new ObjectId(req.params.id) }],
+      status: 'active'
+    }).toArray();
+    
+    var totalActiveAmount = activeInvestments.reduce(function(sum, inv) { return sum + (inv.amount || 0); }, 0);
+    
+    if (activeInvestments.length > 0 && !req.query.confirmOrphan) {
+      return res.status(409).json({ 
+        error: 'User has ' + activeInvestments.length + ' active investment(s) worth GH₵' + totalActiveAmount.toFixed(2) + '. '
+          + 'These investments will be orphaned (money becomes unrecoverable by the user). '
+          + 'Add ?confirmOrphan=true to confirm, or deactivate the user instead.',
+        activeInvestments: activeInvestments.length,
+        totalActiveAmount: totalActiveAmount,
+        suggestion: 'Consider using POST /admin/users/:id/status to suspend the user instead.'
+      });
+    }
+    
     var userId = req.params.id;
     var investmentsHandled = 0;
     var affectedProjects = [];
@@ -1749,8 +1793,12 @@ router.post('/wallet/credit', async function(req, res) {
   try {
     var { userId, email, amount, reason } = req.body;
     
-    if (!amount || amount <= 0) {
+    if (!amount || amount <= 0 || !isFinite(amount)) {
       return res.status(400).json({ error: 'Valid amount required' });
+    }
+    
+    if (amount > 1000000) {
+      return res.status(400).json({ error: 'Maximum credit is GH₵1,000,000 per operation' });
     }
     
     var database = await db.getDb();
@@ -2022,32 +2070,46 @@ router.get('/referrals', async function(req, res) {
     var limit = parseInt(req.query.limit) || 100;
     var database = await db.getDb();
     
-    var referrals = await database.collection('referrals')
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .toArray();
-    
-    // Enrich with user info
-    var enrichedReferrals = [];
-    for (var ref of referrals) {
-      var referrer = await database.collection('users').findOne(
-        { $or: [{ _id: toObjectId(ref.referrerId) }, { id: ref.referrerId }] },
-        { projection: { email: 1, name: 1 } }
-      );
-      var referred = await database.collection('users').findOne(
-        { $or: [{ _id: toObjectId(ref.referredId) }, { id: ref.referredId }] },
-        { projection: { email: 1, name: 1 } }
-      );
-      
-      enrichedReferrals.push({
-        ...ref,
-        referrerEmail: referrer ? referrer.email : 'Unknown',
-        referrerName: referrer ? referrer.name : null,
-        referredEmail: referred ? referred.email : 'Unknown',
-        referredName: referred ? referred.name : null
-      });
-    }
+    // Use $lookup to join user data in one query instead of N+1 queries per referral
+    var enrichedReferrals = await database.collection('referrals').aggregate([
+      { $sort: { createdAt: -1 } },
+      { $limit: limit },
+      {
+        $addFields: {
+          referrerObjId: { $cond: { if: { $regexMatch: { input: { $toString: '$referrerId' }, regex: /^[0-9a-fA-F]{24}$/ } }, then: { $toObjectId: '$referrerId' }, else: null } },
+          referredObjId: { $cond: { if: { $regexMatch: { input: { $toString: '$referredId' }, regex: /^[0-9a-fA-F]{24}$/ } }, then: { $toObjectId: '$referredId' }, else: null } }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'referrerObjId',
+          foreignField: '_id',
+          pipeline: [{ $project: { email: 1, name: 1 } }],
+          as: 'referrerUser'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'referredObjId',
+          foreignField: '_id',
+          pipeline: [{ $project: { email: 1, name: 1 } }],
+          as: 'referredUser'
+        }
+      },
+      { $unwind: { path: '$referrerUser', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$referredUser', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          referrerEmail: { $ifNull: ['$referrerUser.email', 'Unknown'] },
+          referrerName: { $ifNull: ['$referrerUser.name', null] },
+          referredEmail: { $ifNull: ['$referredUser.email', 'Unknown'] },
+          referredName: { $ifNull: ['$referredUser.name', null] }
+        }
+      },
+      { $project: { referrerUser: 0, referredUser: 0, referrerObjId: 0, referredObjId: 0 } }
+    ]).toArray();
     
     res.json({ referrals: enrichedReferrals });
   } catch (err) {

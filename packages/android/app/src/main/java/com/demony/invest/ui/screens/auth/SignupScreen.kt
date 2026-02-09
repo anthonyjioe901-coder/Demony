@@ -46,7 +46,6 @@ fun SignupScreen(
     var showTermsDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showVerificationDialog by remember { mutableStateOf(false) }
-    var verificationCode by remember { mutableStateOf("") }
     
     val isLoading by authViewModel.isLoading.collectAsState()
     val error by authViewModel.error.collectAsState()
@@ -59,8 +58,12 @@ fun SignupScreen(
     }
     
     val passwordsMatch = password == confirmPassword
+    val phoneClean = phone.replace("[\\s\\-]".toRegex(), "")
+    val isPhoneValid = phoneClean.length >= 10
     val isFormValid = name.isNotBlank() && 
                       email.isNotBlank() && 
+                      phone.isNotBlank() &&
+                      isPhoneValid &&
                       password.length >= 6 && 
                       passwordsMatch &&
                       (selectedRole != "business_owner" || 
@@ -86,78 +89,83 @@ fun SignupScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Verify Your Email", fontWeight = FontWeight.Bold)
-                    IconButton(onClick = { 
-                        showVerificationDialog = false
-                        onSignupSuccess()
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
+                    Text("Welcome to Demony!", fontWeight = FontWeight.Bold)
                 }
             },
             text = {
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        Icons.Default.MarkEmailRead,
+                        Icons.Default.CheckCircle,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(72.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Verification email sent!",
+                        text = "Account Created Successfully!",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "We've sent a verification code to:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = email,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = verificationCode,
-                        onValueChange = { if (it.length <= 6) verificationCode = it },
-                        label = { Text("Verification Code") },
-                        placeholder = { Text("Enter 6-digit code") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        ),
                         modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { /* TODO: Resend code */ }) {
-                        Text("Didn't receive the code? Resend")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.MarkEmailRead,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "A verification email has been sent to:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = email,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Please check your inbox and click the verification link to activate your account fully.",
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "You can start using the app now. Some features may be limited until your email is verified.",
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        // TODO: Verify code with API
                         showVerificationDialog = false
                         onSignupSuccess()
                     },
-                    enabled = verificationCode.length == 6
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Verify")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showVerificationDialog = false
-                    onSignupSuccess()
-                }) {
-                    Text("Skip for now")
+                    Text("Get Started")
                 }
             }
         )
@@ -289,11 +297,12 @@ fun SignupScreen(
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // Phone field
+        // Phone field - Required by backend
         OutlinedTextField(
             value = phone,
             onValueChange = { phone = it },
-            label = { Text("Phone Number (Optional)") },
+            label = { Text("Phone Number") },
+            placeholder = { Text("e.g. +233 24 123 4567") },
             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Phone,
@@ -304,7 +313,11 @@ fun SignupScreen(
             ),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
+            enabled = !isLoading,
+            isError = phone.isNotEmpty() && phone.replace("[\\s\\-]".toRegex(), "").length < 10,
+            supportingText = if (phone.isNotEmpty() && phone.replace("[\\s\\-]".toRegex(), "").length < 10) {
+                { Text("Enter a valid phone number (e.g. +233241234567)") }
+            } else null
         )
         
         // Business fields (only for business owners)
@@ -427,7 +440,7 @@ fun SignupScreen(
                     email = email,
                     password = password,
                     role = selectedRole,
-                    phone = phone.takeIf { it.isNotBlank() },
+                    phone = phone.trim(),
                     businessName = businessName.takeIf { it.isNotBlank() },
                     businessRegistration = businessRegistration.takeIf { it.isNotBlank() },
                     referralCode = referralCode.takeIf { it.isNotBlank() },

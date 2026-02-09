@@ -72,6 +72,21 @@ class DemonyRepository @Inject constructor(
         }
     }
 
+    suspend fun forgotPassword(email: String): Result<MessageResponse> = safeApiCall {
+        apiService.forgotPassword(mapOf("email" to email))
+    }
+
+    suspend fun changePassword(currentPassword: String, newPassword: String): Result<MessageResponse> = safeApiCall {
+        apiService.changePassword(mapOf(
+            "currentPassword" to currentPassword,
+            "newPassword" to newPassword
+        ))
+    }
+
+    suspend fun updatePhone(phone: String): Result<MessageResponse> = safeApiCall {
+        apiService.updatePhone(mapOf("phone" to phone))
+    }
+
     fun logout() {
         tokenManager.clearAll()
     }
@@ -211,6 +226,16 @@ class DemonyRepository @Inject constructor(
 
     suspend fun uploadImage(imageBase64: String, filename: String): Result<Map<String, String>> = safeApiCall {
         apiService.uploadImage(mapOf("image" to imageBase64, "filename" to filename))
+    }
+
+    // ==================== KYC ====================
+    
+    suspend fun submitKyc(idDocumentUrl: String, selfieUrl: String, documentType: String = "ghana_card"): Result<MessageResponse> = safeApiCall {
+        apiService.submitKyc(mapOf(
+            "idDocument" to idDocumentUrl,
+            "selfie" to selfieUrl,
+            "documentType" to documentType
+        ))
     }
 
     // ==================== SETTINGS ====================

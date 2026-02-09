@@ -11,6 +11,7 @@ import com.demony.invest.ui.screens.auth.LoginScreen
 import com.demony.invest.ui.screens.auth.SignupScreen
 import com.demony.invest.ui.screens.home.HomeScreen
 import com.demony.invest.ui.screens.investments.InvestmentsScreen
+import com.demony.invest.ui.screens.onboarding.OnboardingScreen
 import com.demony.invest.ui.screens.portfolio.PortfolioScreen
 import com.demony.invest.ui.screens.profile.ProfileScreen
 import com.demony.invest.ui.screens.projects.ProjectDetailScreen
@@ -25,6 +26,7 @@ import com.demony.invest.ui.viewmodels.AuthViewModel
  * Navigation Routes
  */
 sealed class Screen(val route: String) {
+    object Onboarding : Screen("onboarding")
     object Login : Screen("login")
     object Signup : Screen("signup")
     object Home : Screen("home")
@@ -48,14 +50,35 @@ sealed class Screen(val route: String) {
 fun DemonyNavHost(
     navController: NavHostController,
     isAuthenticated: Boolean,
-    authViewModel: AuthViewModel
+    authViewModel: AuthViewModel,
+    isFirstLaunch: Boolean = false
 ) {
-    val startDestination = if (isAuthenticated) Screen.Home.route else Screen.Login.route
+    val startDestination = when {
+        isFirstLaunch && !isAuthenticated -> Screen.Onboarding.route
+        isAuthenticated -> Screen.Home.route
+        else -> Screen.Login.route
+    }
     
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        // Onboarding Screen
+        composable(Screen.Onboarding.route) {
+            OnboardingScreen(
+                onGetStarted = {
+                    navController.navigate(Screen.Signup.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                },
+                onSkip = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        
         // Auth Screens
         composable(Screen.Login.route) {
             LoginScreen(

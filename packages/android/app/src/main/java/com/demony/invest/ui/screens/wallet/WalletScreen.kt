@@ -7,7 +7,9 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -49,6 +51,14 @@ fun WalletScreen(
             currentPaymentUrl = url
             showPaystackWebView = true
             viewModel.clearDepositUrl()
+        }
+    }
+    
+    // Close withdraw dialog when withdrawal succeeds
+    LaunchedEffect(successMessage) {
+        if (successMessage != null && showWithdrawDialog) {
+            showWithdrawDialog = false
+            viewModel.loadWalletData()
         }
     }
     
@@ -342,26 +352,14 @@ fun WalletScreen(
             )
         }
         
-        // Withdraw Dialog (simplified)
+        // Withdraw Dialog - FULL IMPLEMENTATION
         if (showWithdrawDialog) {
-            AlertDialog(
-                onDismissRequest = { showWithdrawDialog = false },
-                title = { Text("Withdraw Funds") },
-                text = {
-                    Text(
-                        "Withdrawal feature allows you to transfer funds to your bank account. " +
-                        "You'll need to provide your bank details and the amount to withdraw."
-                    )
-                },
-                confirmButton = {
-                    Button(onClick = { showWithdrawDialog = false }) {
-                        Text("Got it")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showWithdrawDialog = false }) {
-                        Text("Cancel")
-                    }
+            WithdrawDialog(
+                viewModel = viewModel,
+                onDismiss = { showWithdrawDialog = false },
+                onSuccess = {
+                    showWithdrawDialog = false
+                    viewModel.loadWalletData()
                 }
             )
         }
@@ -555,4 +553,336 @@ fun PaystackWebViewScreen(
             }
         }
     }
+}
+
+/**
+ * Withdraw Dialog - Full implementation with Bank and Mobile Money support
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WithdrawDialog(
+    viewModel: WalletViewModel,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    var selectedMethod by remember { mutableStateOf("bank") }
+    var withdrawAmount by remember { mutableStateOf("") }
+    
+    // Bank fields
+    var selectedBankCode by remember { mutableStateOf("") }
+    var selectedBankName by remember { mutableStateOf("") }
+    var accountNumber by remember { mutableStateOf("") }
+    var accountName by remember { mutableStateOf("") }
+    var isVerifyingAccount by remember { mutableStateOf(false) }
+    var accountVerified by remember { mutableStateOf(false) }
+    
+    // MoMo fields
+    var selectedMomoNetwork by remember { mutableStateOf("") }
+    var momoNumber by remember { mutableStateOf("") }
+    
+    var isSubmitting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    
+    val banks by viewModel.banks.collectAsState()
+    var bankExpanded by remember { mutableStateOf(false) }
+    var momoExpanded by remember { mutableStateOf(false) }
+    
+    val momoNetworks = listOf(
+        "MTN" to "MTN MoMo",
+        "Vodafone" to "Vodafone Cash",
+        "AirtelTigo" to "AirtelTigo Money"
+    )
+    
+    // Load banks when dialog opens
+    LaunchedEffect(Unit) {
+        viewModel.loadBanks()
+    }
+    
+    // Verify account when both bank and account number are filled
+    LaunchedEffect(selectedBankCode, accountNumber) {
+        if (selectedMethod == "bank" && selectedBankCode.isNotEmpty() && accountNumber.length >= 10) {
+            isVerifyingAccount = true
+            accountVerified = false
+            accountName = "Verifying..."
+            viewModel.verifyBankAccount(accountNumber, selectedBankCode) { name ->
+                isVerifyingAccount = false
+                if (name != null) {
+                    accountName = name
+                    accountVerified = true
+                } else {
+                    accountName = ""
+                    accountVerified = false
+                }
+            }
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Text("Withdraw Funds", fontWeight = FontWeight.Bold) 
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Error message
+                errorMessage?.let { error ->
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.width(8.dp))
+                            Text(error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                
+                // Method selection
+                Text("Payout Method", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedMethod == "bank",
+                        onClick = { selectedMethod = "bank" },
+                        label = { Text("Bank") },
+                        leadingIcon = if (selectedMethod == "bank") {
+                            { Icon(Icons.Default.Check, null, Modifier.size(18.dp)) }
+                        } else null,
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = selectedMethod == "momo",
+                        onClick = { selectedMethod = "momo" },
+                        label = { Text("Mobile Money") },
+                        leadingIcon = if (selectedMethod == "momo") {
+                            { Icon(Icons.Default.Check, null, Modifier.size(18.dp)) }
+                        } else null,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                // Amount field
+                OutlinedTextField(
+                    value = withdrawAmount,
+                    onValueChange = { withdrawAmount = it },
+                    label = { Text("Amount (GH₵)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { Text("Minimum withdrawal: GH₵ 20") }
+                )
+                
+                if (selectedMethod == "bank") {
+                    // Bank selection
+                    ExposedDropdownMenuBox(
+                        expanded = bankExpanded,
+                        onExpandedChange = { bankExpanded = !bankExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedBankName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Select Bank") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = bankExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = bankExpanded,
+                            onDismissRequest = { bankExpanded = false }
+                        ) {
+                            banks.forEach { bank ->
+                                DropdownMenuItem(
+                                    text = { Text(bank.name) },
+                                    onClick = {
+                                        selectedBankCode = bank.code
+                                        selectedBankName = bank.name
+                                        bankExpanded = false
+                                        accountVerified = false
+                                        accountName = ""
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Account number
+                    OutlinedTextField(
+                        value = accountNumber,
+                        onValueChange = { 
+                            accountNumber = it
+                            accountVerified = false
+                            accountName = ""
+                        },
+                        label = { Text("Account Number") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    // Account name (auto-verified or manual)
+                    OutlinedTextField(
+                        value = accountName,
+                        onValueChange = { accountName = it },
+                        label = { Text("Account Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isVerifyingAccount && !accountVerified,
+                        trailingIcon = {
+                            if (isVerifyingAccount) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else if (accountVerified) {
+                                Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.secondary)
+                            }
+                        },
+                        supportingText = {
+                            if (accountVerified) {
+                                Text("✓ Account verified", color = MaterialTheme.colorScheme.secondary)
+                            }
+                        }
+                    )
+                } else {
+                    // MoMo Network selection
+                    ExposedDropdownMenuBox(
+                        expanded = momoExpanded,
+                        onExpandedChange = { momoExpanded = !momoExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = momoNetworks.find { it.first == selectedMomoNetwork }?.second ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("MoMo Network") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = momoExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = momoExpanded,
+                            onDismissRequest = { momoExpanded = false }
+                        ) {
+                            momoNetworks.forEach { (code, name) ->
+                                DropdownMenuItem(
+                                    text = { Text(name) },
+                                    onClick = {
+                                        selectedMomoNetwork = code
+                                        momoExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    
+                    // MoMo number
+                    OutlinedTextField(
+                        value = momoNumber,
+                        onValueChange = { momoNumber = it },
+                        label = { Text("MoMo Number") },
+                        placeholder = { Text("e.g. 0244123456") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Text(
+                        text = "Ensure this number is registered for mobile money.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // Processing time info
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (selectedMethod == "bank") 
+                                "Bank transfers are processed within 1-3 business days"
+                            else 
+                                "MoMo transfers are usually instant",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            val amount = withdrawAmount.toDoubleOrNull() ?: 0.0
+            val isValid = amount >= 20 && (
+                (selectedMethod == "bank" && selectedBankCode.isNotEmpty() && accountNumber.isNotEmpty() && accountName.isNotEmpty()) ||
+                (selectedMethod == "momo" && selectedMomoNetwork.isNotEmpty() && momoNumber.length >= 10)
+            )
+            
+            Button(
+                onClick = {
+                    isSubmitting = true
+                    errorMessage = null
+                    
+                    if (selectedMethod == "bank") {
+                        viewModel.requestWithdrawal(
+                            amount = amount,
+                            bankCode = selectedBankCode,
+                            accountNumber = accountNumber,
+                            accountName = accountName
+                        )
+                    } else {
+                        // For MoMo, use a different approach - map to the bank codes Paystack uses
+                        val momoBankCode = when (selectedMomoNetwork) {
+                            "MTN" -> "MTN"
+                            "Vodafone" -> "VOD"
+                            "AirtelTigo" -> "ATL"
+                            else -> selectedMomoNetwork
+                        }
+                        viewModel.requestWithdrawal(
+                            amount = amount,
+                            bankCode = momoBankCode,
+                            accountNumber = momoNumber.replace(" ", ""),
+                            accountName = "$selectedMomoNetwork MoMo"
+                        )
+                    }
+                    // Don't call onSuccess() immediately - let the ViewModel handle it
+                    // The dialog will close when successMessage updates
+                },
+                enabled = isValid && !isSubmitting
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Submit Withdrawal")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

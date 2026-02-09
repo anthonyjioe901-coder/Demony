@@ -95,7 +95,7 @@ fun PortfolioScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "%.1f%% return".format(returnPct),
+                                    text = "%.1f%% return".format(returnPct ?: 0.0),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
@@ -197,7 +197,7 @@ fun PortfolioScreen(
                                                 style = MaterialTheme.typography.bodyMedium
                                             )
                                             Text(
-                                                text = "GH₵ %.2f (${allocation.percent}%)".format(allocation.value),
+                                                text = "GH₵ %.2f (%d%%)".format(allocation.value, allocation.percent),
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 fontWeight = FontWeight.SemiBold
                                             )
@@ -277,7 +277,7 @@ fun PortfolioScreen(
                                                 color = MaterialTheme.colorScheme.primary
                                             )
                                             Text(
-                                                text = "+%.1f%%".format(investment.returnPercentage),
+                                                text = "+%.1f%%".format(investment.returnPercentage ?: 0.0),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.secondary
                                             )

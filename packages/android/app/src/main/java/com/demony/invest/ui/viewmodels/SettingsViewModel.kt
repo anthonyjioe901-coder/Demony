@@ -120,9 +120,14 @@ class SettingsViewModel @Inject constructor(
 
     fun changePassword(currentPassword: String, newPassword: String) {
         viewModelScope.launch {
-            // TODO: Call API to change password
             _showPasswordDialog.value = false
-            _showToast.value = "Password change feature coming soon"
+            repository.changePassword(currentPassword, newPassword)
+                .onSuccess {
+                    _showToast.value = "Password changed successfully!"
+                }
+                .onFailure { e ->
+                    _showToast.value = e.message ?: "Failed to change password"
+                }
         }
     }
 

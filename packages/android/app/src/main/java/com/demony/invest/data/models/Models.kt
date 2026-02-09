@@ -326,13 +326,18 @@ data class SupportTicket(
     val category: String,
     val message: String,
     val status: String = "open",
+    val priority: String = "normal",
+    val email: String? = null,
     @SerializedName("createdAt")
     val createdAt: String? = null
 )
 
 data class TicketResponse(
-    val ticket: SupportTicket,
-    val message: String? = null
+    val ticket: SupportTicket? = null,
+    @SerializedName("ticketId")
+    val ticketId: String? = null,
+    val message: String? = null,
+    val success: Boolean = true
 )
 
 /**

@@ -133,9 +133,15 @@ fun SettingsScreen(
                         SettingsActionRow(
                             icon = Icons.Default.Security,
                             title = "Two-Factor Authentication",
-                            subtitle = "Add extra security to your account",
+                            subtitle = "Coming soon - Extra security for your account",
                             onClick = {
-                                Toast.makeText(context, "2FA coming soon", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Two-Factor Authentication will be available in the next update!", Toast.LENGTH_LONG).show()
+                            },
+                            trailing = {
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text("Soon", style = MaterialTheme.typography.labelSmall) }
+                                )
                             }
                         )
                     }
@@ -398,7 +404,8 @@ private fun SettingsActionRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    isDestructive: Boolean = false
+    isDestructive: Boolean = false,
+    trailing: @Composable (() -> Unit)? = null
 ) {
     Surface(
         onClick = onClick,
@@ -428,6 +435,10 @@ private fun SettingsActionRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            if (trailing != null) {
+                trailing()
+                Spacer(modifier = Modifier.width(8.dp))
             }
             Icon(
                 Icons.Default.ChevronRight,

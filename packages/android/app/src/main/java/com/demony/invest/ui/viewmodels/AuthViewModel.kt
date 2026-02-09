@@ -131,4 +131,92 @@ class AuthViewModel @Inject constructor(
     fun toggleDarkMode() {
         setDarkMode(!_isDarkMode.value)
     }
+
+    fun forgotPassword(email: String, onResult: (success: Boolean, error: String?) -> Unit) {
+        viewModelScope.launch {
+            repository.forgotPassword(email)
+                .onSuccess {
+                    onResult(true, null)
+                }
+                .onFailure { exception ->
+                    onResult(false, exception.message ?: "Failed to send reset email")
+                }
+        }
+    }
+    
+    fun submitKyc(
+        idDocumentUrl: String, 
+        selfieUrl: String,
+        documentType: String = "ghana_card",
+        onResult: (success: Boolean, error: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.submitKyc(idDocumentUrl, selfieUrl, documentType)
+                .onSuccess {
+                    // Refresh user to get updated KYC status
+                    refreshUser()
+                    onResult(true, null)
+                }
+                .onFailure { exception ->
+                    onResult(false, exception.message ?: "Failed to submit KYC documents")
+                }
+            _isLoading.value = false
+        }
+    }
+    
+    fun uploadAndSubmitKyc(
+        idDocumentBase64: String,
+        selfieBase64: String,
+        documentType: String = "ghana_card",
+        onResult: (success: Boolean, error: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            
+            // Upload ID document
+            val idUploadResult = repository.uploadImage(idDocumentBase64, "kyc_id_document.jpg")
+            val idUrl = idUploadResult.getOrNull()?.get("url")
+            
+            if (idUrl == null) {
+                onResult(false, "Failed to upload ID document")
+                _isLoading.value = false
+                return@launch
+            }
+            
+            // Upload selfie
+            val selfieUploadResult = repository.uploadImage(selfieBase64, "kyc_selfie.jpg")
+            val selfieUrl = selfieUploadResult.getOrNull()?.get("url")
+            
+            if (selfieUrl == null) {
+                onResult(false, "Failed to upload selfie")
+                _isLoading.value = false
+                return@launch
+            }
+            
+            // Submit KYC
+            repository.submitKyc(idUrl, selfieUrl, documentType)
+                .onSuccess {
+                    refreshUser()
+                    onResult(true, null)
+                }
+                .onFailure { exception ->
+                    onResult(false, exception.message ?: "Failed to submit KYC documents")
+                }
+            
+            _isLoading.value = false
+        }
+    }
+    
+    fun updatePhone(phone: String, onResult: (success: Boolean, error: String?) -> Unit) {
+        viewModelScope.launch {
+            repository.updatePhone(phone)
+                .onSuccess {
+                    onResult(true, null)
+                }
+                .onFailure { exception ->
+                    onResult(false, exception.message ?: "Failed to update phone number")
+                }
+        }
+    }
 }

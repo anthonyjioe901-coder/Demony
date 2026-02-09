@@ -1,5 +1,7 @@
 package com.demony.invest.ui.screens.support
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,20 +12,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.demony.invest.ui.components.BottomNavigationBar
-
-data class SupportTicket(
-    val id: String,
-    val subject: String,
-    val message: String,
-    val status: String,
-    val createdAt: String,
-    val category: String
-)
+import com.demony.invest.ui.viewmodels.SupportViewModel
 
 data class FAQ(
     val question: String,
@@ -33,17 +29,31 @@ data class FAQ(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportScreen(
-    navController: NavController
+    navController: NavController,
+    viewModel: SupportViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var showNewTicketDialog by remember { mutableStateOf(false) }
     var ticketSubject by remember { mutableStateOf("") }
     var ticketMessage by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("General") }
     
-    // Sample data - in real app, this would come from ViewModel
-    val tickets = remember {
-        listOf<SupportTicket>()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val successMessage by viewModel.successMessage.collectAsState()
+    val ticketSubmitted by viewModel.ticketSubmitted.collectAsState()
+    val myTickets by viewModel.myTickets.collectAsState()
+    
+    // Handle successful ticket submission
+    LaunchedEffect(ticketSubmitted) {
+        if (ticketSubmitted) {
+            showNewTicketDialog = false
+            ticketSubject = ""
+            ticketMessage = ""
+            selectedCategory = "General"
+            viewModel.clearTicketSubmitted()
+        }
     }
     
     val faqs = remember {
@@ -181,7 +191,13 @@ fun SupportScreen(
                             ) {
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Open email */ }
+                                    onClick = { 
+                                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                            data = Uri.parse("mailto:support@demony.com")
+                                            putExtra(Intent.EXTRA_SUBJECT, "Support Request")
+                                        }
+                                        context.startActivity(intent)
+                                    }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(16.dp),
@@ -202,7 +218,12 @@ fun SupportScreen(
                                 
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Open phone */ }
+                                    onClick = { 
+                                        val intent = Intent(Intent.ACTION_DIAL).apply {
+                                            data = Uri.parse("tel:+233249251305")
+                                        }
+                                        context.startActivity(intent)
+                                    }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(16.dp),
@@ -223,7 +244,13 @@ fun SupportScreen(
                                 
                                 Card(
                                     modifier = Modifier.weight(1f),
-                                    onClick = { /* Open chat */ }
+                                    onClick = { 
+                                        // Open WhatsApp for live chat
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            data = Uri.parse("https://wa.me/233249251305")
+                                        }
+                                        context.startActivity(intent)
+                                    }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(16.dp),
@@ -246,8 +273,8 @@ fun SupportScreen(
                     }
                 }
                 1 -> {
-                    // My Tickets
-                    if (tickets.isEmpty()) {
+                    // My Tickets - Show submitted tickets
+                    if (myTickets.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -284,11 +311,82 @@ fun SupportScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(tickets) { ticket ->
-                                TicketItem(ticket = ticket)
+                            items(myTickets) { ticket ->
+                                Card(modifier = Modifier.fillMaxWidth()) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = ticket.subject,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Surface(
+                                                color = when (ticket.status) {
+                                                    "open" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                                                    "resolved", "closed" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                                },
+                                                shape = MaterialTheme.shapes.small
+                                            ) {
+                                                Text(
+                                                    text = ticket.status.replaceFirstChar { it.uppercase() },
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    color = when (ticket.status) {
+                                                        "open" -> MaterialTheme.colorScheme.tertiary
+                                                        "resolved", "closed" -> MaterialTheme.colorScheme.secondary
+                                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = ticket.message,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = ticket.category,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = ticket.id?.let { "ID: $it" } ?: "",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
+                }
+            }
+            
+            // Success message snackbar
+            if (successMessage != null) {
+                Snackbar(
+                    modifier = Modifier.padding(16.dp),
+                    action = {
+                        TextButton(onClick = { viewModel.clearSuccessMessage() }) {
+                            Text("OK")
+                        }
+                    }
+                ) {
+                    Text(successMessage ?: "")
                 }
             }
         }
@@ -296,22 +394,44 @@ fun SupportScreen(
         // New Ticket Dialog
         if (showNewTicketDialog) {
             AlertDialog(
-                onDismissRequest = { showNewTicketDialog = false },
+                onDismissRequest = { 
+                    if (!isLoading) {
+                        showNewTicketDialog = false
+                        viewModel.clearError()
+                    }
+                },
                 title = { Text("Create Support Ticket") },
                 text = {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Error message
+                        if (error != null) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = error ?: "",
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                        
                         // Category
                         var expanded by remember { mutableStateOf(false) }
                         ExposedDropdownMenuBox(
                             expanded = expanded,
-                            onExpandedChange = { expanded = !expanded }
+                            onExpandedChange = { if (!isLoading) expanded = !expanded }
                         ) {
                             OutlinedTextField(
                                 value = selectedCategory,
                                 onValueChange = {},
                                 readOnly = true,
+                                enabled = !isLoading,
                                 label = { Text("Category") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                                 modifier = Modifier
@@ -338,6 +458,7 @@ fun SupportScreen(
                             value = ticketSubject,
                             onValueChange = { ticketSubject = it },
                             label = { Text("Subject") },
+                            enabled = !isLoading,
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                         )
@@ -346,6 +467,7 @@ fun SupportScreen(
                             value = ticketMessage,
                             onValueChange = { ticketMessage = it },
                             label = { Text("Message") },
+                            enabled = !isLoading,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp),
@@ -356,18 +478,33 @@ fun SupportScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            // Submit ticket
-                            showNewTicketDialog = false
-                            ticketSubject = ""
-                            ticketMessage = ""
+                            viewModel.submitTicket(
+                                subject = ticketSubject,
+                                message = ticketMessage,
+                                category = selectedCategory
+                            )
                         },
-                        enabled = ticketSubject.isNotBlank() && ticketMessage.isNotBlank()
+                        enabled = ticketSubject.isNotBlank() && ticketMessage.isNotBlank() && !isLoading
                     ) {
-                        Text("Submit")
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(if (isLoading) "Submitting..." else "Submit")
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showNewTicketDialog = false }) {
+                    TextButton(
+                        onClick = { 
+                            showNewTicketDialog = false
+                            viewModel.clearError()
+                        },
+                        enabled = !isLoading
+                    ) {
                         Text("Cancel")
                     }
                 }
@@ -413,65 +550,6 @@ private fun FAQItem(faq: FAQ) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun TicketItem(ticket: SupportTicket) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = ticket.subject,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = ticket.category,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                Surface(
-                    color = when (ticket.status) {
-                        "open" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                        "pending" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
-                        "resolved" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = ticket.status.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = ticket.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Created: ${ticket.createdAt}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
         }
     }
 }

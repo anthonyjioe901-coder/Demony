@@ -34,6 +34,96 @@ fun HomeScreen(
     val featuredProjects by projectsViewModel.featuredProjects.collectAsState()
     val isLoading by projectsViewModel.isLoading.collectAsState()
     val walletBalance by walletViewModel.walletBalance.collectAsState()
+    val totalProjects by projectsViewModel.totalProjects.collectAsState()
+    
+    var showNotificationsDialog by remember { mutableStateOf(false) }
+    
+    // Sample notifications - in a real app these would come from API
+    val notifications = remember {
+        listOf(
+            Triple("Investment Matured", "Your investment in Kasoa Farm has matured. Profit of GH₵ 250 has been added to your wallet.", "2 hours ago"),
+            Triple("New Project Available", "Check out 'Accra Tech Hub' - a new high-yield investment opportunity!", "5 hours ago"),
+            Triple("Deposit Successful", "Your deposit of GH₵ 500 has been confirmed.", "1 day ago"),
+            Triple("KYC Approved", "Your KYC verification has been approved. You now have full access.", "3 days ago")
+        )
+    }
+    
+    // Notifications Dialog
+    if (showNotificationsDialog) {
+        AlertDialog(
+            onDismissRequest = { showNotificationsDialog = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Notifications", fontWeight = FontWeight.Bold)
+                    IconButton(onClick = { showNotificationsDialog = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+            },
+            text = {
+                if (notifications.isEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.NotificationsOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("No notifications yet")
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        notifications.forEach { (title, message, time) ->
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = time,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showNotificationsDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -53,8 +143,16 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Notifications */ }) {
-                        Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+                    BadgedBox(
+                        badge = {
+                            if (notifications.isNotEmpty()) {
+                                Badge { Text("${notifications.size}") }
+                            }
+                        }
+                    ) {
+                        IconButton(onClick = { showNotificationsDialog = true }) {
+                            Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+                        }
                     }
                 }
             )
@@ -158,7 +256,9 @@ fun HomeScreen(
                 }
             }
             
-            // Stats Section
+            // Stats Section - Platform marketing statistics
+            // Note: "Invested" and "Investors" are promotional figures
+            // "Projects" and "Avg. Returns" could be made dynamic with a public stats API
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -167,14 +267,14 @@ fun HomeScreen(
                     StatCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.AttachMoney,
-                        value = "GH₵2.5M+",
+                        value = "GH₵500K+",
                         label = "Invested",
                         color = MaterialTheme.colorScheme.secondary
                     )
                     StatCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.People,
-                        value = "5,000+",
+                        value = "1,000+",
                         label = "Investors",
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -189,14 +289,14 @@ fun HomeScreen(
                     StatCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Business,
-                        value = "150+",
+                        value = if (totalProjects > 0) "$totalProjects" else "10+",
                         label = "Projects",
                         color = MaterialTheme.colorScheme.secondary
                     )
                     StatCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.TrendingUp,
-                        value = "12%",
+                        value = "8-15%",
                         label = "Avg. Returns",
                         color = MaterialTheme.colorScheme.primary
                     )

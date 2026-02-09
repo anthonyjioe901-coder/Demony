@@ -48,6 +48,11 @@ fun ProjectDetailScreen(
     var lossAcknowledged by remember { mutableStateOf(false) }
     var lockInAcknowledged by remember { mutableStateOf(false) }
     
+    // ROI Calculator state
+    var roiAmount by remember { mutableStateOf("") }
+    var roiDuration by remember { mutableStateOf("12") }
+    var showRoiResult by remember { mutableStateOf(false) }
+    
     LaunchedEffect(projectId) {
         projectsViewModel.getProject(projectId)
     }
@@ -231,6 +236,108 @@ fun ProjectDetailScreen(
                             
                             proj.profitSharingRatio?.let { ratio ->
                                 DetailRow("Investor Share", "${ratio.investor}%")
+                            }
+                        }
+                    }
+                    
+                    // ROI Calculator
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Calculate,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "ROI Calculator",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            OutlinedTextField(
+                                value = roiAmount,
+                                onValueChange = { 
+                                    roiAmount = it
+                                    showRoiResult = false
+                                },
+                                label = { Text("Investment Amount (GH₵)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            OutlinedTextField(
+                                value = roiDuration,
+                                onValueChange = { 
+                                    roiDuration = it
+                                    showRoiResult = false
+                                },
+                                label = { Text("Duration (months)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Button(
+                                onClick = { showRoiResult = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = roiAmount.toDoubleOrNull() != null && roiAmount.toDoubleOrNull()!! > 0
+                            ) {
+                                Icon(Icons.Default.Calculate, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Calculate Returns")
+                            }
+                            
+                            if (showRoiResult) {
+                                val amount = roiAmount.toDoubleOrNull() ?: 0.0
+                                val months = roiDuration.toIntOrNull() ?: 12
+                                // Parse target return range (e.g. "10-15%")
+                                val returnRange = proj.targetReturn.replace("%", "").replace(" ", "")
+                                val returnParts = returnRange.split("-")
+                                val minReturnPct = returnParts.firstOrNull()?.toDoubleOrNull() ?: 10.0
+                                val maxReturnPct = returnParts.lastOrNull()?.toDoubleOrNull() ?: minReturnPct
+                                val investorShare = (proj.profitSharingRatio?.investor ?: 80) / 100.0
+                                
+                                val minProfit = amount * (minReturnPct / 100.0) * (months / 12.0) * investorShare
+                                val maxProfit = amount * (maxReturnPct / 100.0) * (months / 12.0) * investorShare
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Divider()
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                Text(
+                                    text = "Estimated Returns",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                DetailRow("Investment", "GH₵ %.2f".format(amount))
+                                DetailRow("Duration", "$months months")
+                                DetailRow("Est. Profit (Low)", "GH₵ %.2f".format(minProfit))
+                                DetailRow("Est. Profit (High)", "GH₵ %.2f".format(maxProfit))
+                                DetailRow("Total Return (Low)", "GH₵ %.2f".format(amount + minProfit))
+                                DetailRow("Total Return (High)", "GH₵ %.2f".format(amount + maxProfit))
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "* Returns are estimated and not guaranteed. Investor share: ${proj.profitSharingRatio?.investor ?: 80}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }

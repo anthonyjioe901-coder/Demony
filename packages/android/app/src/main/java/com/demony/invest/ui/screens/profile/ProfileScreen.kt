@@ -1,12 +1,15 @@
 package com.demony.invest.ui.screens.profile
 
+import android.content.Context
 import android.net.Uri
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,7 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -24,12 +29,24 @@ import com.demony.invest.ui.components.BottomNavigationBar
 import com.demony.invest.ui.navigation.Screen
 import com.demony.invest.ui.viewmodels.AuthViewModel
 
+fun uriToBase64(context: Context, uri: Uri): String? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri)
+        val bytes = inputStream?.readBytes()
+        inputStream?.close()
+        bytes?.let { Base64.encodeToString(it, Base64.DEFAULT) }
+    } catch (e: Exception) {
+        null
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     navController: NavController,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val user by viewModel.currentUser.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     
@@ -38,6 +55,15 @@ fun ProfileScreen(
     var kycStep by remember { mutableStateOf(0) } // 0 = intro, 1 = ID upload, 2 = selfie, 3 = submitted
     var selectedIdUri by remember { mutableStateOf<Uri?>(null) }
     var selectedSelfieUri by remember { mutableStateOf<Uri?>(null) }
+    var kycError by remember { mutableStateOf<String?>(null) }
+    var kycIsSubmitting by remember { mutableStateOf(false) }
+    
+    // Edit profile dialog state
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editPhone by remember { mutableStateOf("") }
+    var editIsSubmitting by remember { mutableStateOf(false) }
+    var editError by remember { mutableStateOf<String?>(null) }
+    var editSuccess by remember { mutableStateOf<String?>(null) }
     
     // Image pickers
     val idDocumentPicker = rememberLauncherForActivityResult(
@@ -95,6 +121,23 @@ fun ProfileScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    // Error display
+                    if (kycError != null) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = kycError ?: "",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    
                     when (kycStep) {
                         0 -> {
                             // Introduction
@@ -248,16 +291,51 @@ fun ProfileScreen(
                     ) { Text("Continue") }
                     2 -> Button(
                         onClick = { 
-                            // TODO: Upload documents to API
-                            kycStep = 3 
+                            // Upload documents and submit KYC
+                            kycIsSubmitting = true
+                            kycError = null
+                            
+                            val idBase64 = selectedIdUri?.let { uriToBase64(context, it) }
+                            val selfieBase64 = selectedSelfieUri?.let { uriToBase64(context, it) }
+                            
+                            if (idBase64 == null || selfieBase64 == null) {
+                                kycError = "Failed to read selected images"
+                                kycIsSubmitting = false
+                                return@Button
+                            }
+                            
+                            viewModel.uploadAndSubmitKyc(
+                                idDocumentBase64 = idBase64,
+                                selfieBase64 = selfieBase64
+                            ) { success, error ->
+                                kycIsSubmitting = false
+                                if (success) {
+                                    kycStep = 3
+                                } else {
+                                    kycError = error ?: "Failed to submit KYC"
+                                }
+                            }
                         },
-                        enabled = selectedSelfieUri != null
-                    ) { Text("Submit") }
+                        enabled = selectedSelfieUri != null && !kycIsSubmitting
+                    ) { 
+                        if (kycIsSubmitting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Submitting...")
+                        } else {
+                            Text("Submit")
+                        }
+                    }
                     else -> Button(onClick = { 
                         showKycDialog = false
                         kycStep = 0
                         selectedIdUri = null
                         selectedSelfieUri = null
+                        kycError = null
                     }) { Text("Done") }
                 }
             },
@@ -266,6 +344,91 @@ fun ProfileScreen(
                     TextButton(onClick = { kycStep-- }) {
                         Text("Back")
                     }
+                }
+            }
+        )
+    }
+    
+    // Edit Profile Dialog
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showEditDialog = false
+                editError = null
+                editSuccess = null
+            },
+            title = { Text("Update Phone Number", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    editError?.let { error ->
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    editSuccess?.let { msg ->
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.secondary)
+                                Spacer(Modifier.width(8.dp))
+                                Text(msg, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = editPhone,
+                        onValueChange = { editPhone = it },
+                        label = { Text("Phone Number") },
+                        placeholder = { Text("e.g. +233 24 123 4567") },
+                        leadingIcon = { Icon(Icons.Default.Phone, null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !editIsSubmitting
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        editIsSubmitting = true
+                        editError = null
+                        viewModel.updatePhone(editPhone.trim()) { success, error ->
+                            editIsSubmitting = false
+                            if (success) {
+                                editSuccess = "Phone number updated!"
+                                viewModel.refreshUser()
+                            } else {
+                                editError = error ?: "Failed to update phone"
+                            }
+                        }
+                    },
+                    enabled = editPhone.replace("[\\s\\-]".toRegex(), "").length >= 10 && !editIsSubmitting
+                ) {
+                    if (editIsSubmitting) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(if (editIsSubmitting) "Saving..." else "Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false; editError = null; editSuccess = null }) {
+                    Text("Cancel")
                 }
             }
         )
@@ -393,11 +556,48 @@ fun ProfileScreen(
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column {
-                            ProfileDetailRow(
-                                icon = Icons.Default.Phone,
-                                label = "Phone Number",
-                                value = user?.phone ?: "Not provided"
-                            )
+                            // Phone with edit option
+                            Surface(
+                                onClick = { 
+                                    editPhone = user?.phone ?: ""
+                                    editError = null
+                                    editSuccess = null
+                                    showEditDialog = true 
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Phone,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Phone Number",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = user?.phone ?: "Not provided",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
                             Divider()
                             ProfileDetailRow(
                                 icon = Icons.Default.DateRange,

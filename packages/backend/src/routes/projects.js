@@ -5,6 +5,11 @@ var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var router = express.Router();
 
+// Escape regex special chars to prevent ReDoS attacks
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Helper to normalize project for frontend
 function normalizeProject(p) {
   return {
@@ -69,7 +74,8 @@ router.get('/', async function(req, res) {
     
     // Add search functionality - search all visible card fields
     if (search) {
-      var searchRegex = { $regex: search, $options: 'i' };
+      var escapedSearch = escapeRegex(search);
+      var searchRegex = { $regex: escapedSearch, $options: 'i' };
       filter.$or = [
         { name: searchRegex },
         { description: searchRegex },
@@ -98,16 +104,30 @@ router.get('/', async function(req, res) {
     if (projectIds.length > 0) {
       var investmentStats = await database.collection('investments').aggregate([
         { $match: { projectId: { $in: projectIds }, status: 'active' } },
-        { $lookup: {
+        // Convert string userId to ObjectId for efficient index-backed lookup
+        {
+          $addFields: {
+            userObjId: {
+              $cond: {
+                if: { $regexMatch: { input: { $toString: '$userId' }, regex: /^[0-9a-fA-F]{24}$/ } },
+                then: { $toObjectId: '$userId' },
+                else: null
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
             from: 'users',
-            let: { invUserId: '$userId' },
+            localField: 'userObjId',
+            foreignField: '_id',
             pipeline: [
-              { $match: { $expr: { $eq: [ { $toString: '$_id' }, { $toString: '$$invUserId' } ] } } },
               { $match: { isActive: { $ne: false } } },
               { $project: { _id: 1 } }
             ],
             as: 'user'
-        }},
+          }
+        },
         { $match: { user: { $ne: [] } } },
         { $group: { _id: '$projectId', totalAmount: { $sum: '$amount' }, investorCount: { $sum: 1 } } }
       ]).toArray();
@@ -157,16 +177,29 @@ router.get('/:id', async function(req, res) {
     // Recalculate stats for this project using ACTIVE investments with ACTIVE users
     var investmentStats = await database.collection('investments').aggregate([
       { $match: { projectId: id, status: 'active' } },
-      { $lookup: {
+      {
+        $addFields: {
+          userObjId: {
+            $cond: {
+              if: { $regexMatch: { input: { $toString: '$userId' }, regex: /^[0-9a-fA-F]{24}$/ } },
+              then: { $toObjectId: '$userId' },
+              else: null
+            }
+          }
+        }
+      },
+      {
+        $lookup: {
           from: 'users',
-          let: { invUserId: '$userId' },
+          localField: 'userObjId',
+          foreignField: '_id',
           pipeline: [
-            { $match: { $expr: { $eq: [ { $toString: '$_id' }, { $toString: '$$invUserId' } ] } } },
             { $match: { isActive: { $ne: false } } },
             { $project: { _id: 1 } }
           ],
           as: 'user'
-      }},
+        }
+      },
       { $match: { user: { $ne: [] } } },
       { $group: { _id: '$projectId', totalAmount: { $sum: '$amount' }, investorCount: { $sum: 1 } } }
     ]).toArray();

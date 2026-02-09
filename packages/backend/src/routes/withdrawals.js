@@ -7,9 +7,11 @@ var emailService = require('../services/email');
 var router = express.Router();
 
 // Request withdrawal
+// NOTE: The primary withdrawal flow now goes through /api/wallet/withdraw.
+// This route is kept for backward compatibility but redirects to wallet behavior.
 router.post('/', authenticateToken, async function(req, res) {
   var amount = parseFloat(req.body.amount);
-  var method = req.body.method; // 'bank_transfer', 'mobile_money', etc.
+  var method = req.body.method;
   var accountDetails = req.body.accountDetails;
   
   if (!amount || amount <= 0) {
@@ -18,6 +20,10 @@ router.post('/', authenticateToken, async function(req, res) {
   
   if (!method || !accountDetails) {
     return res.status(400).json({ error: 'Withdrawal method and account details required' });
+  }
+  
+  if (amount < 20) {
+    return res.status(400).json({ error: 'Minimum withdrawal is GH₵20' });
   }
   
   try {
@@ -32,19 +38,22 @@ router.post('/', authenticateToken, async function(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Check KYC status
-    if (!user.isVerified) {
-      return res.status(403).json({ error: 'Please complete KYC verification before withdrawing' });
-    }
-    
     // Check balance
     if ((user.walletBalance || 0) < amount) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
     
-    // Minimum withdrawal
-    if (amount < 10) {
-      return res.status(400).json({ error: 'Minimum withdrawal is $10' });
+    // ATOMIC deduction: Only deduct if balance is still sufficient
+    var deductResult = await database.collection('users').updateOne(
+      { _id: new ObjectId(req.user.id), walletBalance: { $gte: amount } },
+      { 
+        $inc: { walletBalance: -amount },
+        $set: { updatedAt: new Date() }
+      }
+    );
+    
+    if (deductResult.modifiedCount === 0) {
+      return res.status(400).json({ error: 'Insufficient balance (concurrent transaction detected)' });
     }
     
     // Create withdrawal request
@@ -53,19 +62,12 @@ router.post('/', authenticateToken, async function(req, res) {
       amount: amount,
       method: method,
       accountDetails: accountDetails,
-      status: 'pending', // pending, completed, rejected
+      status: 'pending',
       createdAt: new Date(),
       updatedAt: new Date()
     };
     
     var result = await database.collection('withdrawals').insertOne(withdrawal);
-    
-    // Reserve amount (deduct from wallet)
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(req.user.id) },
-      { $inc: { walletBalance: -amount } }
-    );
-    
     withdrawal.id = result.insertedId.toString();
     
     // Send withdrawal requested email (async)
@@ -83,12 +85,13 @@ router.post('/', authenticateToken, async function(req, res) {
   }
 });
 
-// Get user's withdrawals
+// Get user's withdrawals (support both userId formats)
 router.get('/my', authenticateToken, async function(req, res) {
   try {
+    var userId = req.user.id || req.user.userId;
     var database = await db.getDb();
     var withdrawals = await database.collection('withdrawals')
-      .find({ userId: req.user.id })
+      .find({ $or: [{ userId: userId }, { userId: req.user.userId }] })
       .sort({ createdAt: -1 })
       .toArray();
     
@@ -106,11 +109,12 @@ router.get('/my', authenticateToken, async function(req, res) {
 // Cancel pending withdrawal
 router.delete('/:id', authenticateToken, async function(req, res) {
   try {
+    var userId = req.user.id || req.user.userId;
     var database = await db.getDb();
     
     var withdrawal = await database.collection('withdrawals').findOne({
       _id: new ObjectId(req.params.id),
-      userId: req.user.id
+      $or: [{ userId: userId }, { userId: req.user.userId }]
     });
     
     if (!withdrawal) {
@@ -121,17 +125,32 @@ router.delete('/:id', authenticateToken, async function(req, res) {
       return res.status(400).json({ error: 'Can only cancel pending withdrawals' });
     }
     
-    // Refund to wallet
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(req.user.id) },
-      { $inc: { walletBalance: withdrawal.amount } }
-    );
-    
-    // Update withdrawal status
-    await database.collection('withdrawals').updateOne(
-      { _id: new ObjectId(req.params.id) },
+    // Atomically update withdrawal to cancelled (only if still pending)
+    var cancelResult = await database.collection('withdrawals').updateOne(
+      { _id: new ObjectId(req.params.id), status: 'pending' },
       { $set: { status: 'cancelled', updatedAt: new Date() } }
     );
+    
+    // Only refund if we actually cancelled it (prevents double-refund)
+    if (cancelResult.modifiedCount > 0) {
+      await database.collection('users').updateOne(
+        { _id: new ObjectId(userId) },
+        { 
+          $inc: { walletBalance: withdrawal.amount },
+          $set: { updatedAt: new Date() }
+        }
+      );
+      
+      // Also update corresponding transaction record if it exists
+      if (withdrawal.reference) {
+        await database.collection('transactions').updateOne(
+          { reference: withdrawal.reference },
+          { $set: { status: 'cancelled', updatedAt: new Date() } }
+        );
+      }
+    } else {
+      return res.status(400).json({ error: 'Withdrawal already processed' });
+    }
     
     res.json({ message: 'Withdrawal cancelled and funds returned to wallet' });
   } catch (err) {

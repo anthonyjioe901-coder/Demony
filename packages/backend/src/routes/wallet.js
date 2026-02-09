@@ -69,7 +69,9 @@ router.get('/balance', async function(req, res) {
       balance: user.walletBalance || 0,
       totalInvested: user.totalInvested || 0,
       totalEarnings: user.totalEarnings || 0,
-      availableForWithdrawal: (user.walletBalance || 0) + (user.totalEarnings || 0)
+      // Only wallet balance is available for withdrawal, not cumulative totalEarnings
+      // totalEarnings is a lifetime counter, not spendable cash
+      availableForWithdrawal: user.walletBalance || 0
     });
   } catch (err) {
     console.error(err);
@@ -130,8 +132,12 @@ router.post('/deposit/initialize', async function(req, res) {
   try {
     var amount = parseFloat(req.body.amount);
     
-    if (!amount || amount < 20) {
+    if (!amount || amount < 20 || !isFinite(amount)) {
       return res.status(400).json({ error: 'Minimum deposit is 20' });
+    }
+    
+    if (amount > 1000000) {
+      return res.status(400).json({ error: 'Maximum deposit is GH₵1,000,000' });
     }
     
     var database = await db.getDb();
@@ -233,8 +239,10 @@ router.get('/deposit/verify/:reference', async function(req, res) {
       { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date(), paidAmount: amount } }
     );
     
-    if (updateResult.matchedCount === 0) {
-      return res.json({ message: 'Already verified', status: transaction.status });
+    // CRITICAL: Only credit wallet if we actually changed the status (modifiedCount, not matchedCount)
+    // This prevents double-credit from concurrent verify requests
+    if (updateResult.modifiedCount === 0) {
+      return res.json({ message: 'Already verified', status: 'success' });
     }
     
     // Credit user wallet
@@ -261,64 +269,9 @@ router.get('/deposit/verify/:reference', async function(req, res) {
 });
 
 // ==================== PAYSTACK WEBHOOK ====================
-
-// Paystack webhook handler (no auth - uses signature verification)
-router.post('/webhook', express.raw({ type: 'application/json' }), async function(req, res) {
-  try {
-    var crypto = require('crypto');
-    var hash = crypto.createHmac('sha512', PAYSTACK_SECRET)
-      .update(JSON.stringify(req.body))
-      .digest('hex');
-    
-    if (hash !== req.headers['x-paystack-signature']) {
-      return res.status(400).send('Invalid signature');
-    }
-    
-    var event = req.body;
-    var database = await db.getDb();
-    
-    if (event.event === 'charge.success') {
-      var data = event.data;
-      var reference = data.reference;
-      
-      var transaction = await database.collection('transactions').findOne({ reference: reference });
-      
-      if (transaction && transaction.status === 'pending') {
-        var amount = data.amount / 100;
-        
-        if (amount < transaction.amount) {
-          await database.collection('transactions').updateOne(
-            { reference: reference },
-            { $set: { status: 'failed', updatedAt: new Date(), failureReason: 'amount_mismatch' } }
-          );
-        } else {
-          var updateResult = await database.collection('transactions').updateOne(
-            { reference: reference, status: 'pending' },
-            { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date(), paidAmount: amount } }
-          );
-          
-          if (updateResult.matchedCount > 0) {
-            var webhookUserId = toObjectId(transaction.userId);
-            if (webhookUserId) {
-              await database.collection('users').updateOne(
-                { _id: webhookUserId },
-                { 
-                  $inc: { walletBalance: amount },
-                  $set: { updatedAt: new Date() }
-                }
-              );
-            }
-          }
-        }
-      }
-    }
-    
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Webhook error:', err);
-    res.sendStatus(500);
-  }
-});
+// NOTE: Webhook handler has been moved to walletWebhook.js and is mounted
+// BEFORE express.json() in server.js for correct HMAC signature verification.
+// See: routes/walletWebhook.js
 
 // ==================== WITHDRAWALS ====================
 
@@ -333,8 +286,12 @@ router.post('/withdraw', async function(req, res) {
     var momoNetwork = req.body.momoNetwork;
     var momoNumber = req.body.momoNumber;
     
-    if (!amount || amount < 100) {
-      return res.status(400).json({ error: 'Minimum withdrawal is 20' });
+    if (!amount || amount < 20 || !isFinite(amount)) {
+      return res.status(400).json({ error: 'Minimum withdrawal is GH₵20' });
+    }
+    
+    if (amount > 1000000) {
+      return res.status(400).json({ error: 'Maximum withdrawal is GH₵1,000,000' });
     }
     
     if (method === 'bank') {
@@ -356,7 +313,7 @@ router.post('/withdraw', async function(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    var availableBalance = (user.walletBalance || 0) + (user.totalEarnings || 0);
+    var availableBalance = user.walletBalance || 0;
     
     if (amount > availableBalance) {
       return res.status(400).json({ error: 'Insufficient balance' });
@@ -369,15 +326,27 @@ router.post('/withdraw', async function(req, res) {
     
     var reference = 'WDR_' + req.user.userId + '_' + Date.now();
     
-    // Create withdrawal request (pending admin approval)
-    await database.collection('transactions').insertOne({
+    // ATOMIC deduction: Only deduct if balance is still sufficient
+    // This prevents race conditions where two concurrent withdrawals both pass the check
+    var deductResult = await database.collection('users').updateOne(
+      { _id: new ObjectId(req.user.userId), walletBalance: { $gte: amount } },
+      { 
+        $inc: { walletBalance: -amount },
+        $set: { updatedAt: new Date() }
+      }
+    );
+    
+    if (deductResult.modifiedCount === 0) {
+      return res.status(400).json({ error: 'Insufficient balance (concurrent transaction detected)' });
+    }
+    
+    // Create withdrawal request (pending admin approval) - write to BOTH collections
+    // for backward compatibility (frontend reads from 'withdrawals', wallet flow uses 'transactions')
+    var withdrawalDoc = {
       userId: req.user.userId,
-      type: 'withdrawal',
-      amount: -amount, // Negative for withdrawals
-      status: 'pending_approval',
-      reference: reference,
-      payoutMethod: method,
-      payoutDetails: method === 'bank' ? {
+      amount: amount,
+      method: method,
+      accountDetails: method === 'bank' ? {
         bankCode: bankCode,
         accountNumber: accountNumber,
         accountName: accountName
@@ -385,22 +354,26 @@ router.post('/withdraw', async function(req, res) {
         network: momoNetwork,
         momoNumber: momoNumber
       },
+      status: 'pending',
+      reference: reference,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    await database.collection('withdrawals').insertOne(withdrawalDoc);
+    
+    // Also record in transactions for audit trail
+    await database.collection('transactions').insertOne({
+      userId: req.user.userId,
+      type: 'withdrawal',
+      amount: -amount,
+      status: 'pending_approval',
+      reference: reference,
+      payoutMethod: method,
+      payoutDetails: withdrawalDoc.accountDetails,
       description: 'Withdrawal request',
       createdAt: new Date()
     });
-    
-    // Deduct from available balance (hold)
-    var deductFrom = amount <= (user.walletBalance || 0) ? 'walletBalance' : 'totalEarnings';
-    var updateField = {};
-    updateField[deductFrom] = -amount;
-    
-    await database.collection('users').updateOne(
-      { _id: new ObjectId(req.user.userId) },
-      { 
-        $inc: updateField,
-        $set: { updatedAt: new Date() }
-      }
-    );
     
     res.json({
       message: 'Withdrawal request submitted',

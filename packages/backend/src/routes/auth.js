@@ -9,7 +9,29 @@ var emailService = require('../services/email');
 var router = express.Router();
 var ObjectId = require('mongodb').ObjectId;
 
-var JWT_SECRET = process.env.JWT_SECRET || 'demony-secret-key-change-in-production';
+// SECURITY: No hardcoded fallback. In dev, generate a random one per session.
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('FATAL: JWT_SECRET environment variable is not set in production!');
+  process.exit(1);
+}
+var JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-' + require('crypto').randomBytes(16).toString('hex');
+
+// Password strength validation
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return 'Password must be at least 8 characters long';
+  }
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must contain at least one uppercase letter';
+  }
+  if (!/[a-z]/.test(password)) {
+    return 'Password must contain at least one lowercase letter';
+  }
+  if (!/[0-9]/.test(password)) {
+    return 'Password must contain at least one number';
+  }
+  return null; // valid
+}
 
 function getApiBaseUrl() {
   // Use API_URL directly if set, otherwise default to the backend API on Render
@@ -48,6 +70,12 @@ router.post('/signup', async function(req, res) {
   
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
+  }
+  
+  // Validate password strength
+  var passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
   }
   
   // Phone is now required for all users
@@ -383,6 +411,46 @@ router.post('/update-phone', authenticateToken, async function(req, res) {
     );
     
     res.json({ message: 'Phone number updated successfully', phone: phoneClean });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Change password (authenticated user)
+router.post('/change-password', authenticateToken, async function(req, res) {
+  var currentPassword = req.body.currentPassword;
+  var newPassword = req.body.newPassword;
+  
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required' });
+  }
+  
+  var passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
+  }
+  
+  try {
+    var database = await db.getDb();
+    var user = await database.collection('users').findOne({ _id: new ObjectId(req.user.id) });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    var isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+    
+    var hashedPassword = await bcrypt.hash(newPassword, 10);
+    await database.collection('users').updateOne(
+      { _id: new ObjectId(req.user.id) },
+      { $set: { password: hashedPassword, updatedAt: new Date() } }
+    );
+    
+    res.json({ message: 'Password changed successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

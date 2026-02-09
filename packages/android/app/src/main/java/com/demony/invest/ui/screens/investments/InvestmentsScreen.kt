@@ -288,7 +288,7 @@ private fun InvestmentCard(investment: Investment) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Return: %.1f%%".format(investment.returnPercentage),
+                    text = "Return: %.1f%%".format(investment.returnPercentage ?: 0.0),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (investment.returnPercentage >= 0) 
                         MaterialTheme.colorScheme.secondary 

@@ -29,6 +29,12 @@ interface DemonyApiService {
     @POST("auth/forgot-password")
     suspend fun forgotPassword(@Body data: Map<String, String>): Response<MessageResponse>
     
+    @POST("auth/change-password")
+    suspend fun changePassword(@Body data: Map<String, String>): Response<MessageResponse>
+    
+    @POST("auth/update-phone")
+    suspend fun updatePhone(@Body data: Map<String, String>): Response<MessageResponse>
+    
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body data: Map<String, String>): Response<MessageResponse>
     

@@ -2,6 +2,9 @@
 var express = require('express');
 var cors = require('cors');
 var dotenv = require('dotenv');
+var helmet = require('helmet');
+var noSqlSanitize = require('./middleware/sanitize');
+var { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 dotenv.config();
 
@@ -58,7 +61,26 @@ app.use(cors({
   credentials: true
 }));
 
+// Security headers (free, no external service needed)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false // Disable CSP for now (frontend is separate)
+}));
+
+// ========== PAYSTACK WEBHOOK (must be BEFORE express.json()) ==========
+// Paystack signs the raw body. If express.json() parses it first,
+// re-serializing with JSON.stringify() may change key order/whitespace
+// and break HMAC verification. Mount raw handler here.
+var walletWebhookRouter = require('./routes/walletWebhook.js');
+app.use('/api/wallet/webhook', walletWebhookRouter);
+
 app.use(express.json({ limit: '10mb' })); // Increased limit for file uploads
+
+// NoSQL injection protection - strips $ operators from user input
+app.use(noSqlSanitize);
+
+// Global rate limiting
+app.use('/api/', apiLimiter);
 
 // Import routes
 var authRoutes = require('./routes/auth.js');
@@ -73,8 +95,8 @@ var uploadRoutes = require('./routes/upload.js');
 var supportRoutes = require('./routes/support.js');
 var referralRoutes = require('./routes/referrals.js');
 
-// Use routes
-app.use('/api/auth', authRoutes);
+// Use routes (auth gets stricter rate limiting)
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/portfolio', portfolioRoutes);
@@ -145,6 +167,20 @@ app.get('/api/native-test', function(req, res) {
       message: 'C++ addon not loaded' 
     });
   }
+});
+
+// Connect to database, create indexes, then start server
+var db = require('../../database/src/index');
+var { createIndexes } = require('../../database/src/create-indexes');
+
+db.connect().then(function() {
+  console.log('📦 Database connected');
+  // Create indexes in background (non-blocking, idempotent)
+  createIndexes().catch(function(err) {
+    console.error('Index creation warning:', err.message);
+  });
+}).catch(function(err) {
+  console.error('Database connection failed:', err);
 });
 
 app.listen(port, function() {
