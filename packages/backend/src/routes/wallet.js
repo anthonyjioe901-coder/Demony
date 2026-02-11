@@ -8,6 +8,14 @@ var router = express.Router();
 
 var PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
+// SEC-06: Warn on startup if Paystack secret is missing
+if (!PAYSTACK_SECRET) {
+  console.warn('⚠️  PAYSTACK_SECRET_KEY is not set. Payment features will not work.');
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: PAYSTACK_SECRET_KEY must be set in production!');
+  }
+}
+
 function toObjectId(value) {
   if (!value) return null;
   if (value instanceof ObjectId) return value;

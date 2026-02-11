@@ -1,11 +1,5 @@
 var jwt = require('jsonwebtoken');
-
-// SECURITY: No fallback in production. Server must not start with a guessable secret.
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error('FATAL: JWT_SECRET environment variable is not set in production!');
-  process.exit(1);
-}
-var JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-' + require('crypto').randomBytes(16).toString('hex');
+var JWT_SECRET = require('../config/jwt').JWT_SECRET;
 
 function authenticateToken(req, res, next) {
   var authHeader = req.headers['authorization'];

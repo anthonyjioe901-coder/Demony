@@ -37,6 +37,32 @@ function getSender() {
   };
 }
 
+// SEC-05: HTML escape helper to prevent XSS in email templates
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Sanitize all string data values before use in templates
+function sanitizeData(data) {
+  var clean = {};
+  for (var key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      if (typeof data[key] === 'string') {
+        clean[key] = escapeHtml(data[key]);
+      } else {
+        clean[key] = data[key];
+      }
+    }
+  }
+  return clean;
+}
+
 // ==================== EMAIL TEMPLATES ====================
 
 var templates = {
@@ -1137,7 +1163,9 @@ async function sendEmail(templateName, recipientEmail, data) {
     return { success: false, error: 'Template not found' };
   }
   
-  var emailContent = templates[templateName](data);
+  // SEC-05: Sanitize all string data to prevent XSS in email templates
+  var safeData = sanitizeData(data || {});
+  var emailContent = templates[templateName](safeData);
   var sender = getSender();
   
   // Log email in development or if transport not available

@@ -133,8 +133,10 @@ router.delete('/:id', authenticateToken, async function(req, res) {
     
     // Only refund if we actually cancelled it (prevents double-refund)
     if (cancelResult.modifiedCount > 0) {
+      // BUG-05: Use withdrawal.userId (the original requester) for refund, not req.user.id
+      var refundUserId = withdrawal.userId;
       await database.collection('users').updateOne(
-        { _id: new ObjectId(userId) },
+        { _id: new ObjectId(refundUserId) },
         { 
           $inc: { walletBalance: withdrawal.amount },
           $set: { updatedAt: new Date() }

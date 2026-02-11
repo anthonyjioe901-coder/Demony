@@ -2,6 +2,8 @@
 var express = require('express');
 var db = require('../../../database/src/index');
 var emailService = require('../services/email');
+var authenticateToken = require('../middleware/auth');
+var { strictLimiter } = require('../middleware/rateLimiter');
 var router = express.Router();
 
 // Generate ticket ID
@@ -110,8 +112,42 @@ router.post('/tickets', async function(req, res) {
   }
 });
 
-// Get ticket status by ID (no auth - uses ticket ID as verification)
-router.get('/tickets/:ticketId', async function(req, res) {
+// Get ticket status by ID (rate-limited, returns limited info without auth)
+router.get('/tickets/:ticketId', strictLimiter, async function(req, res) {
+  try {
+    var ticketId = req.params.ticketId;
+    
+    // Validate ticket ID format to prevent enumeration
+    if (!ticketId || !/^TKT-\d{6}-[A-Z0-9]{6}$/.test(ticketId)) {
+      return res.status(400).json({ error: 'Invalid ticket ID format' });
+    }
+    
+    var database = await db.getDb();
+    var ticket = await database.collection('support_tickets').findOne({ ticketId: ticketId });
+    
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    // Return only status info - no message content without authentication
+    res.json({
+      ticketId: ticket.ticketId,
+      category: ticket.category,
+      priority: ticket.priority,
+      subject: ticket.subject,
+      status: ticket.status,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      responseCount: ticket.responses ? ticket.responses.length : 0
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get full ticket details (authenticated - user can only see their own tickets)
+router.get('/tickets/:ticketId/details', authenticateToken, async function(req, res) {
   try {
     var ticketId = req.params.ticketId;
     
@@ -122,11 +158,17 @@ router.get('/tickets/:ticketId', async function(req, res) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
     
+    // Only allow the ticket owner or admin to see full details
+    if (ticket.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized to view this ticket' });
+    }
+    
     res.json({
       ticketId: ticket.ticketId,
       category: ticket.category,
       priority: ticket.priority,
       subject: ticket.subject,
+      message: ticket.message,
       status: ticket.status,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,

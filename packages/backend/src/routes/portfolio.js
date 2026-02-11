@@ -82,24 +82,58 @@ router.get('/', authenticateToken, async function(req, res) {
   }
 });
 
-// Get portfolio history (Mock for now)
-router.get('/history', authenticateToken, function(req, res) {
-  var history = [
-    { month: 'Jan', value: 10000 },
-    { month: 'Feb', value: 10500 },
-    { month: 'Mar', value: 11200 },
-    { month: 'Apr', value: 11000 },
-    { month: 'May', value: 11800 },
-    { month: 'Jun', value: 12100 },
-    { month: 'Jul', value: 12500 },
-    { month: 'Aug', value: 13100 },
-    { month: 'Sep', value: 13500 },
-    { month: 'Oct', value: 13200 },
-    { month: 'Nov', value: 13600 },
-    { month: 'Dec', value: 13875 }
-  ];
-  
-  res.json(history);
+// Get portfolio history (computed from actual investment and profit data)
+router.get('/history', authenticateToken, async function(req, res) {
+  try {
+    var userId = req.user.userId || req.user.id;
+    var database = await db.getDb();
+    var userIdFilter = buildUserIdFilter(userId);
+    
+    // Get all investments with creation dates
+    var investments = await database.collection('investments')
+      .find(userIdFilter)
+      .sort({ createdAt: 1 })
+      .toArray();
+    
+    // Get all profit distributions with dates
+    var profits = await database.collection('profit_distributions')
+      .find(userIdFilter)
+      .sort({ createdAt: 1 })
+      .toArray();
+    
+    // Build monthly history for the last 12 months
+    var history = [];
+    var now = new Date();
+    var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    for (var i = 11; i >= 0; i--) {
+      var date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      var endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+      
+      // Sum investments up to end of this month
+      var invested = investments
+        .filter(function(inv) { return inv.createdAt <= endOfMonth; })
+        .reduce(function(sum, inv) { return sum + (inv.amount || 0); }, 0);
+      
+      // Sum profits up to end of this month
+      var earned = profits
+        .filter(function(p) { return p.createdAt <= endOfMonth; })
+        .reduce(function(sum, p) { return sum + (p.amount || 0); }, 0);
+      
+      history.push({
+        month: monthNames[date.getMonth()],
+        year: date.getFullYear(),
+        value: invested + earned,
+        invested: invested,
+        earnings: earned
+      });
+    }
+    
+    res.json(history);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

@@ -29,10 +29,10 @@ var INVESTMENT_STATUS = {
   CANCELLED: 'cancelled'
 };
 
-// Format currency
+// Format currency - defaults to Ghana Cedis (GHS)
 function formatCurrency(amount, currency) {
-  currency = currency || 'USD';
-  return new Intl.NumberFormat('en-US', {
+  currency = currency || 'GHS';
+  return new Intl.NumberFormat('en-GH', {
     style: 'currency',
     currency: currency
   }).format(amount);

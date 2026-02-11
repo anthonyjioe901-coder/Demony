@@ -5,6 +5,18 @@ var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var router = express.Router();
 
+// PERF-01: Simple in-memory cache for project listings
+var projectCache = {
+  data: null,
+  timestamp: 0,
+  TTL: 30 * 1000 // 30 seconds
+};
+
+function invalidateProjectCache() {
+  projectCache.data = null;
+  projectCache.timestamp = 0;
+}
+
 // Escape regex special chars to prevent ReDoS attacks
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -59,10 +71,16 @@ function normalizeProject(p) {
 router.get('/', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = parseInt(req.query.limit) || 100; // Increased default to show all
+    var limit = Math.min(parseInt(req.query.limit) || 100, 200); // PERF-01: Cap max limit
     var skip = (page - 1) * limit;
     var category = req.query.category && req.query.category.trim() !== '' ? req.query.category.trim() : null;
     var search = req.query.search && req.query.search.trim() !== '' ? req.query.search.trim() : null;
+    
+    // PERF-01: Return cached result for default unfiltered requests
+    var isDefaultRequest = !category && !search && page === 1 && limit >= 100;
+    if (isDefaultRequest && projectCache.data && (Date.now() - projectCache.timestamp < projectCache.TTL)) {
+      return res.json(projectCache.data);
+    }
     
     // Only show active projects to public
     var filter = { status: 'active' };
@@ -146,7 +164,7 @@ router.get('/', async function(req, res) {
     // Get unique categories for filtering
     var allCategories = await database.collection('projects').distinct('category', { status: 'active' });
     
-    res.json({
+    var responseData = {
       projects: projects.map(normalizeProject),
       categories: allCategories.filter(Boolean).sort(),
       pagination: {
@@ -155,7 +173,15 @@ router.get('/', async function(req, res) {
         limit: limit,
         pages: Math.ceil(total / limit)
       }
-    });
+    };
+    
+    // PERF-01: Cache default request results
+    if (isDefaultRequest) {
+      projectCache.data = responseData;
+      projectCache.timestamp = Date.now();
+    }
+    
+    res.json(responseData);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -508,3 +534,4 @@ router.put('/my/:id', authenticateToken, async function(req, res) {
 });
 
 module.exports = router;
+module.exports.invalidateProjectCache = invalidateProjectCache;

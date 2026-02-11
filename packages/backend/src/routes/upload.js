@@ -69,8 +69,15 @@ router.post('/image', authenticateToken, async function(req, res) {
 
 // Serve uploaded images
 router.get('/image/:filename', function(req, res) {
-  var filename = req.params.filename;
+  // SEC-07: Sanitize filename to prevent path traversal attacks
+  var filename = path.basename(req.params.filename);
   var filePath = path.join(uploadsDir, filename);
+  
+  // Double-check resolved path is within uploadsDir
+  var resolved = path.resolve(filePath);
+  if (!resolved.startsWith(path.resolve(uploadsDir))) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
   
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);

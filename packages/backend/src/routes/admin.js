@@ -4,6 +4,7 @@ var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
+var { validateIdParam } = require('../utils/objectId');
 var router = express.Router();
 
 // Escape regex special chars to prevent ReDoS attacks from user-supplied search input
@@ -183,7 +184,7 @@ router.get('/investments', async function(req, res) {
 router.get('/users', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = parseInt(req.query.limit) || 200; // Increased to show all users
+    var limit = Math.min(parseInt(req.query.limit) || 200, 500); // Capped at 500
     var skip = (page - 1) * limit;
     var role = req.query.role;
     var kycStatus = req.query.kycStatus;
@@ -391,7 +392,7 @@ router.post('/users/:id/status', async function(req, res) {
 router.get('/projects', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = parseInt(req.query.limit) || 200; // Increased to show all projects
+    var limit = Math.min(parseInt(req.query.limit) || 200, 500); // Capped at 500
     var skip = (page - 1) * limit;
     var status = req.query.status && req.query.status.trim() !== '' ? req.query.status.trim() : null;
     var search = req.query.search && req.query.search.trim() !== '' ? req.query.search.trim() : null;
@@ -1505,8 +1506,35 @@ router.delete('/users/:id', async function(req, res) {
     // Delete the user
     await database.collection('users').deleteOne({ _id: new ObjectId(req.params.id) });
     
+    // SEC-03: Cascade - cancel pending withdrawals
+    var cancelledWithdrawals = await database.collection('withdrawals').updateMany(
+      { userId: userId, status: 'pending' },
+      { $set: { status: 'cancelled', cancelledAt: new Date(), cancelReason: 'User account deleted by admin' } }
+    );
+    
+    // SEC-03: Cascade - mark pending deposits as orphaned
+    var cancelledDeposits = await database.collection('deposits').updateMany(
+      { userId: userId, status: 'pending' },
+      { $set: { status: 'orphaned', orphanedAt: new Date(), orphanReason: 'User account deleted by admin' } }
+    );
+    
+    // SEC-03: Create audit trail
+    await database.collection('audit_log').insertOne({
+      action: 'user_deleted',
+      targetUserId: userId,
+      targetUserEmail: user.email,
+      targetUserName: user.name,
+      performedBy: req.user.id,
+      investmentsOrphaned: investmentsHandled,
+      withdrawalsCancelled: cancelledWithdrawals.modifiedCount,
+      depositsCancelled: cancelledDeposits.modifiedCount,
+      affectedProjects: affectedProjects,
+      walletBalanceAtDeletion: user.walletBalance || 0,
+      createdAt: new Date()
+    });
+    
     // Log the deletion
-    console.log('Admin deleted user:', user.email, '- Investments orphaned:', investmentsHandled);
+    console.log('Admin deleted user:', user.email, '- Investments orphaned:', investmentsHandled, '- Withdrawals cancelled:', cancelledWithdrawals.modifiedCount);
     
     res.json({
       message: 'User deleted successfully',

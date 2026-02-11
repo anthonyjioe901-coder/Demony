@@ -9,12 +9,50 @@ var emailService = require('../services/email');
 var router = express.Router();
 var ObjectId = require('mongodb').ObjectId;
 
-// SECURITY: No hardcoded fallback. In dev, generate a random one per session.
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error('FATAL: JWT_SECRET environment variable is not set in production!');
-  process.exit(1);
+var JWT_SECRET = require('../config/jwt').JWT_SECRET;
+
+// MED-10: Simple brute force protection for login attempts
+var loginAttempts = {};
+var MAX_LOGIN_ATTEMPTS = 5;
+var LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+
+// Clean up old entries every 30 minutes
+setInterval(function() {
+  var now = Date.now();
+  for (var key in loginAttempts) {
+    if (loginAttempts[key].lockedUntil && loginAttempts[key].lockedUntil < now) {
+      delete loginAttempts[key];
+    }
+  }
+}, 30 * 60 * 1000);
+
+function checkLoginAttempts(identifier) {
+  var record = loginAttempts[identifier];
+  if (!record) return { allowed: true };
+  if (record.lockedUntil && record.lockedUntil > Date.now()) {
+    var remainingMin = Math.ceil((record.lockedUntil - Date.now()) / 60000);
+    return { allowed: false, remainingMinutes: remainingMin };
+  }
+  if (record.lockedUntil && record.lockedUntil <= Date.now()) {
+    delete loginAttempts[identifier];
+    return { allowed: true };
+  }
+  return { allowed: true };
 }
-var JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-' + require('crypto').randomBytes(16).toString('hex');
+
+function recordFailedLogin(identifier) {
+  if (!loginAttempts[identifier]) {
+    loginAttempts[identifier] = { count: 0 };
+  }
+  loginAttempts[identifier].count++;
+  if (loginAttempts[identifier].count >= MAX_LOGIN_ATTEMPTS) {
+    loginAttempts[identifier].lockedUntil = Date.now() + LOCKOUT_DURATION;
+  }
+}
+
+function clearLoginAttempts(identifier) {
+  delete loginAttempts[identifier];
+}
 
 // Password strength validation
 function validatePassword(password) {
@@ -211,6 +249,16 @@ router.post('/login', async function(req, res) {
     return res.status(400).json({ error: 'Email or phone and password are required' });
   }
   
+  // MED-10: Check for account lockout
+  var loginIdentifier = (email || phone || '').toLowerCase();
+  var lockCheck = checkLoginAttempts(loginIdentifier);
+  if (!lockCheck.allowed) {
+    return res.status(429).json({ 
+      error: 'Too many failed login attempts. Try again in ' + lockCheck.remainingMinutes + ' minutes.',
+      lockedOut: true
+    });
+  }
+  
   try {
     var user;
     
@@ -221,17 +269,18 @@ router.post('/login', async function(req, res) {
     } else if (phone) {
       // Clean phone number for lookup
       var phoneClean = phone.replace(/[\s\-]/g, '');
-      var result = await db.query('users', 'findOne', { filter: { phone: phoneClean } });
-      user = result.rows[0];
+      var phoneResult = await db.query('users', 'findOne', { filter: { phone: phoneClean } });
+      user = phoneResult.rows[0];
       
       // If not found with cleaned phone, try original
       if (!user) {
-        result = await db.query('users', 'findOne', { filter: { phone: phone } });
-        user = result.rows[0];
+        phoneResult = await db.query('users', 'findOne', { filter: { phone: phone } });
+        user = phoneResult.rows[0];
       }
     }
     
     if (!user) {
+      recordFailedLogin(loginIdentifier);
       return res.status(400).json({ error: 'Invalid credentials' });
     }
     
@@ -242,8 +291,12 @@ router.post('/login', async function(req, res) {
     
     var validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
+      recordFailedLogin(loginIdentifier);
       return res.status(400).json({ error: 'Invalid credentials' });
     }
+
+    // MED-10: Clear failed attempts on successful login
+    clearLoginAttempts(loginIdentifier);
 
     // Check email verification - require verification unless in development or explicitly skipped
     var skipVerification = process.env.NODE_ENV === 'development' || process.env.SKIP_EMAIL_VERIFICATION === 'true';

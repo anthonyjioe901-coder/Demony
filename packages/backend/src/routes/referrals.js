@@ -124,42 +124,48 @@ router.get('/history', authenticateToken, async function(req, res) {
     var database = await db.getDb();
     var userId = req.user.id;
     
+    // PERF-02: Use $lookup to batch-fetch referred user names instead of N+1 queries
     var referrals = await database.collection('referrals').aggregate([
       { $match: { referrerId: userId } },
       { $sort: { createdAt: -1 } },
-      { $limit: 50 }
+      { $limit: 50 },
+      {
+        $addFields: {
+          refereeObjId: {
+            $cond: {
+              if: { $regexMatch: { input: { $toString: '$refereeId' }, regex: /^[0-9a-fA-F]{24}$/ } },
+              then: { $toObjectId: '$refereeId' },
+              else: null
+            }
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'refereeObjId',
+          foreignField: '_id',
+          pipeline: [{ $project: { name: 1 } }],
+          as: 'refereeUser'
+        }
+      }
     ]).toArray();
     
-    // Get referred user names (privacy: only first name + initial)
-    var referralList = await Promise.all(referrals.map(async function(ref) {
-      try {
-        var referredUser = await database.collection('users').findOne({
-          _id: new ObjectId(ref.refereeId)
-        });
-        var displayName = 'Anonymous';
-        if (referredUser && referredUser.name) {
-          var nameParts = referredUser.name.split(' ');
-          displayName = nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '');
-        }
-        return {
-          id: ref._id.toString(),
-          displayName: displayName,
-          status: ref.status,
-          bonusPaid: ref.bonusPaid || 0,
-          createdAt: ref.createdAt,
-          investedAt: ref.investedAt
-        };
-      } catch (e) {
-        return {
-          id: ref._id.toString(),
-          displayName: 'User',
-          status: ref.status,
-          bonusPaid: ref.bonusPaid || 0,
-          createdAt: ref.createdAt,
-          investedAt: ref.investedAt
-        };
+    var referralList = referrals.map(function(ref) {
+      var displayName = 'User';
+      if (ref.refereeUser && ref.refereeUser[0] && ref.refereeUser[0].name) {
+        var nameParts = ref.refereeUser[0].name.split(' ');
+        displayName = nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '');
       }
-    }));
+      return {
+        id: ref._id.toString(),
+        displayName: displayName,
+        status: ref.status,
+        bonusPaid: ref.bonusPaid || 0,
+        createdAt: ref.createdAt,
+        investedAt: ref.investedAt
+      };
+    });
     
     res.json({ referrals: referralList });
   } catch (err) {
@@ -428,6 +434,7 @@ router.get('/leaderboard', async function(req, res) {
   try {
     var database = await db.getDb();
     
+    // PERF-02: Use $lookup to batch-fetch user names instead of N+1 queries
     var leaders = await database.collection('referrals').aggregate([
       { $match: { status: 'completed' } },
       { $group: {
@@ -436,35 +443,42 @@ router.get('/leaderboard', async function(req, res) {
         earned: { $sum: '$bonusPaid' }
       }},
       { $sort: { count: -1 } },
-      { $limit: 10 }
+      { $limit: 10 },
+      {
+        $addFields: {
+          referrerObjId: {
+            $cond: {
+              if: { $regexMatch: { input: { $toString: '$_id' }, regex: /^[0-9a-fA-F]{24}$/ } },
+              then: { $toObjectId: '$_id' },
+              else: null
+            }
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'referrerObjId',
+          foreignField: '_id',
+          pipeline: [{ $project: { name: 1 } }],
+          as: 'user'
+        }
+      }
     ]).toArray();
     
-    // Get user names
-    var leaderboard = await Promise.all(leaders.map(async function(leader, index) {
-      try {
-        var user = await database.collection('users').findOne({
-          _id: new ObjectId(leader._id)
-        });
-        var displayName = 'Investor';
-        if (user && user.name) {
-          var nameParts = user.name.split(' ');
-          displayName = nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '');
-        }
-        return {
-          rank: index + 1,
-          displayName: displayName,
-          referrals: leader.count,
-          earned: leader.earned
-        };
-      } catch (e) {
-        return {
-          rank: index + 1,
-          displayName: 'Investor',
-          referrals: leader.count,
-          earned: leader.earned
-        };
+    var leaderboard = leaders.map(function(leader, index) {
+      var displayName = 'Investor';
+      if (leader.user && leader.user[0] && leader.user[0].name) {
+        var nameParts = leader.user[0].name.split(' ');
+        displayName = nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '');
       }
-    }));
+      return {
+        rank: index + 1,
+        displayName: displayName,
+        referrals: leader.count,
+        earned: leader.earned
+      };
+    });
     
     res.json({ leaderboard: leaderboard });
   } catch (err) {

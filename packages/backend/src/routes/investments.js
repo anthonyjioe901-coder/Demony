@@ -167,12 +167,25 @@ router.post('/', authenticateToken, async function(req, res) {
         }, { session: session });
         
         // Step 4: Update project funding
+        // BUG-03: Only increment investorCount if this is a new investor for this project
+        var existingInvestment = await database.collection('investments').findOne({
+          userId: userId,
+          projectId: projectId,
+          status: 'active',
+          _id: { $ne: result.insertedId } // exclude the one we just inserted
+        }, { session: session });
+        
+        var projectUpdate = { 
+          $inc: { currentFunding: amount },
+          $set: { updatedAt: new Date() }
+        };
+        if (!existingInvestment) {
+          projectUpdate.$inc.investorCount = 1;
+        }
+        
         await database.collection('projects').updateOne(
           { _id: new ObjectId(projectId) },
-          { 
-            $inc: { currentFunding: amount, investorCount: 1 },
-            $set: { updatedAt: new Date() }
-          },
+          projectUpdate,
           { session: session }
         );
         
@@ -436,9 +449,25 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
     }
     
     // Update project funding
+    // BUG-03: Only increment investorCount if this is a new investor
+    var existingDirectPayInvestment = await database.collection('investments').findOne({
+      userId: investment.userId,
+      projectId: investment.projectId,
+      status: 'active',
+      _id: { $ne: investment._id }
+    });
+    
+    var projectDirectUpdate = { 
+      $inc: { currentFunding: investment.amount },
+      $set: { updatedAt: new Date() }
+    };
+    if (!existingDirectPayInvestment) {
+      projectDirectUpdate.$inc.investorCount = 1;
+    }
+    
     await database.collection('projects').updateOne(
       { _id: new ObjectId(investment.projectId) },
-      { $inc: { currentFunding: investment.amount, investorCount: 1 }, $set: { updatedAt: new Date() } }
+      projectDirectUpdate
     );
     
     // Record transaction

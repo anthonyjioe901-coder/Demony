@@ -74,7 +74,7 @@ app.use(helmet({
 var walletWebhookRouter = require('./routes/walletWebhook.js');
 app.use('/api/wallet/webhook', walletWebhookRouter);
 
-app.use(express.json({ limit: '10mb' })); // Increased limit for file uploads
+app.use(express.json({ limit: '1mb' })); // MED-02: Reduced default limit (upload route has its own higher limit)
 
 // NoSQL injection protection - strips $ operators from user input
 app.use(noSqlSanitize);
@@ -104,7 +104,7 @@ app.use('/api/performance', performanceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/wallet', walletRoutes);
-app.use('/api/upload', uploadRoutes);
+app.use('/api/upload', express.json({ limit: '10mb' }), uploadRoutes); // Higher limit for image uploads
 app.use('/api/support', supportRoutes);
 app.use('/api/referrals', referralRoutes);
 
@@ -118,11 +118,24 @@ app.get('/', function(req, res) {
 });
 
 // Health check endpoint for keep-alive pings
-app.get('/health', function(req, res) {
-  res.json({ 
-    status: 'alive',
-    timestamp: new Date().toISOString()
-  });
+// DEPLOY-03: Include DB health check
+app.get('/health', async function(req, res) {
+  try {
+    var database = await db.getDb();
+    await database.command({ ping: 1 });
+    res.json({ 
+      status: 'alive',
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(503).json({ 
+      status: 'degraded',
+      database: 'disconnected',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // ========== KEEP-ALIVE MECHANISM ==========
@@ -183,8 +196,51 @@ db.connect().then(function() {
   console.error('Database connection failed:', err);
 });
 
-app.listen(port, function() {
+// MED-04: Global error handler - must be last middleware
+app.use(function(err, req, res, next) {
+  // CORS errors
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'CORS not allowed' });
+  }
+  
+  // JSON parse errors
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON in request body' });
+  }
+  
+  // Payload too large
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request body too large' });
+  }
+  
+  console.error('Unhandled error:', err.stack || err.message || err);
+  res.status(err.status || 500).json({ error: 'Internal server error' });
+});
+
+var server = app.listen(port, function() {
   console.log('Demony API server running on port ' + port);
 });
+
+// DEPLOY-04: Graceful shutdown handler
+function gracefulShutdown(signal) {
+  console.log('\n' + signal + ' received. Shutting down gracefully...');
+  server.close(function() {
+    console.log('HTTP server closed');
+    db.close().then(function() {
+      console.log('Database connection closed');
+      process.exit(0);
+    }).catch(function() {
+      process.exit(0);
+    });
+  });
+  // Force shutdown after 10 seconds
+  setTimeout(function() {
+    console.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', function() { gracefulShutdown('SIGTERM'); });
+process.on('SIGINT', function() { gracefulShutdown('SIGINT'); });
 
 module.exports = { app: app, nativeAddon: nativeAddon };

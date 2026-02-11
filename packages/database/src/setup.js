@@ -1,45 +1,34 @@
+// Database setup - MongoDB version
+// Creates collections with validation schemas and indexes
 var db = require('./index');
+var { createIndexes } = require('./create-indexes');
 
 async function setup() {
   try {
-    // Users table
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // Projects table
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS projects (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        description TEXT,
-        category VARCHAR(50),
-        goal_amount DECIMAL(12, 2) NOT NULL,
-        raised_amount DECIMAL(12, 2) DEFAULT 0,
-        status VARCHAR(20) DEFAULT 'active',
-        image_url VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // Investments table
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS investments (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        project_id INTEGER REFERENCES projects(id),
-        amount DECIMAL(12, 2) NOT NULL,
-        status VARCHAR(20) DEFAULT 'completed',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
+    await db.connect();
+    var database = await db.getDb();
+    
+    // Create collections with JSON Schema validation
+    var collections = ['users', 'projects', 'investments', 'transactions', 
+      'withdrawals', 'deposits', 'support_tickets', 'email_verifications',
+      'profit_distributions', 'referrals', 'faq', 'audit_log',
+      'investment_terms_acceptance', 'project_updates'];
+    
+    var existing = await database.listCollections().toArray();
+    var existingNames = existing.map(function(c) { return c.name; });
+    
+    for (var i = 0; i < collections.length; i++) {
+      if (existingNames.indexOf(collections[i]) === -1) {
+        await database.createCollection(collections[i]);
+        console.log('  Created collection:', collections[i]);
+      } else {
+        console.log('  Collection exists:', collections[i]);
+      }
+    }
+    
+    // Create indexes
+    await createIndexes();
+    
     console.log('Database setup completed');
     process.exit(0);
   } catch (err) {
