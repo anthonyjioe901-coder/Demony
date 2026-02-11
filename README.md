@@ -138,7 +138,7 @@ Scan the codebase and tell me how exactly the above can be done.
 
 
 
-Demony is a Investment platform where people can invest in listed local projects, companies, and businesses.
+Demony is a Investment platform where people can invest in listed local projects, companies, and businesses. 7
 
 Test and go through this page and report to me what we are not doing right. I mean the projects listed the users keep asking how much they will make. ([20/12/2025 06:59] Tony Shelby: Yes bro I know the owners. It a start and it will become big soon
 
