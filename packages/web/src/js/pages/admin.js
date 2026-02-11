@@ -1610,6 +1610,29 @@ function resolveTicket(ticketId) {
     .catch(function(err) { alert('Error: ' + err.message); });
 }
 
+function readImageFileAsDataUrl(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() { resolve(reader.result); };
+    reader.onerror = function() { reject(new Error('Failed to read image file')); };
+    reader.readAsDataURL(file);
+  });
+}
+
+function uploadProjectImage(file) {
+  if (!file) {
+    return Promise.resolve(null);
+  }
+  if (!window._api || !window._api.uploadImage) {
+    return Promise.reject(new Error('Image upload is not available'));
+  }
+  return readImageFileAsDataUrl(file).then(function(dataUrl) {
+    return window._api.uploadImage(dataUrl, file.name).then(function(result) {
+      return result.dataUrl || result.url || dataUrl;
+    });
+  });
+}
+
 // Create Project Modal
 function showCreateProjectModal() {
   var modal = document.createElement('div');
@@ -1629,7 +1652,7 @@ function showCreateProjectModal() {
           '<div class="form-group"><label>Duration (months)</label><input type="number" id="proj-duration" min="1" max="60" value="12"></div>' +
         '</div>' +
         '<div class="form-group"><label>Category</label><select id="proj-category" style="width:100%; padding: 0.5rem;"><option value="agriculture">Agriculture</option><option value="manufacturing">Manufacturing</option><option value="technology">Technology</option><option value="services">Services</option><option value="retail">Retail</option><option value="real_estate">Real Estate</option></select></div>' +
-        '<div class="form-group"><label>Image URL</label><input type="url" id="proj-image" placeholder="https://..."></div>' +
+        '<div class="form-group"><label>Project Image</label><input type="file" id="proj-image" accept="image/*"></div>' +
         '<div class="form-group"><label class="checkbox-label"><input type="checkbox" id="proj-featured"> Mark as Featured</label></div>' +
         '<div style="display: flex; gap: 1rem;">' +
           '<button type="button" class="btn btn-outline" onclick="this.closest(\'.modal\').remove()" style="flex:1;">Cancel</button>' +
@@ -1647,6 +1670,7 @@ function showCreateProjectModal() {
     btn.disabled = true;
     btn.textContent = 'Creating...';
     
+    var imageFile = document.getElementById('proj-image').files[0] || null;
     var projectData = {
       name: document.getElementById('proj-name').value,
       description: document.getElementById('proj-description').value,
@@ -1655,12 +1679,17 @@ function showCreateProjectModal() {
       roi: parseFloat(document.getElementById('proj-roi').value) || 15,
       duration: parseInt(document.getElementById('proj-duration').value) || 12,
       category: document.getElementById('proj-category').value,
-      imageUrl: document.getElementById('proj-image').value || null,
       featured: document.getElementById('proj-featured').checked,
       status: 'active'
     };
-    
-    window._adminApi.createProject(projectData)
+
+    uploadProjectImage(imageFile)
+      .then(function(imageUrl) {
+        if (imageUrl) {
+          projectData.imageUrl = imageUrl;
+        }
+        return window._adminApi.createProject(projectData);
+      })
       .then(function(result) {
         alert('✅ Project created successfully!');
         modal.remove();
@@ -1677,6 +1706,7 @@ function showCreateProjectModal() {
 // Edit Project Modal
 function showEditProjectModal(projectId) {
   window._adminApi.getProject(projectId).then(function(project) {
+    var existingImageUrl = (project.imageUrl || project.image_url || '').replace(/"/g, '&quot;');
     var modal = document.createElement('div');
     modal.className = 'modal active';
     modal.innerHTML = 
@@ -1694,7 +1724,7 @@ function showEditProjectModal(projectId) {
             '<div class="form-group"><label>ROI (%)</label><input type="number" id="edit-proj-roi" value="' + (project.roi || project.expected_returns || 15) + '" step="0.1"></div>' +
             '<div class="form-group"><label>Status</label><select id="edit-proj-status" style="width:100%; padding: 0.5rem;"><option value="active"' + (project.status === 'active' ? ' selected' : '') + '>Active</option><option value="inactive"' + (project.status === 'inactive' ? ' selected' : '') + '>Inactive</option><option value="completed"' + (project.status === 'completed' ? ' selected' : '') + '>Completed</option></select></div>' +
           '</div>' +
-          '<div class="form-group"><label>Image URL</label><input type="url" id="edit-proj-image" value="' + (project.imageUrl || project.image_url || '') + '"></div>' +
+          '<div class="form-group"><label>Project Image</label><input type="file" id="edit-proj-image" accept="image/*" data-current-url="' + existingImageUrl + '"></div>' +
           '<div class="form-group"><label class="checkbox-label"><input type="checkbox" id="edit-proj-featured"' + (project.featured ? ' checked' : '') + '> Mark as Featured</label></div>' +
           '<div style="display: flex; gap: 1rem;">' +
             '<button type="button" class="btn btn-outline" onclick="this.closest(\'.modal\').remove()" style="flex:1;">Cancel</button>' +
@@ -1711,6 +1741,9 @@ function showEditProjectModal(projectId) {
       var btn = this.querySelector('button[type="submit"]');
       btn.disabled = true;
       btn.textContent = 'Saving...';
+
+      var imageFile = document.getElementById('edit-proj-image').files[0] || null;
+      var currentImageUrl = document.getElementById('edit-proj-image').getAttribute('data-current-url') || '';
       
       var updates = {
         name: document.getElementById('edit-proj-name').value,
@@ -1719,11 +1752,14 @@ function showEditProjectModal(projectId) {
         minInvestment: parseFloat(document.getElementById('edit-proj-min').value),
         roi: parseFloat(document.getElementById('edit-proj-roi').value),
         status: document.getElementById('edit-proj-status').value,
-        imageUrl: document.getElementById('edit-proj-image').value,
         featured: document.getElementById('edit-proj-featured').checked
       };
-      
-      window._adminApi.updateProject(projectId, updates)
+
+      uploadProjectImage(imageFile)
+        .then(function(imageUrl) {
+          updates.imageUrl = imageUrl || currentImageUrl || undefined;
+          return window._adminApi.updateProject(projectId, updates);
+        })
         .then(function(result) {
           alert('✅ Project updated!');
           modal.remove();
