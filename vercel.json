@@ -1,8 +1,7 @@
 {
-  "buildCommand": "cd packages/web && npm install && npm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "packages/web/dist",
-  "devCommand": "cd packages/web && npm run dev",
-  "installCommand": "npm install --prefix packages/web",
+  "installCommand": "cd packages/web && npm install",
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
