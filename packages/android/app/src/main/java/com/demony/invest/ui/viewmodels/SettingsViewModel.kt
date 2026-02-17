@@ -72,6 +72,7 @@ class SettingsViewModel @Inject constructor(
                 preferences[PUSH_NOTIFICATIONS] = enabled
             }
             _pushNotifications.value = enabled
+            syncNotificationPreferences()
             _showToast.value = if (enabled) "Push notifications enabled" else "Push notifications disabled"
         }
     }
@@ -82,6 +83,7 @@ class SettingsViewModel @Inject constructor(
                 preferences[EMAIL_NOTIFICATIONS] = enabled
             }
             _emailNotifications.value = enabled
+            syncNotificationPreferences()
             _showToast.value = if (enabled) "Email notifications enabled" else "Email notifications disabled"
         }
     }
@@ -133,5 +135,16 @@ class SettingsViewModel @Inject constructor(
 
     fun clearToast() {
         _showToast.value = null
+    }
+
+    private fun syncNotificationPreferences() {
+        viewModelScope.launch {
+            repository.updateNotificationPreferences(
+                emailNotifications = _emailNotifications.value,
+                investmentUpdates = _pushNotifications.value,
+                referralNotifications = _pushNotifications.value,
+                marketingNotifications = false
+            )
+        }
     }
 }

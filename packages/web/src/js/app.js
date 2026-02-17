@@ -14,6 +14,7 @@ import { renderTerms, renderPrivacy, renderRiskDisclosure, renderAgreementModal 
 import { renderSupport } from './pages/support.js';
 import { renderSettings } from './pages/settings.js';
 import { renderReferrals } from './pages/referrals.js';
+import { initNotifications, destroyNotifications } from './notifications.js';
 
 // Initialize API client
 const api = new Api();
@@ -260,6 +261,9 @@ function updateAuthState() {
       if (userNameDisplay) userNameDisplay.textContent = user.name;
     }
     
+    // Initialize notification bell + SSE stream
+    initNotifications(api);
+    
     // Hide investor-specific links for admin and business owners
     var investorLinks = document.querySelectorAll('[data-page="projects"], [data-page="wallet"], [data-page="investments"], [data-page="portfolio"]');
     if (user.role === 'admin' || user.role === 'business_owner') {
@@ -315,6 +319,7 @@ var logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
   logoutBtn.addEventListener('click', function(e) {
     e.preventDefault();
+    destroyNotifications();
     api.logout();
     updateAuthState();
     router.navigate('home');

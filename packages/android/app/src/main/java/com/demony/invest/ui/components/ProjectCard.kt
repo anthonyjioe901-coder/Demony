@@ -132,6 +132,7 @@ fun ProjectCard(
                 ) {
                     AssistChip(
                         onClick = {},
+                        enabled = false,
                         label = { Text(project.category) },
                         leadingIcon = {
                             Icon(
@@ -223,7 +224,7 @@ fun ProjectCard(
                     ProjectStat(
                         icon = Icons.Default.Schedule,
                         label = "Duration",
-                        value = project.duration
+                        value = "${project.lockInPeriodMonths} mo"
                     )
                     ProjectStat(
                         icon = Icons.Default.People,

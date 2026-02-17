@@ -4,7 +4,7 @@ var cors = require('cors');
 var dotenv = require('dotenv');
 var helmet = require('helmet');
 var noSqlSanitize = require('./middleware/sanitize');
-var { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
+var { apiLimiter, authLimiter, financialLimiter } = require('./middleware/rateLimiter');
 
 dotenv.config();
 
@@ -94,19 +94,21 @@ var walletRoutes = require('./routes/wallet.js');
 var uploadRoutes = require('./routes/upload.js');
 var supportRoutes = require('./routes/support.js');
 var referralRoutes = require('./routes/referrals.js');
+var notificationRoutes = require('./routes/notifications.js');
 
 // Use routes (auth gets stricter rate limiting)
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
-app.use('/api/investments', investmentRoutes);
+app.use('/api/investments', financialLimiter, investmentRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/withdrawals', withdrawalRoutes);
-app.use('/api/wallet', walletRoutes);
+app.use('/api/withdrawals', financialLimiter, withdrawalRoutes);
+app.use('/api/wallet', financialLimiter, walletRoutes);
 app.use('/api/upload', express.json({ limit: '10mb' }), uploadRoutes); // Higher limit for image uploads
 app.use('/api/support', supportRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Root endpoint
 app.get('/', function(req, res) {

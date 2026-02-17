@@ -2,6 +2,11 @@ package com.demony.invest.ui.screens.portfolio
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -13,17 +18,32 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.demony.invest.ui.components.BottomNavigationBar
+import com.demony.invest.ui.navigation.Screen
 import com.demony.invest.ui.viewmodels.PortfolioViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun PortfolioScreen(
     navController: NavController,
     viewModel: PortfolioViewModel = hiltViewModel()
 ) {
     val portfolio by viewModel.portfolio.collectAsState()
+    val referralCode by viewModel.referralCode.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.refresh()
+        }
+    )
+    
+    LaunchedEffect(isLoading) {
+        if (!isLoading) isRefreshing = false
+    }
 
     Scaffold(
         topBar = {
@@ -50,10 +70,15 @@ fun PortfolioScreen(
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .pullRefresh(pullRefreshState)
+            ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -103,6 +128,45 @@ fun PortfolioScreen(
                         }
                     }
                 }
+
+                // Referral Progress Widget
+                referralCode?.stats?.let { stats ->
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "Referral Progress",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "${stats.qualifiedReferrals}/${stats.qualifyingNeeded} qualified referrals",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = (stats.progress.coerceIn(0, 100) / 100f),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = if (stats.isQualified)
+                                        "Unlocked: GH₵ %.2f".format(stats.availableEarnings)
+                                    else
+                                        "Locked earnings: GH₵ %.2f".format(stats.lockedEarnings),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (stats.isQualified) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
                 
                 // Stats Grid
                 item {
@@ -112,6 +176,7 @@ fun PortfolioScreen(
                     ) {
                         Card(
                             modifier = Modifier.weight(1f),
+                            onClick = { navController.navigate(Screen.Investments.route) },
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                             )
@@ -141,6 +206,7 @@ fun PortfolioScreen(
                         
                         Card(
                             modifier = Modifier.weight(1f),
+                            onClick = { navController.navigate(Screen.Investments.route) },
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
                             )
@@ -162,6 +228,68 @@ fun PortfolioScreen(
                                 )
                                 Text(
                                     text = "Total Earnings",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Risk Analysis
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = portfolio?.riskLevel ?: "Moderate",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Risk Level",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.DonutLarge,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "${portfolio?.diversificationScore ?: 1}/10",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Diversification",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -288,6 +416,12 @@ fun PortfolioScreen(
                         }
                     }
                 }
+            }
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
             }
         }
     }

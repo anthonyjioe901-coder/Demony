@@ -46,7 +46,11 @@ fun BottomNavigationBar(navController: NavController) {
             selected = currentRoute == Screen.Projects.route,
             onClick = {
                 if (currentRoute != Screen.Projects.route) {
-                    navController.navigate(Screen.Projects.route)
+                    navController.navigate(Screen.Projects.route) {
+                        popUpTo(Screen.Home.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 }
             }
         )
@@ -62,7 +66,11 @@ fun BottomNavigationBar(navController: NavController) {
             selected = currentRoute == Screen.Wallet.route,
             onClick = {
                 if (currentRoute != Screen.Wallet.route) {
-                    navController.navigate(Screen.Wallet.route)
+                    navController.navigate(Screen.Wallet.route) {
+                        popUpTo(Screen.Home.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 }
             }
         )
@@ -70,15 +78,19 @@ fun BottomNavigationBar(navController: NavController) {
         NavigationBarItem(
             icon = {
                 Icon(
-                    if (currentRoute == Screen.Investments.route) Icons.Filled.ShowChart else Icons.Outlined.ShowChart,
-                    contentDescription = "Investments"
+                    if (currentRoute == Screen.Portfolio.route) Icons.Filled.PieChart else Icons.Outlined.PieChart,
+                    contentDescription = "Portfolio"
                 )
             },
-            label = { Text("Investments") },
-            selected = currentRoute == Screen.Investments.route,
+            label = { Text("Portfolio") },
+            selected = currentRoute == Screen.Portfolio.route,
             onClick = {
-                if (currentRoute != Screen.Investments.route) {
-                    navController.navigate(Screen.Investments.route)
+                if (currentRoute != Screen.Portfolio.route) {
+                    navController.navigate(Screen.Portfolio.route) {
+                        popUpTo(Screen.Home.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 }
             }
         )
@@ -94,7 +106,11 @@ fun BottomNavigationBar(navController: NavController) {
             selected = currentRoute == Screen.Profile.route,
             onClick = {
                 if (currentRoute != Screen.Profile.route) {
-                    navController.navigate(Screen.Profile.route)
+                    navController.navigate(Screen.Profile.route) {
+                        popUpTo(Screen.Home.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 }
             }
         )

@@ -1,7 +1,9 @@
 {
   "name": "demony",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev:web": "cd packages/web && npm run dev",
     "dev:mobile": "cd packages/mobile && npm run dev",
@@ -13,5 +15,8 @@
     "db:setup": "cd packages/database && npm run setup",
     "db:seed": "cd packages/database && npm run seed",
     "install:all": "pnpm install"
+  },
+  "dependencies": {
+    "mongodb": "^7.1.0"
   }
 }

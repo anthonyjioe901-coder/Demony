@@ -1,4 +1,6 @@
 // Profile Page
+import { escapeHtml, escapeAttr } from '../utils.js';
+
 function renderProfile(container, api) {
   var user = api.user;
   
@@ -17,7 +19,7 @@ function renderProfile(container, api) {
     return;
   }
   
-  var initials = user.name ? user.name.split(' ').map(function(n) { return n[0]; }).join('').toUpperCase() : '?';
+  var initials = user.name ? escapeHtml(user.name.split(' ').map(function(n) { return n[0]; }).join('').toUpperCase()) : '?';
   
   var html = 
     '<section>' +
@@ -31,8 +33,8 @@ function renderProfile(container, api) {
         '<div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem; color: white; font-weight: 700;">' +
           initials +
         '</div>' +
-        '<h2 style="margin-bottom: 0.25rem; font-size: 1.25rem;">' + user.name + '</h2>' +
-        '<p style="color: var(--text-muted); font-size: 0.9rem;">' + user.email + '</p>' +
+        '<h2 style="margin-bottom: 0.25rem; font-size: 1.25rem;">' + escapeHtml(user.name) + '</h2>' +
+        '<p style="color: var(--text-muted); font-size: 0.9rem;">' + escapeHtml(user.email) + '</p>' +
         '<span class="badge" style="margin-top: 0.75rem; display: inline-block;">' + 
           (user.role === 'investor' ? '💎 Investor' : user.role === 'business_owner' ? '🏢 Business Owner' : '👑 Admin') + 
         '</span>' +

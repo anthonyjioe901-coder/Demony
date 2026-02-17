@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils.js';
+
 // Support Page - Help Center, FAQ, Contact Form
 
 // FAQ data organized by category
@@ -372,13 +374,13 @@ function submitSupportRequest(api) {
         '<div style="text-align: center; padding: 2rem;">' +
           '<div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>' +
           '<h3 style="color: var(--secondary-color); margin-bottom: 0.5rem;">Request Submitted!</h3>' +
-          '<p style="color: var(--text-muted); margin-bottom: 1rem;">Your ticket ID: <strong>' + result.ticketId + '</strong></p>' +
-          '<p style="color: var(--text-muted); margin-bottom: 1.5rem;">We\'ll respond to <strong>' + email + '</strong> within 24 hours.</p>' +
+          '<p style="color: var(--text-muted); margin-bottom: 1rem;">Your ticket ID: <strong>' + escapeHtml(result.ticketId) + '</strong></p>' +
+          '<p style="color: var(--text-muted); margin-bottom: 1.5rem;">We\'ll respond to <strong>' + escapeHtml(email) + '</strong> within 24 hours.</p>' +
           '<button class="btn btn-outline" onclick="location.reload()">Submit Another Request</button>' +
         '</div>';
     })
     .catch(function(err) {
-      alert('Failed to submit request: ' + err.message);
+      alert('Failed to submit request: ' + (err.message || 'Unknown error'));
       submitBtn.disabled = false;
       submitBtn.textContent = 'Submit Support Request';
     });

@@ -26,8 +26,18 @@ class DemonyRepository @Inject constructor(
 
     // ==================== AUTHENTICATION ====================
 
-    suspend fun login(email: String, password: String): Result<AuthResponse> = safeApiCall {
-        apiService.login(LoginRequest(email, password))
+    suspend fun login(identifier: String, password: String): Result<AuthResponse> = safeApiCall {
+        val cleaned = identifier.trim()
+        val isEmail = cleaned.contains("@")
+        val phoneClean = cleaned.replace("[\\s\\-]".toRegex(), "")
+
+        apiService.login(
+            LoginRequest(
+                email = if (isEmail) cleaned else null,
+                phone = if (!isEmail) phoneClean else null,
+                password = password
+            )
+        )
     }.also { result ->
         result.getOrNull()?.let { response ->
             tokenManager.saveToken(response.token)
@@ -87,6 +97,53 @@ class DemonyRepository @Inject constructor(
         apiService.updatePhone(mapOf("phone" to phone))
     }
 
+    suspend fun updateProfile(
+        name: String,
+        phone: String? = null,
+        businessName: String? = null
+    ): Result<User> = safeApiCall {
+        val payload = mutableMapOf<String, Any>(
+            "name" to name
+        )
+        if (!phone.isNullOrBlank()) {
+            payload["phone"] = phone
+        }
+        if (!businessName.isNullOrBlank()) {
+            payload["businessName"] = businessName
+        }
+        apiService.updateProfile(payload)
+    }.mapCatching { response ->
+        response.user
+    }.also { result ->
+        result.getOrNull()?.let { updatedUser ->
+            tokenManager.saveUser(updatedUser)
+        }
+    }
+
+    suspend fun updateNotificationPreferences(
+        emailNotifications: Boolean,
+        investmentUpdates: Boolean,
+        referralNotifications: Boolean,
+        marketingNotifications: Boolean
+    ): Result<MessageResponse> = safeApiCall {
+        apiService.updateNotificationPreferences(
+            NotificationPreferencesRequest(
+                emailNotifications = emailNotifications,
+                investmentUpdates = investmentUpdates,
+                referralNotifications = referralNotifications,
+                marketingNotifications = marketingNotifications
+            )
+        )
+    }
+
+    suspend fun deleteAccount(): Result<MessageResponse> = safeApiCall {
+        apiService.deleteAccount()
+    }.also { result ->
+        if (result.isSuccess) {
+            tokenManager.clearAll()
+        }
+    }
+
     fun logout() {
         tokenManager.clearAll()
     }
@@ -101,9 +158,10 @@ class DemonyRepository @Inject constructor(
         page: Int = 1,
         limit: Int = 10,
         category: String? = null,
-        sort: String? = null
+        sort: String? = null,
+        search: String? = null
     ): Result<ProjectsResponse> = safeApiCall {
-        apiService.getProjects(page, limit, category, sort)
+        apiService.getProjects(page, limit, category, sort, search)
     }
 
     suspend fun getProject(id: String): Result<Project> = safeApiCall {
@@ -214,8 +272,16 @@ class DemonyRepository @Inject constructor(
         apiService.submitSupportTicket(ticket)
     }
 
+    suspend fun getMySupportTickets(): Result<SupportTicketsResponse> = safeApiCall {
+        apiService.getMySupportTickets()
+    }
+
     suspend fun getTicketStatus(ticketId: String): Result<SupportTicket> = safeApiCall {
         apiService.getTicketStatus(ticketId)
+    }
+
+    suspend fun getTicketDetails(ticketId: String): Result<SupportTicketDetails> = safeApiCall {
+        apiService.getTicketDetails(ticketId)
     }
 
     suspend fun getSystemStatus(): Result<Map<String, Any>> = safeApiCall {
@@ -256,6 +322,24 @@ class DemonyRepository @Inject constructor(
     
     fun setNotificationsEnabled(enabled: Boolean) {
         tokenManager.setNotificationsEnabled(enabled)
+    }
+
+    // ==================== NOTIFICATIONS ====================
+
+    suspend fun getNotifications(limit: Int = 30, unread: Boolean? = null): Result<NotificationsResponse> = safeApiCall {
+        apiService.getNotifications(limit, unread)
+    }
+
+    suspend fun markNotificationRead(id: String): Result<MessageResponse> = safeApiCall {
+        apiService.markNotificationRead(id)
+    }
+
+    suspend fun markAllNotificationsRead(): Result<MessageResponse> = safeApiCall {
+        apiService.markNotificationRead("all")
+    }
+
+    suspend fun getUnreadCount(): Result<UnreadCountResponse> = safeApiCall {
+        apiService.getUnreadCount()
     }
 
     // ==================== HELPER FUNCTIONS ====================

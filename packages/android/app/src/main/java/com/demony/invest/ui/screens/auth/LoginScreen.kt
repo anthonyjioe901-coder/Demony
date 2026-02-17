@@ -1,5 +1,7 @@
 package com.demony.invest.ui.screens.auth
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -31,7 +34,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     authViewModel: AuthViewModel
 ) {
-    var email by remember { mutableStateOf("") }
+    var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     
@@ -41,16 +44,15 @@ fun LoginScreen(
     var forgotPasswordSent by remember { mutableStateOf(false) }
     var forgotPasswordLoading by remember { mutableStateOf(false) }
     var forgotPasswordError by remember { mutableStateOf<String?>(null) }
-    var showTermsDialog by remember { mutableStateOf(false) }
-    var showPrivacyDialog by remember { mutableStateOf(false) }
     
     val isLoading by authViewModel.isLoading.collectAsState()
     val error by authViewModel.error.collectAsState()
     
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     
     // Clear error when inputs change
-    LaunchedEffect(email, password) {
+    LaunchedEffect(identifier, password) {
         authViewModel.clearError()
     }
 
@@ -212,16 +214,6 @@ fun LoginScreen(
         )
     }
     
-    // Terms of Service Dialog
-    if (showTermsDialog) {
-        TermsOfServiceDialog(onDismiss = { showTermsDialog = false })
-    }
-    
-    // Privacy Policy Dialog
-    if (showPrivacyDialog) {
-        PrivacyPolicyDialog(onDismiss = { showPrivacyDialog = false })
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -286,14 +278,14 @@ fun LoginScreen(
         
         // Email field
         OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
+            value = identifier,
+            onValueChange = { identifier = it },
+            label = { Text("Email or Phone") },
             leadingIcon = {
-                Icon(Icons.Default.Email, contentDescription = null)
+                Icon(Icons.Default.Person, contentDescription = null)
             },
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
+                keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Next
             ),
             keyboardActions = KeyboardActions(
@@ -330,8 +322,8 @@ fun LoginScreen(
             keyboardActions = KeyboardActions(
                 onDone = {
                     focusManager.clearFocus()
-                    if (email.isNotBlank() && password.isNotBlank()) {
-                        authViewModel.login(email, password, onLoginSuccess)
+                    if (identifier.isNotBlank() && password.isNotBlank()) {
+                        authViewModel.login(identifier, password, onLoginSuccess)
                     }
                 }
             ),
@@ -346,7 +338,8 @@ fun LoginScreen(
         TextButton(
             onClick = { 
                 showForgotPasswordDialog = true
-                forgotPasswordEmail = email // Pre-fill with entered email
+                // Prefill only when identifier looks like an email
+                forgotPasswordEmail = if (identifier.contains("@")) identifier else ""
             },
             modifier = Modifier.align(Alignment.End)
         ) {
@@ -358,12 +351,12 @@ fun LoginScreen(
         // Login button
         Button(
             onClick = {
-                authViewModel.login(email, password, onLoginSuccess)
+                authViewModel.login(identifier, password, onLoginSuccess)
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            enabled = !isLoading && email.isNotBlank() && password.isNotBlank()
+            enabled = !isLoading && identifier.isNotBlank() && password.isNotBlank()
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -417,7 +410,9 @@ fun LoginScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable { showTermsDialog = true }
+                modifier = Modifier.clickable {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://demony.app/terms")))
+                }
             )
             Text(
                 text = " and ",
@@ -429,7 +424,9 @@ fun LoginScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable { showPrivacyDialog = true }
+                modifier = Modifier.clickable {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://demony.app/privacy")))
+                }
             )
         }
     }

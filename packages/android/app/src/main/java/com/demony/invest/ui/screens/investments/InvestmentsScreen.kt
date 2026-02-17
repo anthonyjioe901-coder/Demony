@@ -3,6 +3,10 @@ package com.demony.invest.ui.screens.investments
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,9 +19,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.demony.invest.data.models.Investment
 import com.demony.invest.ui.components.BottomNavigationBar
+import com.demony.invest.ui.navigation.Screen
 import com.demony.invest.ui.viewmodels.InvestmentsViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun InvestmentsScreen(
     navController: NavController,
@@ -27,6 +34,19 @@ fun InvestmentsScreen(
     val summary by viewModel.summary.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.refresh()
+        }
+    )
+    
+    LaunchedEffect(isLoading) {
+        if (!isLoading) isRefreshing = false
+    }
 
     Scaffold(
         topBar = {
@@ -53,13 +73,55 @@ fun InvestmentsScreen(
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .pullRefresh(pullRefreshState)
+            ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // How Profits Work Banner
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "How Profits Work",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Profits are distributed when the project owner reports earnings. Your share is: (Your Investment ÷ Total Investment) × Total Profit. Profits can be withdrawn anytime, but your principal is locked until the project ends.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                
                 // Summary Card
                 item {
                     summary?.let { sum ->
@@ -153,14 +215,26 @@ fun InvestmentsScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = { navController.navigate(Screen.Projects.route) }
+                                ) {
+                                    Text("Browse Projects")
+                                }
                             }
                         }
                     }
                 } else {
                     items(investments) { investment ->
-                        InvestmentCard(investment = investment)
+                        InvestmentCard(investment = investment, navController = navController)
                     }
                 }
+            }
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
             }
         }
     }
@@ -194,7 +268,25 @@ private fun SummaryItem(
 }
 
 @Composable
-private fun InvestmentCard(investment: Investment) {
+private fun InvestmentCard(investment: Investment, navController: NavController) {
+    // Determine lock-in status
+    val isLocked = try {
+        val endDate = investment.lockInEndDate?.let {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(it)
+        }
+        endDate == null || endDate.after(Date())
+    } catch (e: Exception) { true }
+    
+    val daysRemaining = try {
+        investment.lockInEndDate?.let {
+            val endDate = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(it)
+            if (endDate != null) {
+                val diff = endDate.time - System.currentTimeMillis()
+                if (diff > 0) (diff / (1000 * 60 * 60 * 24)).toInt() else 0
+            } else null
+        }
+    } catch (e: Exception) { null }
+    
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -217,31 +309,50 @@ private fun InvestmentCard(investment: Investment) {
                     }
                 }
                 
-                Surface(
-                    color = when (investment.status) {
-                        "active" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                        "completed" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                        else -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                    },
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = investment.status.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Lock status badge
+                    Surface(
+                        color = if (isLocked) MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                                else MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = if (isLocked) "🔒 Locked" else "✓ Unlocked",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = if (isLocked) MaterialTheme.colorScheme.error 
+                                    else MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    
+                    // Status badge
+                    Surface(
+                        color = when (investment.status) {
+                            "active" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                            "completed" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            else -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                        },
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = investment.status.replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
             
             Spacer(modifier = Modifier.height(12.dp))
             
+            // 4-column stats grid matching web
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Invested",
+                        text = "Principal",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -250,9 +361,14 @@ private fun InvestmentCard(investment: Investment) {
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
+                    Text(
+                        text = "🔒 Locked",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
                 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Earnings",
                         style = MaterialTheme.typography.labelSmall,
@@ -264,9 +380,14 @@ private fun InvestmentCard(investment: Investment) {
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.secondary
                     )
+                    Text(
+                        text = "✓ Withdrawable",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 }
                 
-                Column(horizontalAlignment = Alignment.End) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Total Value",
                         style = MaterialTheme.typography.labelSmall,
@@ -278,28 +399,52 @@ private fun InvestmentCard(investment: Investment) {
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    Text(
+                        text = "+%.1f%%".format(investment.returnPercentage),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             
+            // Lock-in info
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Return: %.1f%%".format(investment.returnPercentage ?: 0.0),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (investment.returnPercentage >= 0) 
-                        MaterialTheme.colorScheme.secondary 
-                    else MaterialTheme.colorScheme.error
-                )
-                
-                Text(
-                    text = "Lock-in: ${investment.lockInPeriodMonths}",
+                    text = "Lock-in: ${investment.lockInPeriodMonths} months",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                
+                daysRemaining?.let { days ->
+                    if (days > 0) {
+                        Text(
+                            text = "$days days left",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            
+            // Action buttons (matching web)
+            if (investment.earnings > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { navController.navigate(Screen.Wallet.route) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Withdraw Earnings", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

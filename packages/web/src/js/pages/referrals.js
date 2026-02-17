@@ -1,4 +1,6 @@
 // Referrals Page - Dedicated page for referral management
+import { escapeHtml } from '../utils.js';
+
 function renderReferrals(container, api) {
   var user = api.user;
   
@@ -126,7 +128,7 @@ function loadReferralCode(api) {
       codeDisplay.innerHTML = 
         '<div style="display: inline-block; background: var(--surface-color); padding: 1rem 2rem; border-radius: 0.75rem; border: 2px dashed var(--primary-color);">' +
           '<div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;">Your Referral Code</div>' +
-          '<div style="font-size: 1.75rem; font-weight: 800; letter-spacing: 2px; color: var(--primary-color);">' + data.code + '</div>' +
+          '<div style="font-size: 1.75rem; font-weight: 800; letter-spacing: 2px; color: var(--primary-color);">' + escapeHtml(data.code) + '</div>' +
         '</div>';
       
       // Update stats
@@ -189,7 +191,7 @@ function loadReferralHistory(api) {
         html += 
           '<div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: var(--bg-secondary); border-radius: 0.5rem;">' +
             '<div>' +
-              '<div style="font-weight: 600; margin-bottom: 0.25rem;">' + (referral.refereeName || 'New User') + '</div>' +
+              '<div style="font-weight: 600; margin-bottom: 0.25rem;">' + escapeHtml(referral.refereeName || 'New User') + '</div>' +
               '<div style="font-size: 0.85rem; color: var(--text-muted);">' + date + '</div>' +
             '</div>' +
             '<div style="text-align: right;">' +
@@ -234,7 +236,7 @@ function loadLeaderboard(api) {
             '<div style="display: flex; align-items: center; gap: 1rem;">' +
               '<div style="font-size: 1.25rem; font-weight: 700; min-width: 32px;">' + medal + '</div>' +
               '<div>' +
-                '<div style="font-weight: 600;">' + leader.name + (isCurrentUser ? ' (You)' : '') + '</div>' +
+                '<div style="font-weight: 600;">' + escapeHtml(leader.name) + (isCurrentUser ? ' (You)' : '') + '</div>' +
               '</div>' +
             '</div>' +
             '<div style="text-align: right;">' +

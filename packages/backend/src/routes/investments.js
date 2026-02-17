@@ -4,6 +4,8 @@ var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
+var notificationService = require('../services/notifications.js');
+var TYPES = notificationService.NOTIFICATION_TYPES;
 var router = express.Router();
 
 function toObjectId(value) {
@@ -39,6 +41,20 @@ router.post('/', authenticateToken, async function(req, res) {
   if (!projectId || !amount) {
     return res.status(400).json({ error: 'Project ID and amount are required' });
   }
+  
+  // Validate ObjectId format
+  if (!ObjectId.isValid(projectId)) {
+    return res.status(400).json({ error: 'Invalid project ID' });
+  }
+  
+  // Validate amount: finite, positive, max 1M, 2 decimal places
+  if (!isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'Invalid investment amount' });
+  }
+  if (amount > 1000000) {
+    return res.status(400).json({ error: 'Maximum investment is GH₵1,000,000' });
+  }
+  amount = Math.round(amount * 100) / 100; // Round to 2 decimal places
   
   // Require risk acknowledgments
   if (!termsAccepted || !riskAcknowledged || !lossAcknowledged || !lockInAcknowledged) {
@@ -91,9 +107,9 @@ router.post('/', authenticateToken, async function(req, res) {
     var lockInEndDate = new Date();
     lockInEndDate.setMonth(lockInEndDate.getMonth() + lockInPeriodMonths);
     
-    // Calculate ownership percentage
-    var goalAmount = project.goalAmount || 100000;
-    var ownershipPercent = (amount / goalAmount) * 100;
+    // Calculate ownership percentage based on actual total funding (not goal)
+    var totalFunding = (project.raisedAmount || project.currentFunding || 0) + amount;
+    var ownershipPercent = totalFunding > 0 ? (amount / totalFunding) * 100 : 100;
     
     // Create investment with enhanced tracking
     var investment = {
@@ -244,6 +260,14 @@ router.post('/', authenticateToken, async function(req, res) {
         lockInEndDate: lockInEndDate
       }
     });
+    
+    // Send notification (non-blocking)
+    notificationService.createNotification(userId, TYPES.INVESTMENT_CONFIRMED, {
+      title: 'Investment Confirmed',
+      message: 'You invested GH₵' + amount.toLocaleString() + ' in ' + project.name + '. Locked until ' + lockInEndDate.toLocaleDateString() + '.',
+      link: '#/investments',
+      metadata: { amount: amount, projectName: project.name, projectId: projectId }
+    }).catch(function() {});
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

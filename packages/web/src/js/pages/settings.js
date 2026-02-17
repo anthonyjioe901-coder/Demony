@@ -1,4 +1,6 @@
 // Settings Page
+import { escapeAttr } from '../utils.js';
+
 function renderSettings(container, api) {
   var user = api.user;
   
@@ -54,21 +56,21 @@ function renderSettings(container, api) {
         '<form id="update-profile-form">' +
           '<div class="form-group">' +
             '<label for="user-name">Full Name</label>' +
-            '<input type="text" id="user-name" required placeholder="Your name" value="' + user.name + '">' +
+            '<input type="text" id="user-name" required placeholder="Your name" value="' + escapeAttr(user.name) + '">' +
           '</div>' +
           '<div class="form-group">' +
             '<label for="user-email">Email Address</label>' +
-            '<input type="email" id="user-email" required placeholder="your@email.com" value="' + user.email + '" disabled style="background: var(--bg-secondary); cursor: not-allowed;">' +
+            '<input type="email" id="user-email" required placeholder="your@email.com" value="' + escapeAttr(user.email) + '" disabled style="background: var(--bg-secondary); cursor: not-allowed;">' +
             '<small style="color: var(--text-muted); font-size: 0.85rem;">Email cannot be changed</small>' +
           '</div>' +
           (user.role === 'business_owner' ? 
             '<div class="form-group">' +
               '<label for="user-phone">Phone Number</label>' +
-              '<input type="tel" id="user-phone" placeholder="+1234567890" value="' + (user.phone || '') + '">' +
+              '<input type="tel" id="user-phone" placeholder="+1234567890" value="' + escapeAttr(user.phone || '') + '">' +
             '</div>' +
             '<div class="form-group">' +
               '<label for="business-name">Business Name</label>' +
-              '<input type="text" id="business-name" placeholder="Your business name" value="' + (user.businessName || '') + '">' +
+              '<input type="text" id="business-name" placeholder="Your business name" value="' + escapeAttr(user.businessName || '') + '">' +
             '</div>'
           : '') +
           '<button type="submit" class="btn btn-primary">Update Profile</button>' +

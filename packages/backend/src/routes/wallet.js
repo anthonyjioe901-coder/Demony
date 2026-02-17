@@ -7,6 +7,8 @@ var ObjectId = require('mongodb').ObjectId;
 var router = express.Router();
 
 var PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
+var notificationService = require('../services/notifications.js');
+var TYPES = notificationService.NOTIFICATION_TYPES;
 
 // SEC-06: Warn on startup if Paystack secret is missing
 if (!PAYSTACK_SECRET) {
@@ -144,6 +146,9 @@ router.post('/deposit/initialize', async function(req, res) {
       return res.status(400).json({ error: 'Minimum deposit is 20' });
     }
     
+    // Round to 2 decimal places
+    amount = Math.round(amount * 100) / 100;
+    
     if (amount > 1000000) {
       return res.status(400).json({ error: 'Maximum deposit is GH₵1,000,000' });
     }
@@ -270,6 +275,14 @@ router.get('/deposit/verify/:reference', async function(req, res) {
       status: 'success',
       amount: amount
     });
+    
+    // Send notification (non-blocking)
+    notificationService.createNotification(transaction.userId, TYPES.DEPOSIT_SUCCESS, {
+      title: 'Deposit Successful',
+      message: 'GH₵' + amount.toLocaleString() + ' has been added to your wallet.',
+      link: '#/wallet',
+      metadata: { amount: amount, reference: reference }
+    }).catch(function() {});
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -298,6 +311,9 @@ router.post('/withdraw', async function(req, res) {
       return res.status(400).json({ error: 'Minimum withdrawal is GH₵20' });
     }
     
+    // Round to 2 decimal places
+    amount = Math.round(amount * 100) / 100;
+    
     if (amount > 1000000) {
       return res.status(400).json({ error: 'Maximum withdrawal is GH₵1,000,000' });
     }
@@ -306,9 +322,26 @@ router.post('/withdraw', async function(req, res) {
       if (!bankCode || !accountNumber || !accountName) {
         return res.status(400).json({ error: 'Bank details required' });
       }
+      // Validate account number format
+      if (typeof accountNumber !== 'string' || !/^[0-9]{6,20}$/.test(accountNumber.replace(/[\s-]/g, ''))) {
+        return res.status(400).json({ error: 'Invalid account number format' });
+      }
+      if (typeof accountName !== 'string' || accountName.trim().length < 2 || accountName.trim().length > 200) {
+        return res.status(400).json({ error: 'Account name must be 2-200 characters' });
+      }
     } else if (method === 'momo') {
       if (!momoNetwork || !momoNumber) {
         return res.status(400).json({ error: 'Mobile money details required' });
+      }
+      // Validate momo network
+      var validNetworks = ['mtn', 'vodafone', 'airteltigo', 'telecel'];
+      if (typeof momoNetwork !== 'string' || validNetworks.indexOf(momoNetwork.toLowerCase()) === -1) {
+        return res.status(400).json({ error: 'Invalid mobile money network. Use: MTN, Vodafone, AirtelTigo, or Telecel' });
+      }
+      // Validate momo number format
+      var momoClean = (typeof momoNumber === 'string') ? momoNumber.replace(/[\s-]/g, '') : '';
+      if (!/^(\+233|0)[0-9]{9}$/.test(momoClean)) {
+        return res.status(400).json({ error: 'Invalid mobile money number format' });
       }
     } else {
       return res.status(400).json({ error: 'Unsupported withdrawal method' });

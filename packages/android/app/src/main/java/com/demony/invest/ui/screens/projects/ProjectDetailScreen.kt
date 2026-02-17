@@ -1,5 +1,6 @@
 package com.demony.invest.ui.screens.projects
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -12,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -33,9 +35,13 @@ fun ProjectDetailScreen(
     investmentsViewModel: InvestmentsViewModel = hiltViewModel(),
     walletViewModel: WalletViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val project by projectsViewModel.selectedProject.collectAsState()
     val isLoading by projectsViewModel.isLoading.collectAsState()
     val error by projectsViewModel.error.collectAsState()
+    val roiResult by projectsViewModel.roiResult.collectAsState()
+    val isRoiLoading by projectsViewModel.isRoiLoading.collectAsState()
+    val roiError by projectsViewModel.roiError.collectAsState()
     val walletBalance by walletViewModel.walletBalance.collectAsState()
     val investSuccess by investmentsViewModel.investSuccess.collectAsState()
     val investError by investmentsViewModel.error.collectAsState()
@@ -51,7 +57,6 @@ fun ProjectDetailScreen(
     // ROI Calculator state
     var roiAmount by remember { mutableStateOf("") }
     var roiDuration by remember { mutableStateOf("12") }
-    var showRoiResult by remember { mutableStateOf(false) }
     
     LaunchedEffect(projectId) {
         projectsViewModel.getProject(projectId)
@@ -68,6 +73,7 @@ fun ProjectDetailScreen(
     DisposableEffect(Unit) {
         onDispose {
             projectsViewModel.clearSelectedProject()
+            projectsViewModel.clearRoiState()
         }
     }
 
@@ -78,6 +84,25 @@ fun ProjectDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            project?.let { proj ->
+                                val shareIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    type = "text/plain"
+                                    putExtra(
+                                        Intent.EXTRA_TEXT,
+                                        "Check out this investment opportunity on Demony: ${proj.name}\n\nhttps://demony.com/#projects/${proj.id}"
+                                    )
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Project"))
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share")
                     }
                 }
             )
@@ -108,7 +133,7 @@ fun ProjectDetailScreen(
                 }
             }
         } else {
-            val proj = project!!
+            val proj = project ?: return@Scaffold
             
             Column(
                 modifier = Modifier
@@ -159,6 +184,7 @@ fun ProjectDetailScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             AssistChip(
                                 onClick = {},
+                                enabled = false,
                                 label = { Text(proj.category) }
                             )
                         }
@@ -229,9 +255,9 @@ fun ProjectDetailScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             
                             DetailRow("Target Returns", proj.targetReturn)
-                            DetailRow("Duration", "${proj.duration} months")
+                            DetailRow("Duration", "${proj.lockInPeriodMonths} months")
                             DetailRow("Min Investment", "GH₵ %.0f".format(proj.minInvestment))
-                            DetailRow("Lock-in Period", proj.lockInPeriodMonths)
+                            DetailRow("Lock-in Period", "${proj.lockInPeriodMonths} months")
                             DetailRow("Profit Distribution", proj.profitDistributionFrequency.replace("_", " ").replaceFirstChar { it.uppercase() })
                             
                             proj.profitSharingRatio?.let { ratio ->
@@ -267,7 +293,7 @@ fun ProjectDetailScreen(
                                 value = roiAmount,
                                 onValueChange = { 
                                     roiAmount = it
-                                    showRoiResult = false
+                                    projectsViewModel.clearRoiState()
                                 },
                                 label = { Text("Investment Amount (GH₵)") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -281,7 +307,7 @@ fun ProjectDetailScreen(
                                 value = roiDuration,
                                 onValueChange = { 
                                     roiDuration = it
-                                    showRoiResult = false
+                                    projectsViewModel.clearRoiState()
                                 },
                                 label = { Text("Duration (months)") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -292,28 +318,46 @@ fun ProjectDetailScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             
                             Button(
-                                onClick = { showRoiResult = true },
+                                onClick = {
+                                    val amount = roiAmount.toDoubleOrNull() ?: 0.0
+                                    val months = roiDuration.toIntOrNull() ?: 12
+                                    projectsViewModel.calculateReturns(projectId = proj.id, amount = amount, durationMonths = months)
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = roiAmount.toDoubleOrNull() != null && roiAmount.toDoubleOrNull()!! > 0
                             ) {
-                                Icon(Icons.Default.Calculate, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Calculate Returns")
+                                if (isRoiLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Calculate, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Calculate Returns")
+                                }
                             }
-                            
-                            if (showRoiResult) {
-                                val amount = roiAmount.toDoubleOrNull() ?: 0.0
-                                val months = roiDuration.toIntOrNull() ?: 12
-                                // Parse target return range (e.g. "10-15%")
-                                val returnRange = proj.targetReturn.replace("%", "").replace(" ", "")
-                                val returnParts = returnRange.split("-")
-                                val minReturnPct = returnParts.firstOrNull()?.toDoubleOrNull() ?: 10.0
-                                val maxReturnPct = returnParts.lastOrNull()?.toDoubleOrNull() ?: minReturnPct
-                                val investorShare = (proj.profitSharingRatio?.investor ?: 80) / 100.0
-                                
-                                val minProfit = amount * (minReturnPct / 100.0) * (months / 12.0) * investorShare
-                                val maxProfit = amount * (maxReturnPct / 100.0) * (months / 12.0) * investorShare
-                                
+
+                            roiError?.let { roiErr ->
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = roiErr,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            roiResult?.let { result ->
+                                val projected = result["projectedReturns"] as? Map<*, *>
+                                val scenarios = result["returnScenarios"] as? Map<*, *>
+                                val monthlyProfit = (projected?.get("monthlyProfit") as? Number)?.toDouble() ?: 0.0
+                                val annualProfit = (projected?.get("annualProfit") as? Number)?.toDouble() ?: 0.0
+                                val totalProfit = (projected?.get("totalProfit") as? Number)?.toDouble() ?: 0.0
+                                val totalValue = (projected?.get("totalValue") as? Number)?.toDouble() ?: 0.0
+                                val pessimistic = ((scenarios?.get("pessimistic") as? Map<*, *>)?.get("totalProfit") as? Number)?.toDouble() ?: 0.0
+                                val optimistic = ((scenarios?.get("optimistic") as? Map<*, *>)?.get("totalProfit") as? Number)?.toDouble() ?: 0.0
+
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Divider()
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -325,16 +369,16 @@ fun ProjectDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 
-                                DetailRow("Investment", "GH₵ %.2f".format(amount))
-                                DetailRow("Duration", "$months months")
-                                DetailRow("Est. Profit (Low)", "GH₵ %.2f".format(minProfit))
-                                DetailRow("Est. Profit (High)", "GH₵ %.2f".format(maxProfit))
-                                DetailRow("Total Return (Low)", "GH₵ %.2f".format(amount + minProfit))
-                                DetailRow("Total Return (High)", "GH₵ %.2f".format(amount + maxProfit))
+                                DetailRow("Monthly Profit", "GH₵ %.2f".format(monthlyProfit))
+                                DetailRow("Annual Profit", "GH₵ %.2f".format(annualProfit))
+                                DetailRow("Projected Total Profit", "GH₵ %.2f".format(totalProfit))
+                                DetailRow("Projected Total Value", "GH₵ %.2f".format(totalValue))
+                                DetailRow("Scenario (Pessimistic)", "GH₵ %.2f".format(pessimistic))
+                                DetailRow("Scenario (Optimistic)", "GH₵ %.2f".format(optimistic))
                                 
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "* Returns are estimated and not guaranteed. Investor share: ${proj.profitSharingRatio?.investor ?: 80}%",
+                                    text = "* Returns are projected and not guaranteed.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -447,9 +491,10 @@ fun ProjectDetailScreen(
         
         // Investment Dialog
         if (showInvestDialog && project != null) {
+            val currentProject = project ?: run { showInvestDialog = false; return@Scaffold }
             AlertDialog(
                 onDismissRequest = { showInvestDialog = false },
-                title = { Text("Invest in ${project!!.name}") },
+                title = { Text("Invest in ${currentProject.name}") },
                 text = {
                     Column {
                         // Error message
@@ -476,7 +521,7 @@ fun ProjectDetailScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
                             supportingText = {
-                                Text("Min: GH₵ %.0f".format(project!!.minInvestment))
+                                Text("Min: GH₵ %.0f".format(currentProject.minInvestment))
                             }
                         )
                         
@@ -532,7 +577,7 @@ fun ProjectDetailScreen(
                     Button(
                         onClick = {
                             val amount = investAmount.toDoubleOrNull()
-                            if (amount != null && amount >= project!!.minInvestment) {
+                            if (amount != null && amount >= currentProject.minInvestment) {
                                 investmentsViewModel.invest(projectId, amount)
                             }
                         },
@@ -541,7 +586,7 @@ fun ProjectDetailScreen(
                                   riskAcknowledged && 
                                   lossAcknowledged && 
                                   lockInAcknowledged &&
-                                  (investAmount.toDoubleOrNull() ?: 0.0) >= project!!.minInvestment
+                                  (investAmount.toDoubleOrNull() ?: 0.0) >= currentProject.minInvestment
                     ) {
                         if (isInvesting) {
                             CircularProgressIndicator(

@@ -5,6 +5,8 @@ var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
 var { validateIdParam } = require('../utils/objectId');
+var notificationService = require('../services/notifications.js');
+var TYPES = notificationService.NOTIFICATION_TYPES;
 var router = express.Router();
 
 // Escape regex special chars to prevent ReDoS attacks from user-supplied search input
@@ -354,6 +356,24 @@ router.post('/users/:id/kyc', async function(req, res) {
     }
     
     res.json({ message: 'KYC ' + action + 'd successfully' });
+    
+    // Send notification (non-blocking)
+    if (user) {
+      var userId = req.params.id;
+      if (action === 'approve') {
+        notificationService.createNotification(userId, TYPES.KYC_APPROVED, {
+          title: 'KYC Verified!',
+          message: 'Your identity has been verified. You can now invest in projects.',
+          link: '#/projects'
+        }).catch(function() {});
+      } else {
+        notificationService.createNotification(userId, TYPES.KYC_REJECTED, {
+          title: 'KYC Needs Attention',
+          message: 'Your verification was not approved: ' + (reason || 'Documents not acceptable') + '. Please resubmit.',
+          link: '#/settings'
+        }).catch(function() {});
+      }
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -756,6 +776,24 @@ router.post('/withdrawals/:id/process', async function(req, res) {
     }
     
     res.json({ message: 'Withdrawal ' + action + 'd successfully' });
+    
+    // Send notification (non-blocking)
+    var wdUserId = withdrawal.userId.toString ? withdrawal.userId.toString() : withdrawal.userId;
+    if (action === 'approve') {
+      notificationService.createNotification(wdUserId, TYPES.WITHDRAWAL_APPROVED, {
+        title: 'Withdrawal Approved',
+        message: 'Your withdrawal of GH₵' + (withdrawal.amount || 0).toLocaleString() + ' has been approved and processed.',
+        link: '#/wallet',
+        metadata: { amount: withdrawal.amount }
+      }).catch(function() {});
+    } else {
+      notificationService.createNotification(wdUserId, TYPES.WITHDRAWAL_REJECTED, {
+        title: 'Withdrawal Rejected',
+        message: 'Your withdrawal of GH₵' + (withdrawal.amount || 0).toLocaleString() + ' was rejected: ' + (reason || 'Contact support'),
+        link: '#/wallet',
+        metadata: { amount: withdrawal.amount, reason: reason }
+      }).catch(function() {});
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -889,6 +927,18 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
         return { userId: d.userId, amount: d.amount, sharePercent: d.sharePercent };
       })
     });
+    
+    // Send profit notifications to all investors (non-blocking)
+    for (var k = 0; k < distributions.length; k++) {
+      (function(dist) {
+        notificationService.createNotification(dist.userId, TYPES.PROFIT_DISTRIBUTED, {
+          title: 'Profit Distribution',
+          message: 'You earned GH₵' + dist.amount.toFixed(2) + ' from ' + project.name + '!',
+          link: '#/investments',
+          metadata: { amount: dist.amount, projectName: project.name }
+        }).catch(function() {});
+      })(distributions[k]);
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

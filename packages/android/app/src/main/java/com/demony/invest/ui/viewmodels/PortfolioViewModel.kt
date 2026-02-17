@@ -30,6 +30,9 @@ class PortfolioViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    private val _referralCode = MutableStateFlow<ReferralCode?>(null)
+    val referralCode: StateFlow<ReferralCode?> = _referralCode.asStateFlow()
+
     init {
         loadPortfolio()
     }
@@ -45,6 +48,11 @@ class PortfolioViewModel @Inject constructor(
                 }
                 .onFailure { exception ->
                     _error.value = exception.message ?: "Failed to load portfolio"
+                }
+
+            repository.getReferralCode()
+                .onSuccess { code ->
+                    _referralCode.value = code
                 }
 
             _isLoading.value = false

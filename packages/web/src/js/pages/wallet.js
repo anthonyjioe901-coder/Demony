@@ -1,4 +1,6 @@
 // Wallet Page - Deposits, Withdrawals, Balance
+import { escapeHtml } from '../utils.js';
+
 function renderWallet(container, api) {
   var user = api.user;
   if (!user) {
@@ -127,15 +129,17 @@ function loadTransactions(api) {
       }
       
       listContainer.innerHTML = data.transactions.map(function(tx) {
-        var isCredit = tx.type === 'deposit' || tx.type === 'profit';
+        var txType = tx.type || 'unknown';
+        var txStatus = tx.status || 'unknown';
+        var isCredit = txType === 'deposit' || txType === 'profit';
         var iconSvg = {
           'deposit': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
           'withdrawal': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>',
           'investment': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
           'profit': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>'
-        }[tx.type] || '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
-        var typeLabel = tx.type.toUpperCase();
-        var statusClass = tx.status === 'success' ? 'success' : (tx.status.includes('pending') ? 'pending' : '');
+        }[txType] || '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
+        var typeLabel = escapeHtml(txType.toUpperCase());
+        var statusClass = txStatus === 'success' ? 'success' : (txStatus.indexOf('pending') !== -1 ? 'pending' : '');
         
         return '<div class="transaction-item">' +
           '<div class="tx-left">' +
@@ -149,7 +153,7 @@ function loadTransactions(api) {
             '<div class="tx-amount ' + (isCredit ? 'credit' : 'debit') + '">' +
               (isCredit ? '+' : '') + 'GH₵' + Math.abs(tx.amount).toLocaleString() +
             '</div>' +
-            '<div class="tx-status ' + statusClass + '">' + tx.status.replace('_', ' ') + '</div>' +
+            '<div class="tx-status ' + statusClass + '">' + escapeHtml(txStatus.replace('_', ' ')) + '</div>' +
           '</div>' +
         '</div>';
       }).join('');

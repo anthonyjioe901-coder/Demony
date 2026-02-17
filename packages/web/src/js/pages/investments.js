@@ -1,4 +1,6 @@
 // My Investments Page
+import { escapeHtml } from '../utils.js';
+
 function renderInvestments(container, api) {
   if (!api.token) {
     container.innerHTML = '<div style="text-align: center; padding: 4rem;"><h2>Please login to view your investments</h2></div>';
@@ -90,8 +92,8 @@ function loadInvestments(api) {
         return '<div class="card investment-item" style="margin-bottom: 1rem;">' +
           '<div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">' +
             '<div>' +
-              '<h3 style="margin-bottom: 0.25rem;">' + (inv.projectName || inv.project_name || 'Project #' + inv.projectId) + '</h3>' +
-              '<span class="badge">' + (inv.category || 'General') + '</span>' +
+              '<h3 style="margin-bottom: 0.25rem;">' + escapeHtml(inv.projectName || inv.project_name || 'Project #' + inv.projectId) + '</h3>' +
+              '<span class="badge">' + escapeHtml(inv.category || 'General') + '</span>' +
             '</div>' +
             '<div style="text-align: right;">' +
               '<span class="badge" style="background: ' + (isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)') + '; color: ' + (isLocked ? '#ef4444' : '#10b981') + ';">' +

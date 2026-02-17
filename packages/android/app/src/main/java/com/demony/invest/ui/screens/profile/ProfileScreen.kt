@@ -28,6 +28,7 @@ import androidx.navigation.NavController
 import com.demony.invest.ui.components.BottomNavigationBar
 import com.demony.invest.ui.navigation.Screen
 import com.demony.invest.ui.viewmodels.AuthViewModel
+import com.demony.invest.ui.viewmodels.WalletViewModel
 
 fun uriToBase64(context: Context, uri: Uri): String? {
     return try {
@@ -44,11 +45,13 @@ fun uriToBase64(context: Context, uri: Uri): String? {
 @Composable
 fun ProfileScreen(
     navController: NavController,
-    viewModel: AuthViewModel = hiltViewModel()
+    viewModel: AuthViewModel = hiltViewModel(),
+    walletViewModel: WalletViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val user by viewModel.currentUser.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val walletBalance by walletViewModel.walletBalance.collectAsState()
     
     // KYC Dialog state
     var showKycDialog by remember { mutableStateOf(false) }
@@ -60,7 +63,9 @@ fun ProfileScreen(
     
     // Edit profile dialog state
     var showEditDialog by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf("") }
     var editPhone by remember { mutableStateOf("") }
+    var editBusinessName by remember { mutableStateOf("") }
     var editIsSubmitting by remember { mutableStateOf(false) }
     var editError by remember { mutableStateOf<String?>(null) }
     var editSuccess by remember { mutableStateOf<String?>(null) }
@@ -357,7 +362,7 @@ fun ProfileScreen(
                 editError = null
                 editSuccess = null
             },
-            title = { Text("Update Phone Number", fontWeight = FontWeight.Bold) },
+            title = { Text("Update Profile", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     editError?.let { error ->
@@ -391,6 +396,14 @@ fun ProfileScreen(
                         }
                     }
                     OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Full Name") },
+                        leadingIcon = { Icon(Icons.Default.Person, null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !editIsSubmitting
+                    )
+                    OutlinedTextField(
                         value = editPhone,
                         onValueChange = { editPhone = it },
                         label = { Text("Phone Number") },
@@ -400,6 +413,16 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !editIsSubmitting
                     )
+                    if (user?.role == "business_owner") {
+                        OutlinedTextField(
+                            value = editBusinessName,
+                            onValueChange = { editBusinessName = it },
+                            label = { Text("Business Name") },
+                            leadingIcon = { Icon(Icons.Default.Business, null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !editIsSubmitting
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -407,17 +430,23 @@ fun ProfileScreen(
                     onClick = {
                         editIsSubmitting = true
                         editError = null
-                        viewModel.updatePhone(editPhone.trim()) { success, error ->
+                        viewModel.updateProfile(
+                            name = editName.trim(),
+                            phone = editPhone.trim(),
+                            businessName = if (user?.role == "business_owner") editBusinessName.trim() else null
+                        ) { success, error ->
                             editIsSubmitting = false
                             if (success) {
-                                editSuccess = "Phone number updated!"
+                                editSuccess = "Profile updated successfully!"
                                 viewModel.refreshUser()
                             } else {
-                                editError = error ?: "Failed to update phone"
+                                editError = error ?: "Failed to update profile"
                             }
                         }
                     },
-                    enabled = editPhone.replace("[\\s\\-]".toRegex(), "").length >= 10 && !editIsSubmitting
+                    enabled = editName.trim().isNotEmpty() &&
+                              editPhone.replace("[\\s\\-]".toRegex(), "").matches("^[+]?[0-9]{10,20}$".toRegex()) &&
+                              !editIsSubmitting
                 ) {
                     if (editIsSubmitting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
@@ -544,6 +573,57 @@ fun ProfileScreen(
                     }
                 }
                 
+                // Account Stats (matching web profile page)
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            onClick = { navController.navigate(Screen.Wallet.route) }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "GH₵ %.2f".format(walletBalance?.balance ?: user?.walletBalance ?: 0.0),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                                Text(
+                                    text = "Wallet Balance",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            onClick = { navController.navigate(Screen.Investments.route) }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "GH₵ %.2f".format(walletBalance?.totalInvested ?: user?.totalInvested ?: 0.0),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Total Invested",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                
                 // Account Details
                 item {
                     Text(
@@ -559,7 +639,9 @@ fun ProfileScreen(
                             // Phone with edit option
                             Surface(
                                 onClick = { 
+                                    editName = user?.name ?: ""
                                     editPhone = user?.phone ?: ""
+                                    editBusinessName = user?.business?.name ?: ""
                                     editError = null
                                     editSuccess = null
                                     showEditDialog = true 
@@ -662,6 +744,18 @@ fun ProfileScreen(
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column {
                             ProfileActionRow(
+                                icon = Icons.Default.AccountBalanceWallet,
+                                label = "Wallet",
+                                onClick = { navController.navigate(Screen.Wallet.route) }
+                            )
+                            Divider()
+                            ProfileActionRow(
+                                icon = Icons.Default.ShowChart,
+                                label = "My Investments",
+                                onClick = { navController.navigate(Screen.Investments.route) }
+                            )
+                            Divider()
+                            ProfileActionRow(
                                 icon = Icons.Default.PieChart,
                                 label = "My Portfolio",
                                 onClick = { navController.navigate(Screen.Portfolio.route) }
@@ -683,6 +777,12 @@ fun ProfileScreen(
                                 icon = Icons.Default.Help,
                                 label = "Help & Support",
                                 onClick = { navController.navigate(Screen.Support.route) }
+                            )
+                            Divider()
+                            ProfileActionRow(
+                                icon = Icons.Default.Settings,
+                                label = "Settings",
+                                onClick = { navController.navigate(Screen.Settings.route) }
                             )
                         }
                     }

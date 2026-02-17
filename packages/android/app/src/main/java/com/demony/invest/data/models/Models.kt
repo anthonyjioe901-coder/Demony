@@ -64,7 +64,8 @@ data class BusinessInfo(
  * Authentication request/response models
  */
 data class LoginRequest(
-    val email: String,
+    val email: String? = null,
+    val phone: String? = null,
     val password: String
 )
 
@@ -116,7 +117,7 @@ data class Project(
     @SerializedName("profit_distribution_frequency")
     val profitDistributionFrequency: String = "as_realized",
     @SerializedName("lock_in_period_months")
-    val lockInPeriodMonths: String = "12",
+    val lockInPeriodMonths: Int = 12,
     @SerializedName("profit_sharing_ratio")
     val profitSharingRatio: ProfitSharingRatio? = null,
     @SerializedName("risk_factors")
@@ -140,6 +141,7 @@ data class ProfitSharingRatio(
 
 data class ProjectsResponse(
     val projects: List<Project>,
+    val categories: List<String> = emptyList(),
     val pagination: Pagination? = null
 )
 
@@ -166,7 +168,7 @@ data class Investment(
     val status: String = "active",
     val earnings: Double = 0.0,
     @SerializedName("lockInPeriodMonths")
-    val lockInPeriodMonths: String = "12",
+    val lockInPeriodMonths: Int = 12,
     @SerializedName("lockInEndDate")
     val lockInEndDate: String? = null,
     @SerializedName("createdAt")
@@ -277,7 +279,11 @@ data class Portfolio(
     @SerializedName("activeInvestments")
     val activeInvestments: Int = 0,
     val investments: List<Investment> = emptyList(),
-    val allocation: List<CategoryAllocation>? = null
+    val allocation: List<CategoryAllocation>? = null,
+    @SerializedName("riskLevel")
+    val riskLevel: String = "Moderate",
+    @SerializedName("diversificationScore")
+    val diversificationScore: Int = 1
 )
 
 data class CategoryAllocation(
@@ -291,16 +297,30 @@ data class CategoryAllocation(
  */
 data class ReferralCode(
     val code: String,
+    @SerializedName("shareUrl")
+    val shareUrl: String? = null,
+    val stats: ReferralStats? = null
+)
+
+data class ReferralStats(
     @SerializedName("totalReferrals")
     val totalReferrals: Int = 0,
     @SerializedName("qualifiedReferrals")
     val qualifiedReferrals: Int = 0,
-    @SerializedName("pendingRewards")
-    val pendingRewards: Double = 0.0,
-    @SerializedName("earnedRewards")
-    val earnedRewards: Double = 0.0,
-    @SerializedName("referralLink")
-    val referralLink: String? = null
+    @SerializedName("pendingReferrals")
+    val pendingReferrals: Int = 0,
+    @SerializedName("qualifyingNeeded")
+    val qualifyingNeeded: Int = 10,
+    @SerializedName("totalEarned")
+    val totalEarned: Double = 0.0,
+    @SerializedName("availableEarnings")
+    val availableEarnings: Double = 0.0,
+    @SerializedName("lockedEarnings")
+    val lockedEarnings: Double = 0.0,
+    @SerializedName("isQualified")
+    val isQualified: Boolean = false,
+    @SerializedName("progress")
+    val progress: Int = 0
 )
 
 data class ReferralHistory(
@@ -322,14 +342,43 @@ data class ReferralHistoryResponse(
  */
 data class SupportTicket(
     val id: String? = null,
+    @SerializedName("ticketId")
+    val ticketId: String? = null,
     val subject: String,
     val category: String,
     val message: String,
     val status: String = "open",
-    val priority: String = "normal",
+    val priority: String = "medium",
     val email: String? = null,
     @SerializedName("createdAt")
     val createdAt: String? = null
+)
+
+data class SupportTicketsResponse(
+    val tickets: List<SupportTicket>
+)
+
+data class SupportTicketResponseItem(
+    val message: String,
+    @SerializedName("isStaff")
+    val isStaff: Boolean = false,
+    @SerializedName("createdAt")
+    val createdAt: String? = null
+)
+
+data class SupportTicketDetails(
+    @SerializedName("ticketId")
+    val ticketId: String,
+    val category: String,
+    val priority: String,
+    val subject: String,
+    val message: String,
+    val status: String,
+    @SerializedName("createdAt")
+    val createdAt: String? = null,
+    @SerializedName("updatedAt")
+    val updatedAt: String? = null,
+    val responses: List<SupportTicketResponseItem> = emptyList()
 )
 
 data class TicketResponse(
@@ -351,4 +400,41 @@ data class ApiError(
 data class MessageResponse(
     val message: String,
     val success: Boolean = true
+)
+
+data class UpdateProfileResponse(
+    val message: String? = null,
+    val user: User
+)
+
+data class NotificationPreferencesRequest(
+    val emailNotifications: Boolean,
+    val investmentUpdates: Boolean,
+    val referralNotifications: Boolean,
+    val marketingNotifications: Boolean
+)
+
+// ==================== NOTIFICATIONS ====================
+
+data class Notification(
+    @SerializedName("_id")
+    val id: String,
+    val type: String,
+    val title: String,
+    val message: String,
+    val icon: String = "🔔",
+    val link: String? = null,
+    val read: Boolean = false,
+    @SerializedName("createdAt")
+    val createdAt: String? = null
+)
+
+data class NotificationsResponse(
+    val notifications: List<Notification> = emptyList(),
+    val total: Int = 0,
+    val unreadCount: Int = 0
+)
+
+data class UnreadCountResponse(
+    val unreadCount: Int = 0
 )

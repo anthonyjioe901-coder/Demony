@@ -13,6 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -38,6 +41,7 @@ fun SettingsScreen(
     
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showPasswordDialog by remember { mutableStateOf(false) }
+    var isDeletingAccount by remember { mutableStateOf(false) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -130,19 +134,10 @@ fun SettingsScreen(
                             onClick = { showPasswordDialog = true }
                         )
                         Divider()
-                        SettingsActionRow(
+                        SettingsComingSoonRow(
                             icon = Icons.Default.Security,
                             title = "Two-Factor Authentication",
-                            subtitle = "Coming soon - Extra security for your account",
-                            onClick = {
-                                Toast.makeText(context, "Two-Factor Authentication will be available in the next update!", Toast.LENGTH_LONG).show()
-                            },
-                            trailing = {
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text("Soon", style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
+                            subtitle = "Coming soon - Extra security for your account"
                         )
                     }
                 }
@@ -265,7 +260,11 @@ fun SettingsScreen(
         // Delete Account Dialog
         if (showDeleteDialog) {
             AlertDialog(
-                onDismissRequest = { showDeleteDialog = false },
+                onDismissRequest = {
+                    if (!isDeletingAccount) {
+                        showDeleteDialog = false
+                    }
+                },
                 icon = { Icon(Icons.Default.Warning, contentDescription = null) },
                 title = { Text("Delete Account?") },
                 text = {
@@ -276,18 +275,41 @@ fun SettingsScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            showDeleteDialog = false
-                            Toast.makeText(context, "Account deletion coming soon. Contact support.", Toast.LENGTH_LONG).show()
+                            isDeletingAccount = true
+                            authViewModel.deleteAccount { success, error ->
+                                isDeletingAccount = false
+                                showDeleteDialog = false
+                                if (success) {
+                                    Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_LONG).show()
+                                    navController.navigate(Screen.Login.route) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                } else {
+                                    Toast.makeText(context, error ?: "Failed to delete account", Toast.LENGTH_LONG).show()
+                                }
+                            }
                         },
+                        enabled = !isDeletingAccount,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text("Delete Account")
+                        if (isDeletingAccount) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onError
+                            )
+                        } else {
+                            Text("Delete Account")
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) {
+                    TextButton(
+                        onClick = { showDeleteDialog = false },
+                        enabled = !isDeletingAccount
+                    ) {
                         Text("Cancel")
                     }
                 }
@@ -310,18 +332,24 @@ fun SettingsScreen(
                             value = currentPassword,
                             onValueChange = { currentPassword = it },
                             label = { Text("Current Password") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = newPassword,
                             onValueChange = { newPassword = it },
                             label = { Text("New Password") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = confirmPassword,
                             onValueChange = { confirmPassword = it },
                             label = { Text("Confirm New Password") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -329,14 +357,23 @@ fun SettingsScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            if (newPassword == confirmPassword && newPassword.length >= 6) {
+                            val hasUppercase = newPassword.any { it.isUpperCase() }
+                            val hasLowercase = newPassword.any { it.isLowerCase() }
+                            val hasDigit = newPassword.any { it.isDigit() }
+                            val isStrongPassword = newPassword.length >= 8 && hasUppercase && hasLowercase && hasDigit
+
+                            if (newPassword == confirmPassword && isStrongPassword) {
                                 settingsViewModel.changePassword(currentPassword, newPassword)
                                 showPasswordDialog = false
                                 currentPassword = ""
                                 newPassword = ""
                                 confirmPassword = ""
                             } else {
-                                Toast.makeText(context, "Passwords must match and be at least 6 characters", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "Passwords must match and include 8+ chars, uppercase, lowercase, and a number",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         },
                         enabled = currentPassword.isNotEmpty() && newPassword.isNotEmpty() && confirmPassword.isNotEmpty()
@@ -354,6 +391,49 @@ fun SettingsScreen(
                         Text("Cancel")
                     }
                 }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsComingSoonRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Surface(
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Text(
+                text = "Soon",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
     }

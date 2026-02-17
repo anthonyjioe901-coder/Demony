@@ -34,6 +34,15 @@ interface DemonyApiService {
     
     @POST("auth/update-phone")
     suspend fun updatePhone(@Body data: Map<String, String>): Response<MessageResponse>
+
+    @PUT("auth/update-profile")
+    suspend fun updateProfile(@Body data: Map<String, Any>): Response<UpdateProfileResponse>
+
+    @PUT("auth/notification-preferences")
+    suspend fun updateNotificationPreferences(@Body data: NotificationPreferencesRequest): Response<MessageResponse>
+
+    @DELETE("auth/delete-account")
+    suspend fun deleteAccount(): Response<MessageResponse>
     
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body data: Map<String, String>): Response<MessageResponse>
@@ -45,7 +54,8 @@ interface DemonyApiService {
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 10,
         @Query("category") category: String? = null,
-        @Query("sort") sort: String? = null
+        @Query("sort") sort: String? = null,
+        @Query("search") search: String? = null
     ): Response<ProjectsResponse>
     
     @GET("projects/{id}")
@@ -132,9 +142,15 @@ interface DemonyApiService {
     
     @POST("support/tickets")
     suspend fun submitSupportTicket(@Body ticket: SupportTicket): Response<TicketResponse>
+
+    @GET("support/tickets/my")
+    suspend fun getMySupportTickets(): Response<SupportTicketsResponse>
     
     @GET("support/tickets/{id}")
     suspend fun getTicketStatus(@Path("id") ticketId: String): Response<SupportTicket>
+
+    @GET("support/tickets/{id}/details")
+    suspend fun getTicketDetails(@Path("id") ticketId: String): Response<SupportTicketDetails>
     
     @GET("support/status")
     suspend fun getSystemStatus(): Response<Map<String, Any>>
@@ -143,4 +159,18 @@ interface DemonyApiService {
     
     @POST("upload/image")
     suspend fun uploadImage(@Body data: Map<String, String>): Response<Map<String, String>>
+
+    // ==================== NOTIFICATIONS ====================
+
+    @GET("notifications")
+    suspend fun getNotifications(
+        @Query("limit") limit: Int = 30,
+        @Query("unread") unread: Boolean? = null
+    ): Response<NotificationsResponse>
+
+    @PUT("notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: String): Response<MessageResponse>
+
+    @GET("notifications/unread-count")
+    suspend fun getUnreadCount(): Response<UnreadCountResponse>
 }

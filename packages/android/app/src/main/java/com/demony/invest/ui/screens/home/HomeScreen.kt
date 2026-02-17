@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,32 +25,43 @@ import com.demony.invest.ui.components.ProjectCard
 import com.demony.invest.ui.navigation.Screen
 import com.demony.invest.ui.viewmodels.ProjectsViewModel
 import com.demony.invest.ui.viewmodels.WalletViewModel
+import com.demony.invest.ui.viewmodels.NotificationsViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun HomeScreen(
     onNavigateToProjects: () -> Unit,
     onNavigateToProject: (String) -> Unit,
     navController: NavController,
     projectsViewModel: ProjectsViewModel = hiltViewModel(),
-    walletViewModel: WalletViewModel = hiltViewModel()
+    walletViewModel: WalletViewModel = hiltViewModel(),
+    notificationsViewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val featuredProjects by projectsViewModel.featuredProjects.collectAsState()
     val isLoading by projectsViewModel.isLoading.collectAsState()
     val walletBalance by walletViewModel.walletBalance.collectAsState()
     val totalProjects by projectsViewModel.totalProjects.collectAsState()
     
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            projectsViewModel.refresh()
+            walletViewModel.refresh()
+        }
+    )
+    
+    // Stop refreshing when loading completes
+    LaunchedEffect(isLoading) {
+        if (!isLoading) isRefreshing = false
+    }
+    
     var showNotificationsDialog by remember { mutableStateOf(false) }
     
-    // Sample notifications - in a real app these would come from API
-    val notifications = remember {
-        listOf(
-            Triple("Investment Matured", "Your investment in Kasoa Farm has matured. Profit of GH₵ 250 has been added to your wallet.", "2 hours ago"),
-            Triple("New Project Available", "Check out 'Accra Tech Hub' - a new high-yield investment opportunity!", "5 hours ago"),
-            Triple("Deposit Successful", "Your deposit of GH₵ 500 has been confirmed.", "1 day ago"),
-            Triple("KYC Approved", "Your KYC verification has been approved. You now have full access.", "3 days ago")
-        )
-    }
+    // Real notifications from ViewModel
+    val notifications by notificationsViewModel.notifications.collectAsState()
+    val unreadCount by notificationsViewModel.unreadCount.collectAsState()
     
     // Notifications Dialog
     if (showNotificationsDialog) {
@@ -59,8 +74,15 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Notifications", fontWeight = FontWeight.Bold)
-                    IconButton(onClick = { showNotificationsDialog = false }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    Row {
+                        if (unreadCount > 0) {
+                            TextButton(onClick = { notificationsViewModel.markAllAsRead() }) {
+                                Text("Mark all read", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        IconButton(onClick = { showNotificationsDialog = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
                     }
                 }
             },
@@ -81,36 +103,57 @@ fun HomeScreen(
                     }
                 } else {
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        notifications.forEach { (title, message, time) ->
+                        notifications.take(20).forEach { notif ->
                             Card(
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
+                                    containerColor = if (!notif.read)
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    else
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                ),
+                                onClick = {
+                                    if (!notif.read) {
+                                        notificationsViewModel.markAsRead(notif.id)
+                                    }
+                                }
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(
-                                            text = title,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = time,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = notif.icon,
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = notif.title,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = if (!notif.read) FontWeight.Bold else FontWeight.SemiBold
+                                            )
+                                        }
+                                        if (!notif.read) {
+                                            Badge { }
+                                        }
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = message,
+                                        text = notif.message,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    notif.createdAt?.let { time ->
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = time,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -145,8 +188,8 @@ fun HomeScreen(
                 actions = {
                     BadgedBox(
                         badge = {
-                            if (notifications.isNotEmpty()) {
-                                Badge { Text("${notifications.size}") }
+                            if (unreadCount > 0) {
+                                Badge { Text("$unreadCount") }
                             }
                         }
                     ) {
@@ -161,10 +204,15 @@ fun HomeScreen(
             BottomNavigationBar(navController = navController)
         }
     ) { paddingValues ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(paddingValues)
+                .pullRefresh(pullRefreshState)
+        ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -242,7 +290,7 @@ fun HomeScreen(
                                 color = MaterialTheme.colorScheme.onSecondary
                             )
                             Text(
-                                text = "Invite friends and earn 5% of their investments!",
+                                text = "Give GH₵20, Get GH₵20 when friends invest!",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.9f)
                             )
@@ -434,6 +482,12 @@ fun HomeScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
         }
     }
 }

@@ -1,3 +1,5 @@
+import { escapeHtml, escapeAttr } from '../utils.js';
+
 // Professional Admin Dashboard - Complete Redesign
 // Features: Sidebar navigation, Stats dashboard, User management, Support tickets, Reports
 
@@ -10,9 +12,9 @@ function renderAdmin(container, api) {
   
   var adminApi = api.getAdmin();
   
-  // Store refs globally for event handlers
-  window._adminApi = adminApi;
-  window._api = api;
+  // Store refs for inline onclick handlers (non-enumerable to prevent casual console discovery)
+  Object.defineProperty(window, '_adminApi', { value: adminApi, configurable: true, writable: true, enumerable: false });
+  Object.defineProperty(window, '_api', { value: api, configurable: true, writable: true, enumerable: false });
   
   var html = 
     '<div class="admin-layout">' +
@@ -210,7 +212,7 @@ function loadDashboard(adminApi, api) {
       '<div class="admin-page-header">' +
         '<div class="page-title-section">' +
           '<h1>Dashboard</h1>' +
-          '<div class="breadcrumb">Welcome back, ' + (api.user.name || 'Admin') + '</div>' +
+          '<div class="breadcrumb">Welcome back, ' + escapeHtml(api.user.name || 'Admin') + '</div>' +
         '</div>' +
         '<div class="page-actions">' +
           '<button class="btn btn-primary" onclick="showCreateProjectModal()">+ Create Project</button>' +
@@ -338,7 +340,7 @@ function loadDashboard(adminApi, api) {
     loadRecentActivity(adminApi);
     
   }).catch(function(err) {
-    main.innerHTML = '<div class="admin-panel"><div class="panel-body"><p class="text-danger">Error loading dashboard: ' + err.message + '</p></div></div>';
+    main.innerHTML = '<div class="admin-panel"><div class="panel-body"><p class="text-danger">Error loading dashboard: ' + escapeHtml(err.message) + '</p></div></div>';
   });
 }
 
@@ -446,7 +448,7 @@ function loadUsersTable(adminApi) {
     allUsersCache = result.users.filter(function(u) { return u.role !== 'admin'; });
     renderUsersTable(allUsersCache);
   }).catch(function(err) {
-    document.getElementById('users-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + err.message + '</p></div>';
+    document.getElementById('users-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
   });
 }
 
@@ -501,8 +503,8 @@ function renderUsersTable(users) {
           '<div class="table-user">' +
             '<div class="table-avatar">' + initials + '</div>' +
             '<div class="table-user-info">' +
-              '<div class="table-user-name">' + (user.name || 'No Name') + '</div>' +
-              '<div class="table-user-email">' + user.email + '</div>' +
+              '<div class="table-user-name">' + escapeHtml(user.name || 'No Name') + '</div>' +
+              '<div class="table-user-email">' + escapeHtml(user.email) + '</div>' +
             '</div>' +
           '</div>' +
         '</td>' +
@@ -514,8 +516,8 @@ function renderUsersTable(users) {
         '<td onclick="event.stopPropagation()">' +
           '<div class="table-actions">' +
             '<button class="btn-icon" title="View" onclick="showUserDetail(\'' + user.id + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>' +
-            '<button class="btn-icon" title="Credit Wallet" onclick="showCreditWalletModal(\'' + user.id + '\', \'' + (user.name || user.email) + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></button>' +
-            '<button class="btn-icon danger" title="Delete" onclick="confirmDeleteUser(\'' + user.id + '\', \'' + (user.name || user.email) + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
+            '<button class="btn-icon" title="Credit Wallet" onclick="showCreditWalletModal(\'' + user.id + '\', \'' + escapeAttr(user.name || user.email) + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></button>' +
+            '<button class="btn-icon danger" title="Delete" onclick="confirmDeleteUser(\'' + user.id + '\', \'' + escapeAttr(user.name || user.email) + '\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
           '</div>' +
         '</td>' +
       '</tr>';
@@ -619,7 +621,7 @@ function loadInvestmentsTable() {
     html += '<div class="table-pagination"><div class="pagination-info">Showing ' + result.investments.length + ' investments</div></div>';
     container.innerHTML = html;
   }).catch(function(err) {
-    container.innerHTML = '<div class="empty-state-box"><p>Error: ' + err.message + '</p></div>';
+    container.innerHTML = '<div class="empty-state-box"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
   });
 }
 
@@ -686,7 +688,7 @@ function loadWithdrawalsTable() {
       
       html += 
         '<tr>' +
-          '<td><strong>' + userName + '</strong></td>' +
+          '<td><strong>' + escapeHtml(userName) + '</strong></td>' +
           '<td><strong style="color: var(--secondary-color);">GH₵' + (w.amount || 0).toLocaleString() + '</strong></td>' +
           '<td>' + (w.method || 'Mobile Money') + '</td>' +
           '<td>' + (w.accountNumber || w.momoNumber || 'N/A') + ' (' + (w.provider || 'MTN') + ')</td>' +
@@ -704,7 +706,7 @@ function loadWithdrawalsTable() {
     html += '</tbody></table>';
     container.innerHTML = html;
   }).catch(function(err) {
-    container.innerHTML = '<div class="empty-state-box"><p>Error: ' + err.message + '</p></div>';
+    container.innerHTML = '<div class="empty-state-box"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
   });
 }
 
@@ -751,8 +753,8 @@ function loadKycPage(adminApi, api) {
     pending.forEach(function(user) {
       html += 
         '<tr>' +
-          '<td><strong>' + (user.name || 'No Name') + '</strong></td>' +
-          '<td>' + user.email + '</td>' +
+          '<td><strong>' + escapeHtml(user.name || 'No Name') + '</strong></td>' +
+          '<td>' + escapeHtml(user.email) + '</td>' +
           '<td>' + (user.kyc.submittedAt ? new Date(user.kyc.submittedAt).toLocaleDateString() : 'N/A') + '</td>' +
           '<td>' +
             (user.kyc.idDocument ? '<a href="' + user.kyc.idDocument + '" target="_blank" class="btn btn-sm btn-outline">ID Doc</a> ' : '') +
@@ -853,10 +855,10 @@ function renderProjectsGrid(projects) {
         '</div>' +
         '<div class="project-content">' +
           '<div class="project-header">' +
-            '<h4>' + (p.name || 'Untitled') + '</h4>' +
+            '<h4>' + escapeHtml(p.name || 'Untitled') + '</h4>' +
             '<span class="badge ' + statusClass + '">' + (p.status || 'draft') + '</span>' +
           '</div>' +
-          '<p class="project-desc">' + (p.description || '').substring(0, 80) + '...</p>' +
+          '<p class="project-desc">' + escapeHtml((p.description || '').substring(0, 80)) + '...</p>' +
           '<div class="project-funding">' +
             '<div class="funding-info">' +
               '<span>GH₵' + funding.toLocaleString() + '</span>' +
@@ -948,11 +950,11 @@ function loadTicketsTable() {
       
       html += 
         '<tr>' +
-          '<td><strong>' + (t.ticketId || t._id) + '</strong></td>' +
-          '<td>' + (t.subject || '').substring(0, 40) + '</td>' +
-          '<td><span class="badge">' + (t.category || 'general') + '</span></td>' +
-          '<td><span class="badge ' + priorityClass + '">' + (t.priority || 'low') + '</span></td>' +
-          '<td>' + (t.email || 'N/A') + '</td>' +
+          '<td><strong>' + escapeHtml(t.ticketId || t._id) + '</strong></td>' +
+          '<td>' + escapeHtml((t.subject || '').substring(0, 40)) + '</td>' +
+          '<td><span class="badge">' + escapeHtml(t.category || 'general') + '</span></td>' +
+          '<td><span class="badge ' + priorityClass + '">' + escapeHtml(t.priority || 'low') + '</span></td>' +
+          '<td>' + escapeHtml(t.email || 'N/A') + '</td>' +
           '<td>' + new Date(t.createdAt).toLocaleDateString() + '</td>' +
           '<td>' +
             '<button class="btn btn-sm btn-outline" onclick="showTicketDetail(\'' + (t._id || t.ticketId) + '\')">View</button>' +
@@ -964,7 +966,7 @@ function loadTicketsTable() {
     html += '</tbody></table>';
     container.innerHTML = html;
   }).catch(function(err) {
-    container.innerHTML = '<div class="empty-state-box"><p>Error: ' + err.message + '</p></div>';
+    container.innerHTML = '<div class="empty-state-box"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
   });
 }
 
@@ -992,7 +994,7 @@ function loadReferralsPage(adminApi, api) {
     adminApi.getReferrals({ limit: 100 }).then(function(result) {
       renderReferralsTable(result.referrals || []);
     }).catch(function(err) {
-      document.getElementById('referrals-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + err.message + '</p></div>';
+      document.getElementById('referrals-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
     });
   } else {
     document.getElementById('referrals-table-container').innerHTML = '<div class="empty-state-box"><h3>Coming Soon</h3><p>Referral tracking will be available shortly</p></div>';
@@ -1114,7 +1116,7 @@ function loadReportData() {
     
     container.innerHTML = html;
   }).catch(function(err) {
-    container.innerHTML = '<div class="empty-state-box"><p>Error loading report: ' + err.message + '</p></div>';
+    container.innerHTML = '<div class="empty-state-box"><p>Error loading report: ' + escapeHtml(err.message) + '</p></div>';
   });
 }
 
@@ -1142,7 +1144,7 @@ function loadTransactionsPage(adminApi, api) {
     adminApi.getTransactions({ limit: 100 }).then(function(result) {
       renderTransactionsTable(result.transactions || []);
     }).catch(function(err) {
-      document.getElementById('transactions-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + err.message + '</p></div>';
+      document.getElementById('transactions-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
     });
   } else {
     document.getElementById('transactions-table-container').innerHTML = '<div class="empty-state-box"><h3>Coming Soon</h3><p>Transaction history will be available shortly</p></div>';
@@ -1194,7 +1196,7 @@ function loadAuditPage(adminApi, api) {
     adminApi.getAuditLog({ limit: 100 }).then(function(result) {
       renderAuditTable(result.logs || []);
     }).catch(function(err) {
-      document.getElementById('audit-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + err.message + '</p></div>';
+      document.getElementById('audit-table-container').innerHTML = '<div class="empty-state-box"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
     });
   } else {
     document.getElementById('audit-table-container').innerHTML = '<div class="empty-state-box"><h3>Coming Soon</h3><p>Audit log will track all admin actions</p></div>';
@@ -1451,8 +1453,8 @@ function showUserDetail(userId) {
         '<div class="user-detail-header">' +
           '<div class="user-detail-avatar">' + initials + '</div>' +
           '<div class="user-detail-info">' +
-            '<h2>' + (user.name || 'No Name') + '</h2>' +
-            '<p>' + user.email + '</p>' +
+            '<h2>' + escapeHtml(user.name || 'No Name') + '</h2>' +
+            '<p>' + escapeHtml(user.email) + '</p>' +
             '<div class="user-detail-badges">' +
               '<span class="badge">' + (user.role || 'investor') + '</span>' +
               '<span class="badge">' + kycStatus + '</span>' +
@@ -1571,16 +1573,16 @@ function showTicketDetail(ticketId) {
     modal.className = 'modal active';
     modal.innerHTML = 
       '<div class="modal-content" style="max-width: 600px;">' +
-        '<h2>🎫 Ticket: ' + (ticket.ticketId || ticket._id) + '</h2>' +
+        '<h2>🎫 Ticket: ' + escapeHtml(ticket.ticketId || ticket._id) + '</h2>' +
         '<div style="margin-bottom: 1rem;">' +
-          '<p><strong>Subject:</strong> ' + (ticket.subject || 'N/A') + '</p>' +
-          '<p><strong>From:</strong> ' + (ticket.email || 'N/A') + '</p>' +
-          '<p><strong>Category:</strong> ' + (ticket.category || 'general') + '</p>' +
+          '<p><strong>Subject:</strong> ' + escapeHtml(ticket.subject || 'N/A') + '</p>' +
+          '<p><strong>From:</strong> ' + escapeHtml(ticket.email || 'N/A') + '</p>' +
+          '<p><strong>Category:</strong> ' + escapeHtml(ticket.category || 'general') + '</p>' +
           '<p><strong>Status:</strong> <span class="badge">' + (ticket.status || 'open') + '</span></p>' +
         '</div>' +
         '<div style="background: var(--surface-elevated); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">' +
           '<strong>Message:</strong><br>' +
-          '<p style="white-space: pre-wrap;">' + (ticket.message || 'No message') + '</p>' +
+          '<p style="white-space: pre-wrap;">' + escapeHtml(ticket.message || 'No message') + '</p>' +
         '</div>' +
         '<div style="display: flex; gap: 1rem;">' +
           '<button class="btn btn-outline" onclick="this.closest(\'.modal\').remove()" style="flex:1;">Close</button>' +

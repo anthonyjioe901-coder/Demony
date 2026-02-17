@@ -21,20 +21,38 @@ router.post('/image', authenticateToken, async function(req, res) {
       return res.status(400).json({ error: 'No image data provided' });
     }
     
+    // Validate file size (max 5MB for base64 data, which is ~3.75MB decoded)
+    var MAX_BASE64_SIZE = 5 * 1024 * 1024; // 5MB base64
+    if (imageData.length > MAX_BASE64_SIZE) {
+      return res.status(400).json({ error: 'Image too large. Maximum size is 5MB.' });
+    }
+    
     // Handle base64 data URL format
     var base64Data = imageData;
     var extension = 'png';
     
+    // Validate allowed image types
+    var ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+    
     if (imageData.startsWith('data:')) {
+      // Validate MIME type
+      var mimeMatch = imageData.match(/^data:(image\/\w+);base64,/);
+      if (!mimeMatch) {
+        return res.status(400).json({ error: 'Invalid image format. Only PNG, JPG, GIF, WEBP are allowed.' });
+      }
+      
       // Extract MIME type and data
       var matches = imageData.match(/^data:image\/(\w+);base64,(.+)$/);
       if (matches) {
-        extension = matches[1];
+        extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
         base64Data = matches[2];
       } else {
-        // Try to extract just the base64 part
         base64Data = imageData.split(',')[1] || imageData;
       }
+    }
+    
+    if (ALLOWED_EXTENSIONS.indexOf(extension) === -1) {
+      return res.status(400).json({ error: 'Invalid image type. Only PNG, JPG, GIF, WEBP are allowed.' });
     }
     
     // Generate unique filename

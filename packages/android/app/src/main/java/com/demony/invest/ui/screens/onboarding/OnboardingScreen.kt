@@ -44,31 +44,31 @@ fun OnboardingScreen(
             icon = Icons.Default.TrendingUp,
             title = "Welcome to Demony",
             description = "Your gateway to smart local investments. Start building wealth by investing in verified Ghanaian businesses.",
-            highlightText = "Invest from just GH₵20"
+            highlightText = "Start with amounts that fit your goals"
         ),
         OnboardingPage(
             icon = Icons.Default.Business,
             title = "Discover Projects",
             description = "Browse carefully vetted investment opportunities across Agriculture, Technology, Real Estate, and more.",
-            highlightText = "150+ verified projects"
+            highlightText = "Opportunities across multiple sectors"
         ),
         OnboardingPage(
             icon = Icons.Default.PieChart,
             title = "Track Your Growth",
             description = "Monitor your investments in real-time. See your earnings grow with our transparent profit-sharing model.",
-            highlightText = "Up to 15% returns"
+            highlightText = "Project returns vary by opportunity"
         ),
         OnboardingPage(
             icon = Icons.Default.Security,
             title = "Safe & Secure",
             description = "Your money is protected. We use bank-grade security and conduct thorough due diligence on all projects.",
-            highlightText = "100% secure transactions"
+            highlightText = "Strong security and risk controls"
         ),
         OnboardingPage(
             icon = Icons.Default.CardGiftcard,
             title = "Earn Bonus Rewards",
             description = "Refer friends and earn 5% of their investments! Plus, both you and your friend get GH₵20 bonus.",
-            highlightText = "Give GH₵20, Get GH₵20"
+            highlightText = "Referral rewards are program-based"
         )
     )
 

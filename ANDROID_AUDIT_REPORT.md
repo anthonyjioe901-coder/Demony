@@ -8,6 +8,40 @@
 
 ## EXECUTIVE SUMMARY
 
+## REMEDIATION UPDATE (FEB 2026)
+
+The following high-impact issues from the initial audit have now been fixed in code:
+
+- **Settings Delete Account flow** now calls live API and logs user out on success.
+- **Settings Change Password validation** now matches backend password policy (8+ chars, upper/lower/number).
+- **Support ticket submission parity** fixed (valid backend categories, priority, required email).
+- **Support "My Tickets"** now loads authenticated user's real tickets from backend (`GET /support/tickets/my`).
+- **Onboarding risk wording** updated to remove absolute/guaranteed marketing claims.
+- **Support FAQ parity** improved with in-app FAQ search and live backend system status display.
+- **Referrals parity** improved with Top Referrers leaderboard section in Android.
+- **Project Detail parity** improved with native project share action and backend-powered ROI calculation.
+- **Portfolio parity** improved with Risk Level and Diversification Score cards from backend data.
+- **Portfolio stat cards** now support drilldown navigation to Investments.
+- **Referrals sharing parity** improved with WhatsApp, Twitter, and Facebook deep-link buttons.
+- **Support ticket UX parity** improved with authenticated ticket detail modal and response thread viewing.
+- **Portfolio referral parity** improved with qualification progress and locked/unlocked earnings widget.
+- **Settings dead-action cleanup** applied: 2FA now renders as explicit non-clickable "Soon" info row instead of actionable-looking control.
+- **Signup UX polish (Achieve-style guidance)** applied: step-based sectioning, welcoming setup guidance, and completion readiness indicator.
+- **Support FAQ parity** further improved with richer multi-category FAQ coverage and category filtering.
+- **Support contact config cleanup** applied by centralizing contact endpoints used by email/phone/WhatsApp actions.
+- **Referrals metrics parity** improved with Pending Rewards display alongside total referrals and earned rewards.
+- **Login legal UX parity** improved by opening hosted Terms and Privacy pages instead of inline hardcoded legal dialogs.
+
+### Newly Added Endpoint
+
+- `GET /api/support/tickets/my` (authenticated): returns current user's support tickets ordered by newest first.
+
+### Remaining Priority Gaps (next pass)
+
+- Device-level runtime verification on physical Android phone (adb environment still required).
+- Achieve-style registration/onboarding UX polish beyond copy/legal hardening.
+- Remaining parity features from initial list (ROI calculator UI, referrals leaderboard UI, support FAQ search depth, portfolio parity widgets).
+
 | Priority | Count |
 |----------|-------|
 | 🔴 CRITICAL | 7 |

@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils.js';
+
 // Portfolio Page
 function renderPortfolio(container, api) {
   if (!api.token) {
@@ -112,7 +114,7 @@ function loadReferralWidget(api) {
         '<div class="referral-code-container">' +
           '<div class="referral-code-label">Your referral code</div>' +
           '<div class="referral-code-wrapper">' +
-            '<div id="referral-code-display" class="referral-code-text">' + data.code + '</div>' +
+            '<div id="referral-code-display" class="referral-code-text">' + escapeHtml(data.code) + '</div>' +
             '<button id="copy-referral-btn" class="referral-copy-btn">' +
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>' +
               '<span>Copy</span>' +
@@ -309,7 +311,7 @@ function attachInvestmentDrilldown(api) {
 function createAllocationBar(label, percent, color) {
   return '<div>' +
     '<div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem;">' +
-      '<span style="font-weight: 600;">' + label + '</span>' +
+      '<span style="font-weight: 600;">' + escapeHtml(label) + '</span>' +
       '<span style="color: var(--text-muted);">' + percent + '%</span>' +
     '</div>' +
     '<div class="progress-bar" style="height: 8px; background: var(--border-color); border-radius: 999px; overflow: hidden;">' +

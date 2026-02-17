@@ -10,6 +10,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -26,7 +30,7 @@ import com.demony.invest.data.models.Transaction
 import com.demony.invest.ui.components.BottomNavigationBar
 import com.demony.invest.ui.viewmodels.WalletViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun WalletScreen(
     navController: NavController,
@@ -44,6 +48,19 @@ fun WalletScreen(
     var showPaystackWebView by remember { mutableStateOf(false) }
     var depositAmount by remember { mutableStateOf("") }
     var currentPaymentUrl by remember { mutableStateOf("") }
+    
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.refresh()
+        }
+    )
+    
+    LaunchedEffect(isLoading) {
+        if (!isLoading) isRefreshing = false
+    }
     
     // Watch for deposit URL changes
     LaunchedEffect(depositUrl) {
@@ -110,10 +127,15 @@ fun WalletScreen(
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .pullRefresh(pullRefreshState)
+            ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -302,6 +324,12 @@ fun WalletScreen(
                     }
                 }
             }
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+            }
         }
         
         // Deposit Dialog
@@ -317,7 +345,7 @@ fun WalletScreen(
                             label = { Text("Amount (GH₵)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
-                            supportingText = { Text("Minimum deposit: GH₵ 10") }
+                            supportingText = { Text("Minimum deposit: GH₵ 20") }
                         )
                         
                         Spacer(modifier = Modifier.height(8.dp))
@@ -333,13 +361,13 @@ fun WalletScreen(
                     Button(
                         onClick = {
                             val amount = depositAmount.toDoubleOrNull()
-                            if (amount != null && amount >= 10) {
+                            if (amount != null && amount >= 20) {
                                 viewModel.initializeDeposit(amount)
                                 showDepositDialog = false
                                 depositAmount = ""
                             }
                         },
-                        enabled = (depositAmount.toDoubleOrNull() ?: 0.0) >= 10
+                        enabled = (depositAmount.toDoubleOrNull() ?: 0.0) >= 20
                     ) {
                         Text("Continue to Payment")
                     }

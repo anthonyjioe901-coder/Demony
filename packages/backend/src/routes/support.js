@@ -4,6 +4,8 @@ var db = require('../../../database/src/index');
 var emailService = require('../services/email');
 var authenticateToken = require('../middleware/auth');
 var { strictLimiter } = require('../middleware/rateLimiter');
+var notificationService = require('../services/notifications.js');
+var TYPES = notificationService.NOTIFICATION_TYPES;
 var router = express.Router();
 
 // Generate ticket ID
@@ -32,9 +34,19 @@ router.post('/tickets', async function(req, res) {
       return res.status(400).json({ error: 'Category, subject, message, and email are required' });
     }
     
-    if (!email.includes('@') || !email.includes('.')) {
+    // Validate types and lengths
+    if (typeof subject !== 'string' || subject.trim().length < 3 || subject.trim().length > 200) {
+      return res.status(400).json({ error: 'Subject must be 3-200 characters' });
+    }
+    if (typeof message !== 'string' || message.trim().length < 10 || message.trim().length > 5000) {
+      return res.status(400).json({ error: 'Message must be 10-5000 characters' });
+    }
+    
+    // Proper email validation
+    if (typeof email !== 'string' || !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email.trim())) {
       return res.status(400).json({ error: 'Invalid email address' });
     }
+    email = email.trim().toLowerCase();
     
     var validCategories = ['account', 'deposit', 'withdrawal', 'investment', 'technical', 'business', 'feedback', 'other'];
     if (validCategories.indexOf(category) === -1) {
@@ -106,8 +118,52 @@ router.post('/tickets', async function(req, res) {
       message: 'Support ticket submitted successfully',
       ticketId: ticketId
     });
+    
+    // Send in-app notification if user exists (non-blocking)
+    if (user) {
+      notificationService.createNotification(user._id.toString(), TYPES.SUPPORT_TICKET_CREATED, {
+        title: 'Support Request Received',
+        message: 'Your ticket ' + ticketId + ' has been submitted. We\'ll respond within 24 hours.',
+        link: '#/support',
+        metadata: { ticketId: ticketId }
+      }).catch(function() {});
+    }
   } catch (err) {
     console.error('Support ticket error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get authenticated user's tickets
+router.get('/tickets/my', authenticateToken, async function(req, res) {
+  try {
+    var database = await db.getDb();
+    var userId = req.user.userId || req.user.id;
+
+    var tickets = await database.collection('support_tickets')
+      .find({ userId: String(userId) })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .toArray();
+
+    res.json({
+      tickets: tickets.map(function(ticket) {
+        return {
+          ticketId: ticket.ticketId,
+          category: ticket.category,
+          priority: ticket.priority,
+          subject: ticket.subject,
+          message: ticket.message,
+          status: ticket.status,
+          email: ticket.email,
+          createdAt: ticket.createdAt,
+          updatedAt: ticket.updatedAt,
+          responseCount: ticket.responses ? ticket.responses.length : 0
+        };
+      })
+    });
+  } catch (err) {
+    console.error('Get my tickets error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

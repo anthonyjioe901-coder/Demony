@@ -7,6 +7,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,7 +26,7 @@ import com.demony.invest.ui.components.BottomNavigationBar
 import com.demony.invest.ui.components.ProjectCard
 import com.demony.invest.ui.viewmodels.ProjectsViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ProjectsScreen(
     onNavigateToProject: (String) -> Unit,
@@ -33,6 +37,7 @@ fun ProjectsScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val categories by viewModel.categories.collectAsState()
     val error by viewModel.error.collectAsState()
     
     var showSearchBar by remember { mutableStateOf(false) }
@@ -40,6 +45,19 @@ fun ProjectsScreen(
     var showFilterSheet by remember { mutableStateOf(false) }
     var selectedSortBy by remember { mutableStateOf("Newest") }
     var minReturn by remember { mutableStateOf("") }
+    
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.loadProjects(forceRefresh = true)
+        }
+    )
+    
+    LaunchedEffect(isLoading) {
+        if (!isLoading) isRefreshing = false
+    }
     
     // Filter projects by search query, sort, and min return
     val filteredProjects = remember(projects, searchQuery, selectedSortBy, minReturn) {
@@ -149,14 +167,21 @@ fun ProjectsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                viewModel.categories.forEach { category ->
+                FilterChip(
+                    selected = selectedCategory == null,
+                    onClick = { viewModel.selectAllCategories() },
+                    label = { Text("All") },
+                    leadingIcon = if (selectedCategory == null) {
+                        { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp)) }
+                    } else null
+                )
+
+                categories.forEach { categoryKey ->
                     FilterChip(
-                        selected = selectedCategory == category || 
-                                  (selectedCategory == null && category == "All"),
-                        onClick = { viewModel.selectCategory(category) },
-                        label = { Text(category) },
-                        leadingIcon = if (selectedCategory == category || 
-                                         (selectedCategory == null && category == "All")) {
+                        selected = selectedCategory == categoryKey,
+                        onClick = { viewModel.selectCategory(categoryKey) },
+                        label = { Text(formatCategoryLabel(categoryKey)) },
+                        leadingIcon = if (selectedCategory == categoryKey) {
                             { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp)) }
                         } else null
                     )
@@ -236,6 +261,11 @@ fun ProjectsScreen(
                     }
                 }
             } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pullRefresh(pullRefreshState)
+                ) {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -260,6 +290,24 @@ fun ProjectsScreen(
                             }
                         }
                     }
+                    
+                    // Load More button
+                    if (!isLoadingMore && filteredProjects.size >= 10) {
+                        item {
+                            OutlinedButton(
+                                onClick = { viewModel.loadMoreProjects() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Load More Projects")
+                            }
+                        }
+                    }
+                }
+                PullRefreshIndicator(
+                    refreshing = isRefreshing,
+                    state = pullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
                 }
             }
         }
@@ -347,4 +395,15 @@ fun ProjectsScreen(
             }
         }
     }
+}
+
+private fun formatCategoryLabel(categoryKey: String): String {
+    return categoryKey
+        .trim()
+        .replace('_', '-')
+        .split('-')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { part ->
+            part.lowercase().replaceFirstChar { it.uppercase() }
+        }
 }

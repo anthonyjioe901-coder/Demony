@@ -289,6 +289,21 @@ async function completeReferral(refereeId, investmentAmount) {
       return { completed: false, reason: 'No pending referral' };
     }
     
+    // Check if referrer account is still active
+    var referrer = await database.collection('users').findOne(
+      { _id: new ObjectId(referral.referrerId) },
+      { projection: { isActive: 1, isSuspended: 1 } }
+    );
+    if (!referrer || referrer.isActive === false || referrer.isSuspended === true) {
+      console.log('📣 Referrer account inactive/suspended, skipping bonus');
+      // Still mark referral as completed but skip bonus
+      await database.collection('referrals').updateOne(
+        { _id: referral._id },
+        { $set: { status: 'completed', bonusPaid: 0, investedAt: new Date(), investmentAmount: investmentAmount, note: 'Referrer account inactive' } }
+      );
+      return { completed: true, bonusSkipped: true, reason: 'Referrer inactive' };
+    }
+    
     // Update referral status
     await database.collection('referrals').updateOne(
       { _id: referral._id },

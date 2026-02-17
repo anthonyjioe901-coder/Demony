@@ -1,3 +1,5 @@
+import { escapeHtml, escapeAttr } from '../utils.js';
+
 // Projects Page
 function renderProjects(container, api) {
   var html = 
@@ -184,19 +186,19 @@ function loadProjects(api, loadCategories) {
         
         return '<div class="card project-card">' +
           '<div class="project-image" style="height: 200px; position: relative;">' +
-            '<img src="' + imageUrl + '" alt="' + (project.name || 'Project') + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800' + '\'' + ';">' +
+            '<img src="' + imageUrl + '" alt="' + escapeAttr(project.name || 'Project') + '" loading="lazy" onerror="this.onerror=null;this.src=\'' + 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800' + '\'' + ';">'  +
             '<span class="progress-status-indicator" style="position: absolute; top: 12px; left: 12px; background: ' + progressInfo.bgColor + '; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 6px; backdrop-filter: blur(4px);">' + progressInfo.icon + ' ' + progressInfo.label + '</span>' +
           '</div>' +
           '<div class="project-content">' +
             '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">' +
-              '<span class="badge">' + (project.category || 'General') + '</span>' +
+              '<span class="badge">' + escapeHtml(project.category || 'General') + '</span>' +
               '<div style="display: flex; align-items: center; gap: 0.5rem;">' +
                 '<span style="color: var(--text-muted); font-size: 0.875rem; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> ' + ageDisplay + '</span>' +
                 '<button class="share-project-btn" data-id="' + project.id + '" data-name="' + encodeURIComponent(project.name) + '" title="Share project" style="background: none; border: none; cursor: pointer; padding: 0.25rem; display: flex; align-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>' +
               '</div>' +
             '</div>' +
-            '<h3>' + project.name + '</h3>' +
-            '<p class="project-desc">' + (project.description || '').substring(0, 100) + '...</p>' +
+            '<h3>' + escapeHtml(project.name) + '</h3>' +
+            '<p class="project-desc">' + escapeHtml((project.description || '').substring(0, 100)) + '...</p>' +
             
             // Investment Terms Box
             '<div class="investment-terms">' +
@@ -259,7 +261,7 @@ function loadProjects(api, loadCategories) {
       });
     })
     .catch(function(err) {
-      projectsList.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #ef4444;">Error loading projects: ' + err.message + '</div>';
+      projectsList.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #ef4444;">Error loading projects: ' + escapeHtml(err.message || 'Unknown error') + '</div>';
     });
 }
 
@@ -286,7 +288,7 @@ function showInvestModal(projectId, api) {
     
     modal.innerHTML = 
       '<div class="modal-content" style="max-width: 500px; max-height: 90vh; overflow-y: auto;">' +
-        '<h2>Invest in ' + project.name + '</h2>' +
+        '<h2>Invest in ' + escapeHtml(project.name) + '</h2>' +
         
         // Risk Disclosure Banner
         '<div style="background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #f59e0b; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">' +
@@ -439,7 +441,7 @@ function showInvestModal(projectId, api) {
             '<div class="modal-content" style="max-width: 400px; text-align: center;">' +
               '<div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>' +
               '<h2 style="color: var(--secondary-color);">Investment Successful!</h2>' +
-              '<p>You invested <strong>GH₵' + parseFloat(amount).toLocaleString() + '</strong> in ' + project.name + '</p>' +
+              '<p>You invested <strong>GH₵' + parseFloat(amount).toLocaleString() + '</strong> in ' + escapeHtml(project.name) + '</p>' +
               '<div style="background: #fef3c7; border-radius: 8px; padding: 1rem; margin: 1rem 0; text-align: left;">' +
                 '<p style="margin: 0; font-size: 0.85rem;"><strong>🔒 Remember:</strong> Your principal is locked until ' + new Date(result.investment.lockInEndDate).toLocaleDateString() + '. Profits can be withdrawn anytime.</p>' +
               '</div>' +
@@ -450,7 +452,7 @@ function showInvestModal(projectId, api) {
           loadProjects(api);
         })
         .catch(function(err) {
-          alert('Investment failed: ' + err.message);
+          alert('Investment failed: ' + (err.message || 'Unknown error'));
           confirmBtn.disabled = false;
           confirmBtn.textContent = 'Confirm Investment';
         });
@@ -470,7 +472,7 @@ function showCalculatorModal(projectId, api) {
     modal.innerHTML = 
       '<div class="modal-content" style="max-width: 500px;">' +
         '<h2>📊 ROI Calculator</h2>' +
-        '<p style="color: var(--text-muted); margin-bottom: 1rem;">' + project.name + '</p>' +
+        '<p style="color: var(--text-muted); margin-bottom: 1rem;">' + escapeHtml(project.name) + '</p>' +
         
         '<div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem;">' +
           '<strong>⚠️ Disclaimer:</strong> These are PROJECTED returns only. Actual profits depend on project performance and are NOT guaranteed.' +
@@ -565,7 +567,7 @@ function showCalculatorModal(projectId, api) {
             '<p style="color: #ef4444; font-size: 0.75rem; margin: 1rem 0 0 0; text-align: center;">⚠️ Profits depend on actual project performance</p>' +
           '</div>';
       }).catch(function(err) {
-        calcResults.innerHTML = '<div style="text-align: center; color: #ef4444;">Error calculating returns: ' + (err.message || 'Unknown error') + '</div>';
+        calcResults.innerHTML = '<div style="text-align: center; color: #ef4444;">Error calculating returns: ' + escapeHtml(err.message || 'Unknown error') + '</div>';
       });
     }
     
@@ -581,7 +583,7 @@ function showCalculatorModal(projectId, api) {
       showInvestModal(projectId, api);
     });
   }).catch(function(err) {
-    alert('Error loading project: ' + err.message);
+    alert('Error loading project: ' + (err.message || 'Unknown error'));
   });
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -43,9 +44,9 @@ fun SignupScreen(
     var businessRegistration by remember { mutableStateOf("") }
     
     // Dialog states
-    var showTermsDialog by remember { mutableStateOf(false) }
-    var showPrivacyDialog by remember { mutableStateOf(false) }
     var showVerificationDialog by remember { mutableStateOf(false) }
+    
+    val uriHandler = LocalUriHandler.current
     
     val isLoading by authViewModel.isLoading.collectAsState()
     val error by authViewModel.error.collectAsState()
@@ -59,26 +60,22 @@ fun SignupScreen(
     
     val passwordsMatch = password == confirmPassword
     val phoneClean = phone.replace("[\\s\\-]".toRegex(), "")
-    val isPhoneValid = phoneClean.length >= 10
+    val isPhoneValid = phoneClean.matches("^[+]?[0-9]{10,20}$".toRegex())
+
+    val passwordHasUpper = password.any { it.isUpperCase() }
+    val passwordHasLower = password.any { it.isLowerCase() }
+    val passwordHasNumber = password.any { it.isDigit() }
+    val isPasswordValid = password.length >= 8 && passwordHasUpper && passwordHasLower && passwordHasNumber
+
     val isFormValid = name.isNotBlank() && 
                       email.isNotBlank() && 
                       phone.isNotBlank() &&
                       isPhoneValid &&
-                      password.length >= 6 && 
+                      isPasswordValid && 
                       passwordsMatch &&
                       (selectedRole != "business_owner" || 
                        (businessName.isNotBlank() && businessRegistration.isNotBlank()))
 
-    // Terms of Service Dialog
-    if (showTermsDialog) {
-        TermsOfServiceDialog(onDismiss = { showTermsDialog = false })
-    }
-    
-    // Privacy Policy Dialog
-    if (showPrivacyDialog) {
-        PrivacyPolicyDialog(onDismiss = { showPrivacyDialog = false })
-    }
-    
     // Email Verification Dialog
     if (showVerificationDialog) {
         AlertDialog(
@@ -203,6 +200,29 @@ fun SignupScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp)
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "Let’s set up your profile",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Step 1: Your details  •  Step 2: Account security",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
@@ -259,6 +279,16 @@ fun SignupScreen(
         }
         
         Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Step 1 of 2 • Tell us about you",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
         
         // Name field
         OutlinedTextField(
@@ -354,6 +384,16 @@ fun SignupScreen(
                 enabled = !isLoading
             )
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Step 2 of 2 • Secure your account",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth()
+        )
         
         Spacer(modifier = Modifier.height(12.dp))
         
@@ -382,10 +422,10 @@ fun SignupScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading,
-            isError = password.isNotEmpty() && password.length < 6,
-            supportingText = if (password.isNotEmpty() && password.length < 6) {
-                { Text("Password must be at least 6 characters") }
-            } else null
+            isError = password.isNotEmpty() && !isPasswordValid,
+            supportingText = {
+                Text("Min 8 chars, include uppercase, lowercase, and a number")
+            }
         )
         
         Spacer(modifier = Modifier.height(12.dp))
@@ -431,6 +471,32 @@ fun SignupScreen(
         )
         
         Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (isFormValid) Icons.Default.CheckCircle else Icons.Default.Info,
+                    contentDescription = null,
+                    tint = if (isFormValid) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isFormValid) "Great! You’re ready to create your account." else "Complete all required fields to continue.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
         
         // Signup button
         Button(
@@ -505,7 +571,7 @@ fun SignupScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable { showTermsDialog = true }
+                    modifier = Modifier.clickable { uriHandler.openUri("https://demony.app/terms") }
                 )
                 Text(
                     text = " and ",
@@ -517,7 +583,7 @@ fun SignupScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable { showPrivacyDialog = true }
+                    modifier = Modifier.clickable { uriHandler.openUri("https://demony.app/privacy") }
                 )
             }
         }

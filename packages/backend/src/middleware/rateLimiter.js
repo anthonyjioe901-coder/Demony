@@ -88,9 +88,18 @@ var strictLimiter = createRateLimiter({
   message: 'Too many attempts. Please try again later.'
 });
 
+// Financial operations - stricter limits for deposits, withdrawals, investments
+var financialLimiter = createRateLimiter({
+  name: 'financial',
+  windowMs: 60 * 1000,  // 1 minute
+  maxRequests: 10,       // 10 financial operations per minute
+  message: 'Too many financial operations. Please slow down.'
+});
+
 module.exports = {
   createRateLimiter: createRateLimiter,
   authLimiter: authLimiter,
   apiLimiter: apiLimiter,
-  strictLimiter: strictLimiter
+  strictLimiter: strictLimiter,
+  financialLimiter: financialLimiter
 };

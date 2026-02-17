@@ -110,6 +110,18 @@ router.post('/signup', async function(req, res) {
     return res.status(400).json({ error: 'Name, email, and password are required' });
   }
   
+  // Validate and normalize email
+  if (typeof email !== 'string' || !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email.trim())) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+  email = email.trim().toLowerCase();
+  
+  // Validate name length
+  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) {
+    return res.status(400).json({ error: 'Name must be 2-100 characters' });
+  }
+  name = name.trim();
+  
   // Validate password strength
   var passwordError = validatePassword(password);
   if (passwordError) {
@@ -175,6 +187,7 @@ router.post('/signup', async function(req, res) {
       walletBalance: 0,
       totalInvested: 0,
       totalEarnings: 0,
+      tokenVersion: 0,
       
       createdAt: new Date(),
       updatedAt: new Date()
@@ -202,7 +215,7 @@ router.post('/signup', async function(req, res) {
     };
     
     var token = jwt.sign(
-      { id: newUser.id, email: newUser.email, role: role },
+      { id: newUser.id, email: newUser.email, role: role, tokenVersion: 0 },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -247,6 +260,16 @@ router.post('/login', async function(req, res) {
   // Must have either email or phone
   if ((!email && !phone) || !password) {
     return res.status(400).json({ error: 'Email or phone and password are required' });
+  }
+  
+  // Guard against bcrypt DoS with huge passwords
+  if (typeof password !== 'string' || password.length > 128) {
+    return res.status(400).json({ error: 'Invalid credentials' });
+  }
+  
+  // Normalize email on login
+  if (email) {
+    email = email.trim().toLowerCase();
   }
   
   // MED-10: Check for account lockout
@@ -367,7 +390,7 @@ router.post('/login', async function(req, res) {
     }
     
     var token = jwt.sign(
-      { id: user._id.toString(), email: user.email, role: user.role || 'investor' },
+      { id: user._id.toString(), email: user.email, role: user.role || 'investor', tokenVersion: user.tokenVersion || 0 },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -420,6 +443,144 @@ router.get('/me', authenticateToken, async function(req, res) {
       business: user.business || null,
       createdAt: user.createdAt
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update user profile (name, optional phone, optional business name)
+// Used by web mobile Settings page and Android app parity
+router.put('/update-profile', authenticateToken, async function(req, res) {
+  var name = req.body.name;
+  var phone = req.body.phone;
+  var businessName = req.body.businessName;
+
+  if (!name || typeof name !== 'string' || name.trim().length < 2) {
+    return res.status(400).json({ error: 'Name is required' });
+  }
+
+  var updateDoc = {
+    $set: {
+      name: name.trim(),
+      updatedAt: new Date()
+    }
+  };
+
+  // Optional phone update (validate + enforce uniqueness)
+  if (phone && typeof phone === 'string') {
+    var phoneClean = phone.replace(/[\s\-]/g, '');
+    if (!/^[+]?[0-9]{10,20}$/.test(phoneClean)) {
+      return res.status(400).json({ error: 'Invalid phone format. Use international format (e.g., +233 24 123 4567)' });
+    }
+    updateDoc.$set.phone = phoneClean;
+  }
+
+  try {
+    var database = await db.getDb();
+
+    // Ensure user exists
+    var existing = await database.collection('users').findOne({ _id: new ObjectId(req.user.id) });
+    if (!existing) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check phone uniqueness if changing
+    if (updateDoc.$set.phone) {
+      var phoneUsed = await database.collection('users').findOne({
+        phone: updateDoc.$set.phone,
+        _id: { $ne: new ObjectId(req.user.id) }
+      });
+      if (phoneUsed) {
+        return res.status(400).json({ error: 'Phone number already registered to another account' });
+      }
+    }
+
+    // Optional business name update (only for business owners with business object)
+    var businessNameTrimmed = typeof businessName === 'string' ? businessName.trim() : '';
+    if (businessNameTrimmed.length > 0 && (existing.role || '') === 'business_owner') {
+      updateDoc.$set['business.name'] = businessNameTrimmed;
+      // Ensure business object exists
+      updateDoc.$set.business = existing.business || {
+        name: businessNameTrimmed,
+        registrationNumber: (existing.business && existing.business.registrationNumber) || '',
+        verified: false,
+        documents: []
+      };
+    }
+
+    await database.collection('users').updateOne(
+      { _id: new ObjectId(req.user.id) },
+      updateDoc
+    );
+
+    var user = await database.collection('users').findOne({ _id: new ObjectId(req.user.id) });
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        phone: user.phone || null,
+        role: user.role || 'investor',
+        isVerified: user.isVerified || false,
+        kycStatus: user.kyc ? user.kyc.status : 'pending',
+        walletBalance: user.walletBalance || 0,
+        totalInvested: user.totalInvested || 0,
+        totalEarnings: user.totalEarnings || 0,
+        business: user.business || null,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Save notification preferences (web mobile Settings parity)
+router.put('/notification-preferences', authenticateToken, async function(req, res) {
+  var prefs = {
+    emailNotifications: !!req.body.emailNotifications,
+    investmentUpdates: !!req.body.investmentUpdates,
+    referralNotifications: !!req.body.referralNotifications,
+    marketingNotifications: !!req.body.marketingNotifications
+  };
+
+  try {
+    var database = await db.getDb();
+
+    var result = await database.collection('users').updateOne(
+      { _id: new ObjectId(req.user.id) },
+      { $set: { notificationPreferences: prefs, updatedAt: new Date() } }
+    );
+
+    if (!result.matchedCount) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Notification preferences saved', preferences: prefs });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete account (soft delete by deactivating)
+router.delete('/delete-account', authenticateToken, async function(req, res) {
+  try {
+    var database = await db.getDb();
+    var result = await database.collection('users').updateOne(
+      { _id: new ObjectId(req.user.id) },
+      { $set: { isActive: false, deletedAt: new Date(), updatedAt: new Date() } }
+    );
+
+    if (!result.matchedCount) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Account deleted successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -498,12 +659,24 @@ router.post('/change-password', authenticateToken, async function(req, res) {
     }
     
     var hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Increment tokenVersion to invalidate all existing tokens
     await database.collection('users').updateOne(
       { _id: new ObjectId(req.user.id) },
-      { $set: { password: hashedPassword, updatedAt: new Date() } }
+      { 
+        $set: { password: hashedPassword, updatedAt: new Date() },
+        $inc: { tokenVersion: 1 }
+      }
     );
     
-    res.json({ message: 'Password changed successfully' });
+    // Issue new token with updated version
+    var updatedUser = await database.collection('users').findOne({ _id: new ObjectId(req.user.id) });
+    var newToken = jwt.sign(
+      { id: updatedUser._id.toString(), email: updatedUser.email, role: updatedUser.role || 'investor', tokenVersion: updatedUser.tokenVersion || 0 },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.json({ message: 'Password changed successfully', token: newToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

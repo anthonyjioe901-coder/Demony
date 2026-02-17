@@ -43,12 +43,12 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun login(email: String, password: String, onSuccess: () -> Unit) {
+    fun login(identifier: String, password: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
-            repository.login(email, password)
+            repository.login(identifier, password)
                 .onSuccess { response ->
                     _currentUser.value = response.user
                     _isAuthenticated.value = true
@@ -112,9 +112,18 @@ class AuthViewModel @Inject constructor(
                 .onSuccess { user ->
                     _currentUser.value = user
                 }
-                .onFailure {
-                    // Token might be invalid, logout
-                    logout()
+                .onFailure { exception ->
+                    // Only logout on auth errors (401/403), not network issues
+                    when (exception) {
+                        is retrofit2.HttpException -> {
+                            if (exception.code() == 401 || exception.code() == 403) {
+                                logout()
+                            }
+                        }
+                        // Network errors, timeouts, etc. - keep user logged in
+                        is java.io.IOException -> { /* offline, don't logout */ }
+                        else -> { /* unknown error, don't logout */ }
+                    }
                 }
         }
     }
@@ -217,6 +226,42 @@ class AuthViewModel @Inject constructor(
                 .onFailure { exception ->
                     onResult(false, exception.message ?: "Failed to update phone number")
                 }
+        }
+    }
+
+    fun updateProfile(
+        name: String,
+        phone: String? = null,
+        businessName: String? = null,
+        onResult: (success: Boolean, error: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.updateProfile(name, phone, businessName)
+                .onSuccess { user ->
+                    _currentUser.value = user
+                    onResult(true, null)
+                }
+                .onFailure { exception ->
+                    onResult(false, exception.message ?: "Failed to update profile")
+                }
+            _isLoading.value = false
+        }
+    }
+
+    fun deleteAccount(onResult: (success: Boolean, error: String?) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.deleteAccount()
+                .onSuccess {
+                    _currentUser.value = null
+                    _isAuthenticated.value = false
+                    onResult(true, null)
+                }
+                .onFailure { exception ->
+                    onResult(false, exception.message ?: "Failed to delete account")
+                }
+            _isLoading.value = false
         }
     }
 }

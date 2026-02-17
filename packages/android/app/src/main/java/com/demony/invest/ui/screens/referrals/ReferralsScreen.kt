@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,11 +32,13 @@ fun ReferralsScreen(
 ) {
     val referralCode by viewModel.referralCode.collectAsState()
     val history by viewModel.referralHistory.collectAsState()
+    val leaderboard by viewModel.leaderboard.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     
     val context = LocalContext.current
     var showCopiedSnackbar by remember { mutableStateOf(false) }
+    val referralStats = referralCode?.stats
 
     LaunchedEffect(Unit) {
         viewModel.loadReferralData()
@@ -155,11 +158,12 @@ fun ReferralsScreen(
                                 Button(
                                     onClick = {
                                         referralCode?.code?.let { code ->
+                                            val shareUrl = referralCode?.shareUrl ?: "https://demony-web.onrender.com?ref=$code"
                                             val shareIntent = Intent().apply {
                                                 action = Intent.ACTION_SEND
                                                 type = "text/plain"
                                                 putExtra(Intent.EXTRA_TEXT, 
-                                                    "Join Demony and start investing! Use my referral code: $code\n\nDownload: https://demony.com/download"
+                                                    "Join Demony and start investing! Use my referral code: $code\n\n$shareUrl"
                                                 )
                                             }
                                             context.startActivity(Intent.createChooser(shareIntent, "Share Referral Code"))
@@ -171,50 +175,129 @@ fun ReferralsScreen(
                                     Text("Share")
                                 }
                             }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        referralCode?.code?.let { code ->
+                                            val shareUrl = referralCode?.shareUrl ?: "https://demony-web.onrender.com?ref=$code"
+                                            val message = "Join me on Demony and get started with investing. Use my referral code: $code"
+                                            val url = "https://wa.me/?text=${Uri.encode("$message $shareUrl")}" 
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("WhatsApp")
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        referralCode?.code?.let { code ->
+                                            val shareUrl = referralCode?.shareUrl ?: "https://demony-web.onrender.com?ref=$code"
+                                            val message = "Join me on Demony with code $code"
+                                            val url = "https://twitter.com/intent/tweet?text=${Uri.encode(message)}&url=${Uri.encode(shareUrl)}"
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Twitter")
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        referralCode?.code?.let { code ->
+                                            val shareUrl = referralCode?.shareUrl ?: "https://demony-web.onrender.com?ref=$code"
+                                            val url = "https://www.facebook.com/sharer/sharer.php?u=${Uri.encode(shareUrl)}"
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Facebook")
+                                }
+                            }
                         }
                     }
                 }
                 
                 // Stats Card
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Card(modifier = Modifier.weight(1f)) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "${referralCode?.totalReferrals ?: 0}",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "Total Referrals",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Card(modifier = Modifier.weight(1f)) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "${referralStats?.totalReferrals ?: 0}",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Total Referrals",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Card(modifier = Modifier.weight(1f)) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "GH₵ %.2f".format(referralStats?.availableEarnings ?: 0.0),
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                    Text(
+                                        text = "Total Earnings",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
-                        
-                        Card(modifier = Modifier.weight(1f)) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Column {
+                                    Text(
+                                        text = "Pending Rewards",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "Unlocks after qualification target",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 Text(
-                                    text = "GH₵ %.2f".format(referralCode?.earnedRewards ?: 0.0),
-                                    style = MaterialTheme.typography.headlineSmall,
+                                    text = "GH₵ %.2f".format(referralStats?.lockedEarnings ?: 0.0),
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                Text(
-                                    text = "Total Earnings",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.tertiary
                                 )
                             }
                         }
@@ -262,6 +345,69 @@ fun ReferralsScreen(
                 } else {
                     items(history) { referral ->
                         ReferralHistoryItem(referral = referral)
+                    }
+                }
+
+                if (leaderboard.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Top Referrers",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    items(leaderboard.take(5).withIndex().toList()) { indexedEntry ->
+                        val rank = indexedEntry.index + 1
+                        val entry = indexedEntry.value
+                        val name = entry["name"]?.toString() ?: entry["userName"]?.toString() ?: "Referrer"
+                        val points = (entry["totalReferrals"] ?: entry["referrals"] ?: 0).toString()
+                        val rewards = (entry["earnedRewards"] ?: entry["rewards"] ?: 0).toString()
+
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = MaterialTheme.shapes.small,
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "$rank",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "$points referrals",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Text(
+                                    text = "GH₵ $rewards",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
                     }
                 }
             }

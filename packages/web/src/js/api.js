@@ -586,4 +586,69 @@ Api.prototype.getReferralLeaderboard = function() {
   return this.request('/referrals/leaderboard');
 };
 
+// ==================== NOTIFICATIONS ====================
+Api.prototype.getNotifications = function(options) {
+  var query = '';
+  if (options) {
+    var params = [];
+    if (options.limit) params.push('limit=' + options.limit);
+    if (options.skip) params.push('skip=' + options.skip);
+    if (options.unread) params.push('unread=true');
+    if (params.length) query = '?' + params.join('&');
+  }
+  return this.request('/notifications' + query);
+};
+
+Api.prototype.markNotificationRead = function(id) {
+  return this.request('/notifications/' + id + '/read', { method: 'PUT' });
+};
+
+Api.prototype.getUnreadCount = function() {
+  return this.request('/notifications/unread-count');
+};
+
+Api.prototype.connectNotificationStream = function(onNotification) {
+  var self = this;
+  if (this._eventSource) {
+    this._eventSource.close();
+  }
+  
+  if (!this.token) return null;
+  
+  // SSE doesn't support Authorization headers natively, pass token as query param
+  var url = this.baseUrl + '/notifications/stream?token=' + encodeURIComponent(this.token);
+  
+  var es = new EventSource(url);
+  
+  es.onmessage = function(event) {
+    try {
+      var data = JSON.parse(event.data);
+      if (onNotification) {
+        onNotification(data);
+      }
+    } catch (err) {
+      // ignore parse errors
+    }
+  };
+  
+  es.onerror = function() {
+    // Auto-reconnect is built into EventSource
+    // But if we're logged out, close it
+    if (!self.token) {
+      es.close();
+      self._eventSource = null;
+    }
+  };
+  
+  this._eventSource = es;
+  return es;
+};
+
+Api.prototype.disconnectNotificationStream = function() {
+  if (this._eventSource) {
+    this._eventSource.close();
+    this._eventSource = null;
+  }
+};
+
 export { Api };

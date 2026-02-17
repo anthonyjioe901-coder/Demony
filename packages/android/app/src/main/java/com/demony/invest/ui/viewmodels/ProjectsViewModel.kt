@@ -43,25 +43,24 @@ class ProjectsViewModel @Inject constructor(
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
+    private val _categories = MutableStateFlow<List<String>>(emptyList())
+    val categories: StateFlow<List<String>> = _categories.asStateFlow()
+
     private val _totalProjects = MutableStateFlow(0)
     val totalProjects: StateFlow<Int> = _totalProjects.asStateFlow()
+
+    private val _roiResult = MutableStateFlow<Map<String, Any>?>(null)
+    val roiResult: StateFlow<Map<String, Any>?> = _roiResult.asStateFlow()
+
+    private val _isRoiLoading = MutableStateFlow(false)
+    val isRoiLoading: StateFlow<Boolean> = _isRoiLoading.asStateFlow()
+
+    private val _roiError = MutableStateFlow<String?>(null)
+    val roiError: StateFlow<String?> = _roiError.asStateFlow()
 
     private var currentPage = 1
     private var totalPages = 1
     private var hasMorePages = true
-
-    val categories = listOf(
-        "All",
-        "Agriculture",
-        "Technology",
-        "Real Estate",
-        "Manufacturing",
-        "Retail",
-        "Healthcare",
-        "Energy",
-        "Education",
-        "Transportation"
-    )
 
     init {
         loadProjects()
@@ -79,15 +78,20 @@ class ProjectsViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            val category = _selectedCategory.value?.takeIf { it != "All" }
+            val category = _selectedCategory.value
             
             repository.getProjects(
                 page = currentPage,
-                limit = 10,
+                limit = 20,
                 category = category
             )
                 .onSuccess { response ->
                     _projects.value = response.projects
+                    if (response.categories.isNotEmpty()) {
+                        _categories.value = response.categories
+                    } else if (_categories.value.isEmpty()) {
+                        _categories.value = response.projects.map { it.category }.distinct().sorted()
+                    }
                     response.pagination?.let { pagination ->
                         totalPages = pagination.pages
                         hasMorePages = currentPage < totalPages
@@ -109,7 +113,7 @@ class ProjectsViewModel @Inject constructor(
             _isLoadingMore.value = true
             currentPage++
 
-            val category = _selectedCategory.value?.takeIf { it != "All" }
+            val category = _selectedCategory.value
             
             repository.getProjects(
                 page = currentPage,
@@ -145,6 +149,11 @@ class ProjectsViewModel @Inject constructor(
         loadProjects(forceRefresh = true)
     }
 
+    fun selectAllCategories() {
+        _selectedCategory.value = null
+        loadProjects(forceRefresh = true)
+    }
+
     fun getProject(projectId: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -164,6 +173,29 @@ class ProjectsViewModel @Inject constructor(
 
     fun clearSelectedProject() {
         _selectedProject.value = null
+    }
+
+    fun calculateReturns(projectId: String, amount: Double, durationMonths: Int = 12) {
+        viewModelScope.launch {
+            _isRoiLoading.value = true
+            _roiError.value = null
+            _roiResult.value = null
+
+            repository.calculateReturns(projectId, amount, durationMonths)
+                .onSuccess { result ->
+                    _roiResult.value = result
+                }
+                .onFailure { exception ->
+                    _roiError.value = exception.message ?: "Failed to calculate returns"
+                }
+
+            _isRoiLoading.value = false
+        }
+    }
+
+    fun clearRoiState() {
+        _roiResult.value = null
+        _roiError.value = null
     }
 
     fun clearError() {

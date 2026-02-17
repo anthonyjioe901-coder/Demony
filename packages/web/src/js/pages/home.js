@@ -1,4 +1,6 @@
 // Home Page
+import { escapeHtml } from '../utils.js';
+
 function renderHome(container, api) {
   // SVG Icons
   const icons = {
@@ -103,8 +105,8 @@ function renderHome(container, api) {
         var percent = Math.round((project.raised_amount / project.goal_amount) * 100);
         return '<div class="project-item" style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; padding: 0.9rem; background: var(--surface-elevated); border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 0.65rem; cursor: pointer;" onclick="window.DemonyApp.router.navigate(\'projects\')">' +
           '<div style="display: grid; gap: 0.25rem;">' +
-            '<div style="font-weight: 700; font-size: 1rem;">' + project.name + '</div>' +
-            '<div style="color: var(--text-muted); font-size: 0.9rem;">' + (project.category || 'General') + '</div>' +
+            '<div style="font-weight: 700; font-size: 1rem;">' + escapeHtml(project.name) + '</div>' +
+            '<div style="color: var(--text-muted); font-size: 0.9rem;">' + escapeHtml(project.category || 'General') + '</div>' +
             '<div style="color: var(--text-muted); font-size: 0.85rem;">Min: GH₵' + (project.min_investment || 20) + '</div>' +
           '</div>' +
           '<div style="text-align: right; align-self: center;">' +
