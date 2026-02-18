@@ -21,8 +21,7 @@ router.get('/stream', function(req, res, next) {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no', // Disable Nginx buffering (Render uses Nginx)
-    'Access-Control-Allow-Origin': '*'
+    'X-Accel-Buffering': 'no' // Disable Nginx buffering (Render uses Nginx)
   });
   
   // Send initial connection event

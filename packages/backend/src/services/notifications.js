@@ -1,7 +1,7 @@
 // Notification Service - Real-time SSE + Persistent Storage
 // Handles in-app notifications for deposits, investments, KYC, support, profits
 
-var db = require('../../database/src/index.js');
+var db = require('../../database/src/index');
 var { ObjectId } = require('mongodb');
 
 // ==================== SSE Connection Manager ====================

@@ -766,7 +766,9 @@ router.get('/:id/project-updates', authenticateToken, async function(req, res) {
       projectStats: {
         totalProfitDistributed: totalProjectProfit,
         distributionCount: allProjectDistributions.length,
-        yourSharePercent: investment.amount / (project.currentFunding || investment.amount) * 100
+        yourSharePercent: (project.currentFunding || investment.amount) > 0 
+          ? investment.amount / (project.currentFunding || investment.amount) * 100 
+          : 0
       },
       
       // Admin updates for investors

@@ -26,8 +26,10 @@ function authenticateToken(req, res, next) {
       if (user.isActive === false) return res.status(403).json({ error: 'Account is suspended' });
 
       // Token version check: if user changed password, old tokens are invalid
-      if (typeof user.tokenVersion === 'number' && typeof decoded.tokenVersion === 'number') {
-        if (decoded.tokenVersion !== user.tokenVersion) {
+      // Treat missing tokenVersion in token as version 0 to prevent old tokens surviving forever
+      if (typeof user.tokenVersion === 'number') {
+        var decodedVersion = typeof decoded.tokenVersion === 'number' ? decoded.tokenVersion : 0;
+        if (decodedVersion !== user.tokenVersion) {
           return res.status(401).json({ error: 'Token expired. Please login again.' });
         }
       }

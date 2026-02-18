@@ -4,6 +4,7 @@ var https = require('https');
 var db = require('../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
+var { toObjectId } = require('../utils/objectId');
 var router = express.Router();
 
 var PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;

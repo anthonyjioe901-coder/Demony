@@ -197,8 +197,8 @@ app.get('/api/native-test', function(req, res) {
 });
 
 // Connect to database, create indexes, then start server
-var db = require('../../database/src/index');
-var { createIndexes } = require('../../database/src/create-indexes');
+var db = require('../database/src/index');
+var { createIndexes } = require('../database/src/create-indexes');
 
 db.connect().then(function() {
   console.log('📦 Database connected');

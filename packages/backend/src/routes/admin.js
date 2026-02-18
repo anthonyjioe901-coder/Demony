@@ -1923,13 +1923,14 @@ router.post('/wallet/credit', async function(req, res) {
     }
     
     var currentBalance = user.walletBalance || 0;
-    var newBalance = currentBalance + amount;
     
-    // Update user wallet
+    // Use atomic $inc to prevent race condition (lost updates)
     await database.collection('users').updateOne(
       { _id: user._id },
-      { $set: { walletBalance: newBalance } }
+      { $inc: { walletBalance: amount } }
     );
+    
+    var newBalance = currentBalance + amount;
     
     // Record transaction
     await database.collection('transactions').insertOne({
@@ -2149,7 +2150,7 @@ router.post('/support/tickets/:id/reply', async function(req, res) {
     var result = await database.collection('support_tickets').updateOne(
       { $or: [{ _id: toObjectId(ticketId) }, { ticketId: ticketId }] },
       { 
-        $push: { replies: reply },
+        $push: { responses: reply },
         $set: { status: 'in_progress', updatedAt: new Date() }
       }
     );

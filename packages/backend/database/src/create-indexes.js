@@ -116,6 +116,19 @@ async function createIndexes() {
     await adminAuditLog.createIndex({ action: 1, timestamp: -1 }, { name: 'idx_admin_audit_action' });
     await adminAuditLog.createIndex({ timestamp: -1 }, { name: 'idx_admin_audit_time' });
 
+    // ==================== NOTIFICATIONS ====================
+    var notifications = database.collection('notifications');
+    await notifications.createIndex({ userId: 1, read: 1, createdAt: -1 }, { name: 'idx_notifications_user_read' });
+    await notifications.createIndex({ userId: 1, createdAt: -1 }, { name: 'idx_notifications_user_created' });
+
+    // ==================== RATE LIMITS (TTL cleanup) ====================
+    var rateLimits = database.collection('rate_limits');
+    await rateLimits.createIndex({ updatedAt: 1 }, { expireAfterSeconds: 86400, name: 'idx_rate_limits_ttl' });
+
+    // ==================== IDEMPOTENCY KEYS (TTL cleanup) ====================
+    var idempotencyKeys = database.collection('idempotency_keys');
+    await idempotencyKeys.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: 'idx_idempotency_ttl' });
+
     console.log('✅ All MongoDB indexes created successfully');
   } catch (err) {
     // Index creation errors are non-fatal — the app still works, just slower
