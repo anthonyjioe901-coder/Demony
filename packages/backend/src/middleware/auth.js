@@ -1,6 +1,6 @@
 var jwt = require('jsonwebtoken');
 var JWT_SECRET = require('../config/jwt').JWT_SECRET;
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var ObjectId = require('mongodb').ObjectId;
 
 function authenticateToken(req, res, next) {

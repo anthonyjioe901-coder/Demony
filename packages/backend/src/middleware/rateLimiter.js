@@ -1,7 +1,7 @@
 // Rate limiter with MongoDB persistence for multi-instance safety
 // Falls back to in-memory if DB is not available
 
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 
 var inMemoryStores = {};
 

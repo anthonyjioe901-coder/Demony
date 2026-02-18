@@ -1,6 +1,6 @@
 // Support routes - Tickets and FAQ
 var express = require('express');
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var emailService = require('../services/email');
 var authenticateToken = require('../middleware/auth');
 var { strictLimiter } = require('../middleware/rateLimiter');

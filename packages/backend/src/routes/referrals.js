@@ -1,7 +1,7 @@
 // Referral System Routes - MongoDB version
 var express = require('express');
 var crypto = require('crypto');
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var emailService = require('../services/email');
 var router = express.Router();

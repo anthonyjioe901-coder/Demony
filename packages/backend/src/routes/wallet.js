@@ -1,7 +1,7 @@
 // Wallet routes - Deposits, Withdrawals, Balance with Paystack
 var express = require('express');
 var https = require('https');
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var router = express.Router();

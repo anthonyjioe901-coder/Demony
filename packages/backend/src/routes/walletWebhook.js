@@ -2,7 +2,7 @@
 // This ensures the raw body is available for HMAC signature verification.
 var express = require('express');
 var crypto = require('crypto');
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var ObjectId = require('mongodb').ObjectId;
 var { toObjectId } = require('../utils/objectId');
 var router = express.Router();

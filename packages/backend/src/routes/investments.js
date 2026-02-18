@@ -1,6 +1,6 @@
 // Investments routes - MongoDB version with Wallet Integration
 var express = require('express');
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');

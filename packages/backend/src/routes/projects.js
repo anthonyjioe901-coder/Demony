@@ -1,6 +1,6 @@
 // Projects routes - MongoDB version
 var express = require('express');
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var router = express.Router();

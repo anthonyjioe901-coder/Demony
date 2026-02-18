@@ -1,6 +1,6 @@
 // Portfolio routes - MongoDB version
 var express = require('express');
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var router = express.Router();
 var ObjectId = require('mongodb').ObjectId;

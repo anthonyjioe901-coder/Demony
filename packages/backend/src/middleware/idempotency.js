@@ -1,6 +1,6 @@
 // SYS-01: Idempotency key middleware for financial endpoints
 // Prevents duplicate operations (double-charges, double-withdrawals) from network retries
-var db = require('../../../database/src/index');
+var db = require('../../database/src/index');
 
 var IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
