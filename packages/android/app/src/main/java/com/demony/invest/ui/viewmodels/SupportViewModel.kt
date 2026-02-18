@@ -95,7 +95,7 @@ class SupportViewModel @Inject constructor(
                         status = "open",
                         priority = priority,
                         email = email,
-                        createdAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+                        createdAt = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"))
                     )
                     _myTickets.value = listOf(submittedTicket) + _myTickets.value
                     onSuccess()

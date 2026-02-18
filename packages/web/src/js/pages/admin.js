@@ -1,5 +1,9 @@
 import { escapeHtml, escapeAttr } from '../utils.js';
 
+// Module-scoped API references (NOT on window - prevents XSS exploitation)
+var _adminApi = null;
+var _api = null;
+
 // Professional Admin Dashboard - Complete Redesign
 // Features: Sidebar navigation, Stats dashboard, User management, Support tickets, Reports
 
@@ -12,9 +16,9 @@ function renderAdmin(container, api) {
   
   var adminApi = api.getAdmin();
   
-  // Store refs for inline onclick handlers (non-enumerable to prevent casual console discovery)
-  Object.defineProperty(window, '_adminApi', { value: adminApi, configurable: true, writable: true, enumerable: false });
-  Object.defineProperty(window, '_api', { value: api, configurable: true, writable: true, enumerable: false });
+  // Store refs in module scope (NOT on window - prevents XSS exploitation)
+  _adminApi = adminApi;
+  _api = api;
   
   var html = 
     '<div class="admin-layout">' +
@@ -134,7 +138,7 @@ function setupSidebarNavigation(adminApi, api) {
       document.getElementById('sidebar-overlay').classList.remove('show');
       
       // Load page
-      loadPage(page, adminApi, api);
+      loadPage(page);
     });
   });
 }
@@ -182,7 +186,9 @@ function updateNavBadges(adminApi) {
 }
 
 // Load page based on navigation
-function loadPage(page, adminApi, api) {
+function loadPage(page) {
+  var adminApi = _adminApi;
+  var api = _api;
   var main = document.getElementById('admin-main');
   main.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
   
@@ -261,7 +267,7 @@ function loadDashboard(adminApi, api) {
       
       if (stats.withdrawals.pending > 0) {
         html += 
-          '<div class="alert-card danger" onclick="loadPage(\'withdrawals\', window._adminApi, window._api)">' +
+          '<div class="alert-card danger" onclick="loadPage(\'withdrawals\')">' +
             '<div class="alert-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>' +
             '<div class="alert-card-content">' +
               '<strong>' + stats.withdrawals.pending + ' Pending Withdrawals</strong>' +
@@ -273,7 +279,7 @@ function loadDashboard(adminApi, api) {
       
       if (stats.users.pendingKyc > 0) {
         html += 
-          '<div class="alert-card warning" onclick="loadPage(\'kyc\', window._adminApi, window._api)">' +
+          '<div class="alert-card warning" onclick="loadPage(\'kyc\')">' +
             '<div class="alert-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
             '<div class="alert-card-content">' +
               '<strong>' + stats.users.pendingKyc + ' KYC Pending</strong>' +
@@ -306,7 +312,7 @@ function loadDashboard(adminApi, api) {
               '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' +
               '<span>Send Email</span>' +
             '</button>' +
-            '<button class="quick-action-btn" onclick="loadPage(\'reports\', window._adminApi, window._api)">' +
+            '<button class="quick-action-btn" onclick="loadPage(\'reports\')">' +
               '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>' +
               '<span>View Reports</span>' +
             '</button>' +
@@ -314,7 +320,7 @@ function loadDashboard(adminApi, api) {
               '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>' +
               '<span>Cleanup Data</span>' +
             '</button>' +
-            '<button class="quick-action-btn" onclick="loadPage(\'audit\', window._adminApi, window._api)">' +
+            '<button class="quick-action-btn" onclick="loadPage(\'audit\')">' +
               '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
               '<span>Audit Log</span>' +
             '</button>' +
@@ -327,7 +333,7 @@ function loadDashboard(adminApi, api) {
       '<div class="admin-panel">' +
         '<div class="panel-header">' +
           '<h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Recent Activity</h3>' +
-          '<button class="btn btn-sm btn-outline" onclick="loadPage(\'investments\', window._adminApi, window._api)">View All</button>' +
+          '<button class="btn btn-sm btn-outline" onclick="loadPage(\'investments\')">View All</button>' +
         '</div>' +
         '<div class="panel-body no-padding" id="recent-activity-table">' +
           '<div class="loading-spinner"><div class="spinner"></div></div>' +
@@ -401,7 +407,7 @@ function loadUsersPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Users Management</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Users</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Users</div>' +
       '</div>' +
     '</div>' +
     
@@ -536,7 +542,7 @@ function loadInvestmentsPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Investments</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Investments</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Investments</div>' +
       '</div>' +
       '<div class="page-actions">' +
         '<button class="btn btn-outline" onclick="runOrphanedCleanup()">🧹 Cleanup Orphaned</button>' +
@@ -573,7 +579,7 @@ function loadInvestmentsTable() {
   var status = document.getElementById('inv-status-filter') ? document.getElementById('inv-status-filter').value : 'active';
   var container = document.getElementById('investments-table-container');
   
-  window._adminApi.getInvestments({ limit: 200, status: status || undefined }).then(function(result) {
+  _adminApi.getInvestments({ limit: 200, status: status || undefined }).then(function(result) {
     if (!result.investments || result.investments.length === 0) {
       container.innerHTML = '<div class="empty-state-box"><h3>No investments found</h3><p>No ' + (status || 'any') + ' investments</p></div>';
       return;
@@ -633,7 +639,7 @@ function loadWithdrawalsPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Withdrawals</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Withdrawals</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Withdrawals</div>' +
       '</div>' +
     '</div>' +
     
@@ -663,7 +669,7 @@ function loadWithdrawalsTable() {
   var status = document.getElementById('withdrawal-status-filter') ? document.getElementById('withdrawal-status-filter').value : 'pending';
   var container = document.getElementById('withdrawals-table-container');
   
-  window._adminApi.getWithdrawals({ status: status || undefined }).then(function(result) {
+  _adminApi.getWithdrawals({ status: status || undefined }).then(function(result) {
     if (!result.withdrawals || result.withdrawals.length === 0) {
       container.innerHTML = '<div class="empty-state-box"><h3>No withdrawals</h3><p>No ' + (status || 'any') + ' withdrawal requests</p></div>';
       return;
@@ -718,7 +724,7 @@ function loadKycPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>KYC Verification</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / KYC</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / KYC</div>' +
       '</div>' +
     '</div>' +
     
@@ -780,7 +786,7 @@ function loadProjectsPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Projects</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Projects</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Projects</div>' +
       '</div>' +
       '<div class="page-actions">' +
         '<button class="btn btn-primary" onclick="showCreateProjectModal()">+ Create Project</button>' +
@@ -891,7 +897,7 @@ function loadSupportPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Support Tickets</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Support</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Support</div>' +
       '</div>' +
     '</div>' +
     
@@ -921,12 +927,12 @@ function loadTicketsTable() {
   var status = document.getElementById('ticket-status-filter') ? document.getElementById('ticket-status-filter').value : 'open';
   var container = document.getElementById('tickets-table-container');
   
-  if (!window._adminApi.getSupportTickets) {
+  if (!_adminApi.getSupportTickets) {
     container.innerHTML = '<div class="empty-state-box"><h3>Feature Coming Soon</h3><p>Support ticket management will be available shortly</p></div>';
     return;
   }
   
-  window._adminApi.getSupportTickets({ status: status || undefined }).then(function(result) {
+  _adminApi.getSupportTickets({ status: status || undefined }).then(function(result) {
     if (!result.tickets || result.tickets.length === 0) {
       container.innerHTML = '<div class="empty-state-box"><h3>No tickets</h3><p>No ' + (status || 'any') + ' support tickets</p></div>';
       return;
@@ -978,7 +984,7 @@ function loadReferralsPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Referral Program</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Referrals</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Referrals</div>' +
       '</div>' +
     '</div>' +
     
@@ -1033,7 +1039,7 @@ function loadReportsPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Financial Reports</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Reports</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Reports</div>' +
       '</div>' +
     '</div>' +
     
@@ -1060,7 +1066,7 @@ function loadReportData() {
   var endDate = document.getElementById('report-end').value;
   var container = document.getElementById('report-content');
   
-  window._adminApi.getFinancialReport(startDate, endDate).then(function(report) {
+  _adminApi.getFinancialReport(startDate, endDate).then(function(report) {
     var html = 
       '<div class="stats-grid">' +
         '<div class="stat-card">' +
@@ -1128,7 +1134,7 @@ function loadTransactionsPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>All Transactions</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Transactions</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Transactions</div>' +
       '</div>' +
     '</div>' +
     
@@ -1180,7 +1186,7 @@ function loadAuditPage(adminApi, api) {
     '<div class="admin-page-header">' +
       '<div class="page-title-section">' +
         '<h1>Audit Log</h1>' +
-        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\', window._adminApi, window._api)">Dashboard</a> / Audit</div>' +
+        '<div class="breadcrumb"><a href="#" onclick="loadPage(\'dashboard\')">Dashboard</a> / Audit</div>' +
       '</div>' +
     '</div>' +
     
@@ -1258,7 +1264,7 @@ function showCreditWalletModal(userId, userName) {
     btn.disabled = true;
     btn.textContent = 'Processing...';
     
-    window._adminApi.creditUserWallet({ userId: targetUserId, email: email, amount: amount, reason: reason })
+    _adminApi.creditUserWallet({ userId: targetUserId, email: email, amount: amount, reason: reason })
       .then(function(result) {
         alert('✅ Wallet credited successfully! New balance: GH₵' + (result.newBalance || 0).toLocaleString());
         modal.remove();
@@ -1312,7 +1318,7 @@ function showBroadcastModal() {
     btn.disabled = true;
     btn.textContent = 'Sending...';
     
-    window._adminApi.sendBroadcastEmail({ target: target, subject: subject, message: message })
+    _adminApi.sendBroadcastEmail({ target: target, subject: subject, message: message })
       .then(function(result) {
         alert('✅ Email sent to ' + (result.sentCount || 0) + ' users');
         modal.remove();
@@ -1387,7 +1393,7 @@ function showWithdrawInvestmentModal(investmentId, amount, projectName, userName
     btn.disabled = true;
     btn.textContent = 'Processing...';
     
-    window._adminApi.withdrawInvestment(investmentId, { reason: reason, applyPenalty: applyPenalty, penaltyPercent: penaltyPercent })
+    _adminApi.withdrawInvestment(investmentId, { reason: reason, applyPenalty: applyPenalty, penaltyPercent: penaltyPercent })
       .then(function(result) {
         alert('✅ Investment ended. Refunded: GH₵' + (result.refundAmount || 0).toLocaleString());
         modal.remove();
@@ -1427,7 +1433,7 @@ function completeProject(projectId, btn) {
   btn.disabled = true;
   btn.textContent = 'Processing...';
   
-  window._adminApi.completeProject(projectId)
+  _adminApi.completeProject(projectId)
     .then(function(result) {
       alert('✅ Project completed. ' + (result.investorCount || 0) + ' investors refunded.');
       btn.closest('.modal').remove();
@@ -1442,7 +1448,7 @@ function completeProject(projectId, btn) {
 
 // User Detail Modal
 function showUserDetail(userId) {
-  window._adminApi.getUser(userId).then(function(user) {
+  _adminApi.getUser(userId).then(function(user) {
     var modal = document.createElement('div');
     modal.className = 'modal active';
     var initials = (user.name || user.email || 'U').substring(0, 2).toUpperCase();
@@ -1490,7 +1496,7 @@ function showUserDetail(userId) {
 function confirmDeleteUser(userId, userName) {
   if (!confirm('Delete user "' + userName + '"?\n\nThis will:\n- Mark their investments as orphaned\n- Remove user from system\n\nThis cannot be undone!')) return;
   
-  window._adminApi.deleteUser(userId)
+  _adminApi.deleteUser(userId)
     .then(function(result) {
       alert('✅ User deleted. ' + (result.investmentsOrphaned || 0) + ' investments orphaned.');
       if (typeof filterUsers === 'function' && document.getElementById('users-table-container')) filterUsers();
@@ -1503,10 +1509,10 @@ function confirmDeleteUser(userId, userName) {
 
 // Approve/Reject KYC
 function approveKyc(userId) {
-  window._adminApi.reviewKyc(userId, 'approve')
+  _adminApi.reviewKyc(userId, 'approve')
     .then(function() {
       alert('✅ KYC approved');
-      loadPage('kyc', window._adminApi, window._api);
+      loadPage('kyc');
     })
     .catch(function(err) { alert('Error: ' + err.message); });
 }
@@ -1515,17 +1521,17 @@ function rejectKyc(userId) {
   var reason = prompt('Enter rejection reason:');
   if (!reason) return;
   
-  window._adminApi.reviewKyc(userId, 'reject', reason)
+  _adminApi.reviewKyc(userId, 'reject', reason)
     .then(function() {
       alert('KYC rejected');
-      loadPage('kyc', window._adminApi, window._api);
+      loadPage('kyc');
     })
     .catch(function(err) { alert('Error: ' + err.message); });
 }
 
 // Verify Email
 function verifyUserEmail(userId) {
-  window._adminApi.verifyUserEmail(userId)
+  _adminApi.verifyUserEmail(userId)
     .then(function() { alert('✅ Email verified'); })
     .catch(function(err) { alert('Error: ' + err.message); });
 }
@@ -1535,7 +1541,7 @@ function processWithdrawal(withdrawalId, action) {
   var reason = action === 'reject' ? prompt('Rejection reason:') : null;
   if (action === 'reject' && !reason) return;
   
-  window._adminApi.processWithdrawal(withdrawalId, action, reason)
+  _adminApi.processWithdrawal(withdrawalId, action, reason)
     .then(function() {
       alert('✅ Withdrawal ' + action + 'd');
       loadWithdrawalsTable();
@@ -1547,7 +1553,7 @@ function processWithdrawal(withdrawalId, action) {
 function runOrphanedCleanup() {
   if (!confirm('Cleanup orphaned investments and recalculate project stats?')) return;
   
-  window._adminApi.cleanupOrphanedInvestments()
+  _adminApi.cleanupOrphanedInvestments()
     .then(function(result) {
       alert('✅ Cleanup complete!\nOrphaned: ' + (result.count || 0) + '\nProjects updated: ' + (result.affectedProjects || 0));
     })
@@ -1563,12 +1569,12 @@ function exportReport() {
 
 // Show Ticket Detail
 function showTicketDetail(ticketId) {
-  if (!window._adminApi.getTicketDetail) {
+  if (!_adminApi.getTicketDetail) {
     alert('Ticket details will be available soon.');
     return;
   }
   
-  window._adminApi.getTicketDetail(ticketId).then(function(ticket) {
+  _adminApi.getTicketDetail(ticketId).then(function(ticket) {
     var modal = document.createElement('div');
     modal.className = 'modal active';
     modal.innerHTML = 
@@ -1599,12 +1605,12 @@ function showTicketDetail(ticketId) {
 
 // Resolve Ticket
 function resolveTicket(ticketId) {
-  if (!window._adminApi.resolveTicket) {
+  if (!_adminApi.resolveTicket) {
     alert('This feature will be available soon.');
     return;
   }
   
-  window._adminApi.resolveTicket(ticketId)
+  _adminApi.resolveTicket(ticketId)
     .then(function() {
       alert('✅ Ticket resolved');
       loadTicketsTable();
@@ -1625,11 +1631,11 @@ function uploadProjectImage(file) {
   if (!file) {
     return Promise.resolve(null);
   }
-  if (!window._api || !window._api.uploadImage) {
+  if (!_api || !_api.uploadImage) {
     return Promise.reject(new Error('Image upload is not available'));
   }
   return readImageFileAsDataUrl(file).then(function(dataUrl) {
-    return window._api.uploadImage(dataUrl, file.name).then(function(result) {
+    return _api.uploadImage(dataUrl, file.name).then(function(result) {
       return result.dataUrl || result.url || dataUrl;
     });
   });
@@ -1690,12 +1696,12 @@ function showCreateProjectModal() {
         if (imageUrl) {
           projectData.imageUrl = imageUrl;
         }
-        return window._adminApi.createProject(projectData);
+        return _adminApi.createProject(projectData);
       })
       .then(function(result) {
         alert('✅ Project created successfully!');
         modal.remove();
-        loadPage('projects', window._adminApi, window._api);
+        loadPage('projects');
       })
       .catch(function(err) {
         alert('❌ Error: ' + err.message);
@@ -1707,7 +1713,7 @@ function showCreateProjectModal() {
 
 // Edit Project Modal
 function showEditProjectModal(projectId) {
-  window._adminApi.getProject(projectId).then(function(project) {
+  _adminApi.getProject(projectId).then(function(project) {
     var existingImageUrl = (project.imageUrl || project.image_url || '').replace(/"/g, '&quot;');
     var modal = document.createElement('div');
     modal.className = 'modal active';
@@ -1717,7 +1723,7 @@ function showEditProjectModal(projectId) {
         '<form id="edit-project-form">' +
           '<input type="hidden" id="edit-proj-id" value="' + projectId + '">' +
           '<div class="form-group"><label>Project Name</label><input type="text" id="edit-proj-name" required value="' + (project.name || '').replace(/"/g, '&quot;') + '"></div>' +
-          '<div class="form-group"><label>Description</label><textarea id="edit-proj-description" rows="3">' + (project.description || '') + '</textarea></div>' +
+          '<div class="form-group"><label>Description</label><textarea id="edit-proj-description" rows="3">' + escapeHtml(project.description || '') + '</textarea></div>' +
           '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">' +
             '<div class="form-group"><label>Goal Amount (GH₵)</label><input type="number" id="edit-proj-goal" value="' + (project.goalAmount || project.goal_amount || 0) + '"></div>' +
             '<div class="form-group"><label>Min. Investment (GH₵)</label><input type="number" id="edit-proj-min" value="' + (project.minInvestment || project.min_investment || 100) + '"></div>' +
@@ -1760,12 +1766,12 @@ function showEditProjectModal(projectId) {
       uploadProjectImage(imageFile)
         .then(function(imageUrl) {
           updates.imageUrl = imageUrl || currentImageUrl || undefined;
-          return window._adminApi.updateProject(projectId, updates);
+          return _adminApi.updateProject(projectId, updates);
         })
         .then(function(result) {
           alert('✅ Project updated!');
           modal.remove();
-          loadPage('projects', window._adminApi, window._api);
+          loadPage('projects');
         })
         .catch(function(err) {
           alert('❌ Error: ' + err.message);
@@ -1813,7 +1819,7 @@ function showDistributeProfitModal(projectId, projectName) {
     btn.disabled = true;
     btn.textContent = 'Distributing...';
     
-    window._adminApi.distributeProfits(projectId, amount, description)
+    _adminApi.distributeProfits(projectId, amount, description)
       .then(function(result) {
         alert('✅ Distributed GH₵' + (result.totalDistributed || amount).toLocaleString() + ' to ' + (result.investorCount || 0) + ' investors');
         modal.remove();
@@ -1827,8 +1833,9 @@ function showDistributeProfitModal(projectId, projectName) {
 }
 
 // =====================
-// Expose functions to window for onclick handlers
+// Expose UI functions to window for onclick handlers
 // (ES modules scope functions locally, but inline onclick needs global access)
+// NOTE: API objects (_adminApi, _api) are intentionally NOT exposed on window to prevent XSS exploitation
 // =====================
 window.loadPage = loadPage;
 window.showCreateProjectModal = showCreateProjectModal;

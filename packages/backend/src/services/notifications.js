@@ -7,12 +7,22 @@ var { ObjectId } = require('mongodb');
 // ==================== SSE Connection Manager ====================
 // Stores active SSE connections per user
 var activeConnections = new Map(); // userId -> Set of response objects
+var MAX_CONNECTIONS_PER_USER = 5; // MED-08: Limit SSE connections per user
 
 function addConnection(userId, res) {
   if (!activeConnections.has(userId)) {
     activeConnections.set(userId, new Set());
   }
-  activeConnections.get(userId).add(res);
+  var connections = activeConnections.get(userId);
+  
+  // MED-08: Enforce per-user connection limit — drop oldest
+  if (connections.size >= MAX_CONNECTIONS_PER_USER) {
+    var oldest = connections.values().next().value;
+    try { oldest.end(); } catch (e) {}
+    connections.delete(oldest);
+  }
+  
+  connections.add(res);
   
   // Clean up on disconnect
   res.on('close', function() {
@@ -137,13 +147,40 @@ async function createNotification(userId, type, data) {
 }
 
 // ==================== Bulk Notification ====================
+// HIGH-07: Use insertMany for efficiency instead of sequential loop
 async function notifyMultipleUsers(userIds, type, data) {
-  var results = [];
-  for (var i = 0; i < userIds.length; i++) {
-    var result = await createNotification(userIds[i], type, data);
-    results.push(result);
+  if (!userIds || userIds.length === 0) return [];
+  try {
+    var database = await db.getDb();
+    var now = new Date();
+    var notifications = userIds.map(function(userId) {
+      return {
+        userId: userId,
+        type: type,
+        title: data.title || getDefaultTitle(type),
+        message: data.message || '',
+        icon: data.icon || getDefaultIcon(type),
+        link: data.link || null,
+        read: false,
+        createdAt: now,
+        metadata: data.metadata || {}
+      };
+    });
+    
+    var result = await database.collection('notifications').insertMany(notifications);
+    
+    // Attach inserted IDs and send SSE to connected users
+    var inserted = notifications.map(function(n, i) {
+      n._id = result.insertedIds[i];
+      sendToUser(n.userId, { event: 'notification', notification: n });
+      return n;
+    });
+    
+    return inserted;
+  } catch (err) {
+    console.error('Failed to bulk create notifications:', err);
+    return [];
   }
-  return results;
 }
 
 // ==================== Get Notifications ====================

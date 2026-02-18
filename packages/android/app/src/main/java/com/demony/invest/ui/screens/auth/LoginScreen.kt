@@ -51,9 +51,19 @@ fun LoginScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     
-    // Clear error when inputs change
+    // HIGH-21: Debounced error clearing - only clear after user sees the error and then types
+    var hadError by remember { mutableStateOf(false) }
+
+    LaunchedEffect(error) {
+        if (error != null) hadError = true
+    }
+
     LaunchedEffect(identifier, password) {
-        authViewModel.clearError()
+        if (hadError) {
+            kotlinx.coroutines.delay(500)
+            authViewModel.clearError()
+            hadError = false
+        }
     }
 
     // Forgot Password Dialog
@@ -430,175 +440,4 @@ fun LoginScreen(
             )
         }
     }
-}
-
-// Terms of Service Dialog
-@Composable
-fun TermsOfServiceDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Terms of Service", fontWeight = FontWeight.Bold)
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
-                }
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    text = "DEMONY INVESTMENT PLATFORM - TERMS OF SERVICE",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = """
-1. ACCEPTANCE OF TERMS
-By accessing and using Demony, you agree to be bound by these Terms of Service.
-
-2. ELIGIBILITY
-You must be at least 18 years old and legally capable of entering into binding contracts.
-
-3. ACCOUNT REGISTRATION
-- You must provide accurate and complete information
-- You are responsible for maintaining account security
-- One account per person/entity
-
-4. INVESTMENT RISKS
-- All investments carry risk
-- Past performance does not guarantee future results
-- You may lose some or all of your investment
-
-5. FEES AND CHARGES
-- Platform fees may apply to transactions
-- Fee schedules are available in the app
-- Fees are subject to change with notice
-
-6. USER CONDUCT
-You agree not to:
-- Engage in fraudulent activities
-- Violate any applicable laws
-- Misrepresent your identity
-
-7. INTELLECTUAL PROPERTY
-All content and materials on Demony are protected by copyright and trademark laws.
-
-8. LIMITATION OF LIABILITY
-Demony is not liable for investment losses or decisions made based on information provided.
-
-9. TERMINATION
-We reserve the right to terminate accounts that violate these terms.
-
-10. CHANGES TO TERMS
-We may update these terms at any time. Continued use constitutes acceptance.
-
-Last Updated: January 2026
-                    """.trimIndent(),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = onDismiss) {
-                Text("I Understand")
-            }
-        }
-    )
-}
-
-// Privacy Policy Dialog
-@Composable
-fun PrivacyPolicyDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Privacy Policy", fontWeight = FontWeight.Bold)
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close")
-                }
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    text = "DEMONY - PRIVACY POLICY",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = """
-1. INFORMATION WE COLLECT
-- Personal Information: Name, email, phone number, ID documents
-- Financial Information: Bank details, transaction history
-- Device Information: Device type, OS, app usage data
-
-2. HOW WE USE YOUR INFORMATION
-- To provide and improve our services
-- To process transactions
-- To verify your identity (KYC)
-- To communicate with you
-- To comply with legal requirements
-
-3. DATA SECURITY
-We implement industry-standard security measures to protect your data including:
-- Encryption of sensitive data
-- Secure data storage
-- Regular security audits
-
-4. INFORMATION SHARING
-We do not sell your personal information. We may share data with:
-- Payment processors
-- Regulatory authorities
-- Service providers (under strict agreements)
-
-5. YOUR RIGHTS
-You have the right to:
-- Access your personal data
-- Correct inaccurate data
-- Delete your account
-- Opt-out of marketing communications
-
-6. COOKIES AND TRACKING
-We use cookies to improve user experience and analyze app usage.
-
-7. CHILDREN'S PRIVACY
-Our services are not intended for users under 18 years of age.
-
-8. DATA RETENTION
-We retain your data as long as your account is active or as required by law.
-
-9. CHANGES TO POLICY
-We may update this policy. You will be notified of significant changes.
-
-10. CONTACT US
-For privacy concerns, contact: privacy@demony.com
-
-Last Updated: January 2026
-                    """.trimIndent(),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = onDismiss) {
-                Text("I Understand")
-            }
-        }
-    )
 }

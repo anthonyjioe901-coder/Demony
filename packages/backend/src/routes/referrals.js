@@ -15,10 +15,10 @@ var QUALIFYING_REFERRALS_NEEDED = 10; // Number of qualified referrals to unlock
 var MIN_QUALIFYING_INVESTMENT = 100; // Minimum investment amount per referral to count as "qualified"
 
 // Generate referral code from user ID
+// MED-04: Use crypto.randomBytes for non-deterministic, collision-resistant codes
 function generateReferralCode(userId) {
-  // Create a short, unique code from user ID + random string
-  var hash = crypto.createHash('sha256').update(userId + Date.now().toString()).digest('hex');
-  return 'DEM' + hash.substring(0, 6).toUpperCase();
+  var random = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return 'DEM' + random.substring(0, 6);
 }
 
 // Get or create referral code for current user

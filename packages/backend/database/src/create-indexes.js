@@ -66,6 +66,8 @@ async function createIndexes() {
     // ==================== REFERRALS ====================
     var referrals = database.collection('referrals');
     await referrals.createIndex({ referrerId: 1 }, { name: 'idx_referrals_referrer' });
+    // Drop old index if key changed (referredId -> refereeId)
+    try { await referrals.dropIndex('idx_referrals_referred'); } catch (e) { /* doesn't exist */ }
     await referrals.createIndex({ refereeId: 1 }, { name: 'idx_referrals_referred' });
     await referrals.createIndex({ status: 1 }, { name: 'idx_referrals_status' });
 

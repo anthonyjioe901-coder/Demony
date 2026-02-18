@@ -61,10 +61,22 @@ app.use(cors({
   credentials: true
 }));
 
-// Security headers (free, no external service needed)
+// Security headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false // Disable CSP for now (frontend is separate)
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://connect.facebook.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://demony-api.onrender.com", "https://api.paystack.co", "https://www.google-analytics.com"],
+      frameSrc: ["'self'", "https://checkout.paystack.com"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"]
+    }
+  }
 }));
 
 // ========== PAYSTACK WEBHOOK (must be BEFORE express.json()) ==========

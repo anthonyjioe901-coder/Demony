@@ -4,28 +4,34 @@ var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
-var { validateIdParam } = require('../utils/objectId');
+var { validateIdParam, toObjectId, buildUserIdFilter } = require('../utils/objectId');
 var notificationService = require('../services/notifications.js');
 var TYPES = notificationService.NOTIFICATION_TYPES;
 var router = express.Router();
+
+// HIGH-06: Validate :id and :updateId params on all routes that use them
+router.param('id', validateIdParam);
+router.param('updateId', validateIdParam);
 
 // Escape regex special chars to prevent ReDoS attacks from user-supplied search input
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function toObjectId(value) {
-  if (!value) return null;
-  if (value instanceof ObjectId) return value;
-  if (ObjectId.isValid(value)) return new ObjectId(value);
-  return null;
-}
-
-function buildUserIdFilter(userId) {
-  var filters = [{ userId: userId }];
-  var asObjectId = toObjectId(userId);
-  if (asObjectId) filters.push({ userId: asObjectId });
-  return { $or: filters };
+// Admin audit logging - records all sensitive admin actions
+async function logAdminAction(adminUserId, action, details) {
+  try {
+    var database = await db.getDb();
+    await database.collection('admin_audit_log').insertOne({
+      adminUserId: adminUserId,
+      action: action,
+      details: details || {},
+      timestamp: new Date(),
+      ip: details._ip || null
+    });
+  } catch (err) {
+    console.error('Failed to log admin action:', err.message);
+  }
 }
 
 // Middleware to check admin role
@@ -186,7 +192,7 @@ router.get('/investments', async function(req, res) {
 router.get('/users', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = Math.min(parseInt(req.query.limit) || 200, 500); // Capped at 500
+    var limit = Math.min(parseInt(req.query.limit) || 50, 100); // HIGH-13: Reduced from 200/500 to 50/100
     var skip = (page - 1) * limit;
     var role = req.query.role;
     var kycStatus = req.query.kycStatus;
@@ -357,6 +363,14 @@ router.post('/users/:id/kyc', async function(req, res) {
     
     res.json({ message: 'KYC ' + action + 'd successfully' });
     
+    // Audit log
+    logAdminAction(req.user.userId, 'kyc_' + action, {
+      targetUserId: req.params.id,
+      targetEmail: user ? user.email : null,
+      reason: reason || null,
+      _ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress
+    });
+    
     // Send notification (non-blocking)
     if (user) {
       var userId = req.params.id;
@@ -412,7 +426,7 @@ router.post('/users/:id/status', async function(req, res) {
 router.get('/projects', async function(req, res) {
   try {
     var page = parseInt(req.query.page) || 1;
-    var limit = Math.min(parseInt(req.query.limit) || 200, 500); // Capped at 500
+    var limit = Math.min(parseInt(req.query.limit) || 50, 100); // HIGH-13: Reduced from 200/500 to 50/100
     var skip = (page - 1) * limit;
     var status = req.query.status && req.query.status.trim() !== '' ? req.query.status.trim() : null;
     var search = req.query.search && req.query.search.trim() !== '' ? req.query.search.trim() : null;
@@ -776,6 +790,16 @@ router.post('/withdrawals/:id/process', async function(req, res) {
     }
     
     res.json({ message: 'Withdrawal ' + action + 'd successfully' });
+    
+    // Audit log
+    logAdminAction(req.user.userId, 'process_withdrawal', {
+      withdrawalId: req.params.id,
+      action: action,
+      amount: withdrawal.amount,
+      userId: withdrawal.userId,
+      reason: reason || null,
+      _ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress
+    });
     
     // Send notification (non-blocking)
     var wdUserId = withdrawal.userId.toString ? withdrawal.userId.toString() : withdrawal.userId;

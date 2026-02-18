@@ -146,6 +146,48 @@ var templates = {
     };
   },
 
+  // Password reset
+  passwordReset: function(data) {
+    return {
+      subject: 'Reset your Demony password',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #111827; margin: 0; padding: 0; background: #f3f4f6; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #dc2626, #ef4444); padding: 28px; text-align: center; color: white; }
+            .content { padding: 28px; }
+            .cta { display: inline-block; background: #dc2626; color: white; padding: 14px 28px; border-radius: 10px; text-decoration: none; font-weight: 700; }
+            .footer { background: #111827; color: #9ca3af; padding: 20px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Password Reset</h1>
+              <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.85);">Hi ${data.userName}, we received a password reset request.</p>
+            </div>
+            <div class="content">
+              <p>Click the button below to reset your password. This link expires in <strong>1 hour</strong>.</p>
+              <p style="text-align: center; margin: 28px 0;">
+                <a class="cta" href="${data.resetUrl}">Reset Password</a>
+              </p>
+              <p style="color: #6b7280; font-size: 14px;">If you did not request a password reset, please ignore this email. Your password will remain unchanged.</p>
+              <p style="color: #9ca3af; font-size: 12px; margin-top: 16px;">For security, this link can only be used once.</p>
+            </div>
+            <div class="footer">
+              <p>&copy; ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `Hi ${data.userName},\n\nWe received a request to reset your Demony password.\n\nClick this link to reset your password (expires in 1 hour):\n${data.resetUrl}\n\nIf you didn't request this, please ignore this email.`
+    };
+  },
+
   // Email verification
   verifyEmail: function(data) {
     return {
@@ -1254,6 +1296,14 @@ async function sendVerificationEmail(user, verifyUrl) {
   });
 }
 
+// Send password reset email
+async function sendPasswordResetEmail(user, resetUrl) {
+  return sendEmail('passwordReset', user.email, {
+    userName: user.name || user.email.split('@')[0],
+    resetUrl: resetUrl
+  });
+}
+
 // Send investment confirmation
 async function sendInvestmentEmail(user, investment, project) {
   return sendEmail('investmentConfirmation', user.email, {
@@ -1418,6 +1468,7 @@ module.exports = {
   // Convenience functions
   sendWelcomeEmail: sendWelcomeEmail,
   sendVerificationEmail: sendVerificationEmail,
+  sendPasswordResetEmail: sendPasswordResetEmail,
   sendInvestmentEmail: sendInvestmentEmail,
   sendProfitEmail: sendProfitEmail,
   sendWithdrawalRequestedEmail: sendWithdrawalRequestedEmail,

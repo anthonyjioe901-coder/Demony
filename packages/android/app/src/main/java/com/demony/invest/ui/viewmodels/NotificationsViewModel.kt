@@ -27,10 +27,10 @@ class NotificationsViewModel @Inject constructor(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private var isPolling = false
+    private var pollingJob: kotlinx.coroutines.Job? = null
 
     init {
         loadNotifications()
-        startPolling()
     }
 
     fun loadNotifications() {
@@ -71,10 +71,10 @@ class NotificationsViewModel @Inject constructor(
         loadNotifications()
     }
 
-    private fun startPolling() {
+    fun startPolling() {
         if (isPolling) return
         isPolling = true
-        viewModelScope.launch {
+        pollingJob = viewModelScope.launch {
             while (isPolling) {
                 delay(30_000) // Poll every 30 seconds
                 repository.getUnreadCount()
@@ -82,7 +82,6 @@ class NotificationsViewModel @Inject constructor(
                         val newCount = response.unreadCount
                         if (newCount != _unreadCount.value) {
                             _unreadCount.value = newCount
-                            // If count changed, reload full list
                             loadNotifications()
                         }
                     }
@@ -90,8 +89,14 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
+    fun stopPolling() {
+        isPolling = false
+        pollingJob?.cancel()
+        pollingJob = null
+    }
+
     override fun onCleared() {
         super.onCleared()
-        isPolling = false
+        stopPolling()
     }
 }

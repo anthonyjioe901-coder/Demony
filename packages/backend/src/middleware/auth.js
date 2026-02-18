@@ -32,8 +32,9 @@ function authenticateToken(req, res, next) {
         }
       }
     } catch (dbErr) {
-      // If DB is down, allow the request through (graceful degradation)
+      // If DB is down, reject the request - do NOT allow unauthenticated access
       console.error('Auth middleware DB check failed:', dbErr.message);
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again.' });
     }
 
     // Normalize userId - support both 'id' and 'userId' in token

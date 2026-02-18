@@ -528,6 +528,24 @@ fun PaystackWebViewScreen(
                         settings.useWideViewPort = true
                         
                         webViewClient = object : WebViewClient() {
+                            // Allowlisted domains for payment processing
+                            private val allowedDomains = listOf(
+                                "paystack.com",
+                                "standard.paystack.co",
+                                "checkout.paystack.com",
+                                "api.paystack.co",
+                                "demony.tech",
+                                "demony.app",
+                                "demony-api.onrender.com"
+                            )
+                            
+                            private fun isAllowedUrl(urlString: String): Boolean {
+                                return try {
+                                    val host = android.net.Uri.parse(urlString).host ?: return false
+                                    allowedDomains.any { domain -> host == domain || host.endsWith(".$domain") }
+                                } catch (e: Exception) { false }
+                            }
+                            
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 isLoading = false
                             }
@@ -537,6 +555,11 @@ fun PaystackWebViewScreen(
                                 request: WebResourceRequest?
                             ): Boolean {
                                 val requestUrl = request?.url?.toString() ?: return false
+                                
+                                // Block navigation to non-allowlisted domains
+                                if (!isAllowedUrl(requestUrl)) {
+                                    return true // Block the request
+                                }
                                 
                                 // Check if payment completed (callback URL)
                                 if (requestUrl.contains("status=success") || 
@@ -624,6 +647,15 @@ fun WithdrawDialog(
     // Load banks when dialog opens
     LaunchedEffect(Unit) {
         viewModel.loadBanks()
+    }
+    
+    // Reset isSubmitting when ViewModel error changes (withdrawal failed)
+    val vmError by viewModel.error.collectAsState()
+    LaunchedEffect(vmError) {
+        if (vmError != null && isSubmitting) {
+            isSubmitting = false
+            errorMessage = vmError
+        }
     }
     
     // Verify account when both bank and account number are filled

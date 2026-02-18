@@ -1,4 +1,6 @@
 // Business Owner Dashboard Page
+import { escapeHtml, escapeAttr } from '../utils.js';
+
 function renderBusinessDashboard(container, api) {
   var user = api.user;
   if (!user || user.role !== 'business_owner') {
@@ -85,12 +87,12 @@ function loadMyProjects(api) {
           '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
             '<div style="flex: 1;">' +
               '<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">' +
-                '<h3>' + project.name + '</h3>' +
+                '<h3>' + escapeHtml(project.name) + '</h3>' +
                 '<span class="badge" style="background: ' + (statusColors[project.status] || '#6b7280') + ';">' + 
-                  project.status.replace('_', ' ').toUpperCase() + 
+                  escapeHtml(project.status.replace('_', ' ').toUpperCase()) + 
                 '</span>' +
               '</div>' +
-              '<p style="color: var(--text-muted); margin-bottom: 1rem;">' + project.description.substring(0, 150) + '...</p>' +
+              '<p style="color: var(--text-muted); margin-bottom: 1rem;">' + escapeHtml(project.description.substring(0, 150)) + '...</p>' +
               
               (project.status === 'active' || project.status === 'funded' ? 
                 '<div style="margin-bottom: 1rem;">' +
@@ -126,7 +128,7 @@ function loadMyProjects(api) {
       });
     })
     .catch(function(err) {
-      projectsContainer.innerHTML = '<div style="color: #ef4444;">Error loading projects: ' + err.message + '</div>';
+      projectsContainer.innerHTML = '<div style="color: #ef4444;">Error loading projects: ' + escapeHtml(err.message) + '</div>';
     });
 }
 
@@ -141,12 +143,12 @@ function showSubmitProjectModal(api, existingProject) {
       '<form id="project-form">' +
         '<div class="form-group">' +
           '<label for="project-name">Project Name *</label>' +
-          '<input type="text" id="project-name" required value="' + (isEdit ? existingProject.name : '') + '">' +
+          '<input type="text" id="project-name" required value="' + (isEdit ? escapeAttr(existingProject.name) : '') + '">' +
         '</div>' +
         
         '<div class="form-group">' +
           '<label for="project-description">Description *</label>' +
-          '<textarea id="project-description" rows="4" required>' + (isEdit ? existingProject.description : '') + '</textarea>' +
+          '<textarea id="project-description" rows="4" required>' + (isEdit ? escapeHtml(existingProject.description) : '') + '</textarea>' +
         '</div>' +
         
         '<div class="form-group">' +

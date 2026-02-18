@@ -17,6 +17,5 @@
     "install:all": "pnpm install"
   },
   "dependencies": {
-    "mongodb": "^7.1.0"
   }
 }

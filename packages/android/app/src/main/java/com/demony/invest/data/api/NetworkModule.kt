@@ -8,6 +8,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.CertificatePinner
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -45,12 +46,9 @@ object NetworkModule {
             val request = if (token != null) {
                 originalRequest.newBuilder()
                     .header("Authorization", "Bearer $token")
-                    .header("Content-Type", "application/json")
                     .build()
             } else {
-                originalRequest.newBuilder()
-                    .header("Content-Type", "application/json")
-                    .build()
+                originalRequest
             }
             
             chain.proceed(request)
@@ -68,14 +66,23 @@ object NetworkModule {
             }
         }
 
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .build()
+            .retryOnConnectionFailure(false) // Prevent double-spend on POST requests
+
+        // CRIT-12: Certificate pinning for production builds only
+        if (!BuildConfig.DEBUG) {
+            val certificatePinner = CertificatePinner.Builder()
+                .add("demony-api.onrender.com", "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=") // TODO: Replace with actual server certificate pin
+                .build()
+            builder.certificatePinner(certificatePinner)
+        }
+
+        return builder.build()
     }
 
     @Provides

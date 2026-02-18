@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 /**
@@ -61,6 +63,7 @@ class ProjectsViewModel @Inject constructor(
     private var currentPage = 1
     private var totalPages = 1
     private var hasMorePages = true
+    private val paginationMutex = Mutex()
 
     init {
         loadProjects()
@@ -68,20 +71,24 @@ class ProjectsViewModel @Inject constructor(
     }
 
     fun loadProjects(forceRefresh: Boolean = false) {
-        if (forceRefresh) {
-            currentPage = 1
-            hasMorePages = true
-            _projects.value = emptyList()
-        }
-
         viewModelScope.launch {
+            paginationMutex.withLock {
+                if (forceRefresh) {
+                    currentPage = 1
+                    hasMorePages = true
+                    _projects.value = emptyList()
+                }
+            }
+
             _isLoading.value = true
             _error.value = null
 
-            val category = _selectedCategory.value
-            
+            val (page, category) = paginationMutex.withLock {
+                currentPage to _selectedCategory.value
+            }
+
             repository.getProjects(
-                page = currentPage,
+                page = page,
                 limit = 20,
                 category = category
             )
@@ -92,10 +99,12 @@ class ProjectsViewModel @Inject constructor(
                     } else if (_categories.value.isEmpty()) {
                         _categories.value = response.projects.map { it.category }.distinct().sorted()
                     }
-                    response.pagination?.let { pagination ->
-                        totalPages = pagination.pages
-                        hasMorePages = currentPage < totalPages
-                        _totalProjects.value = pagination.total
+                    paginationMutex.withLock {
+                        response.pagination?.let { pagination ->
+                            totalPages = pagination.pages
+                            hasMorePages = currentPage < totalPages
+                            _totalProjects.value = pagination.total
+                        }
                     }
                 }
                 .onFailure { exception ->
@@ -107,28 +116,34 @@ class ProjectsViewModel @Inject constructor(
     }
 
     fun loadMoreProjects() {
-        if (!hasMorePages || _isLoadingMore.value) return
-
         viewModelScope.launch {
-            _isLoadingMore.value = true
-            currentPage++
+            val page = paginationMutex.withLock {
+                if (!hasMorePages || _isLoadingMore.value) return@launch
+                _isLoadingMore.value = true
+                currentPage++
+                currentPage
+            }
 
             val category = _selectedCategory.value
-            
+
             repository.getProjects(
-                page = currentPage,
+                page = page,
                 limit = 10,
                 category = category
             )
                 .onSuccess { response ->
                     _projects.value = _projects.value + response.projects
-                    response.pagination?.let { pagination ->
-                        totalPages = pagination.pages
-                        hasMorePages = currentPage < totalPages
+                    paginationMutex.withLock {
+                        response.pagination?.let { pagination ->
+                            totalPages = pagination.pages
+                            hasMorePages = currentPage < totalPages
+                        }
                     }
                 }
                 .onFailure {
-                    currentPage-- // Revert on failure
+                    paginationMutex.withLock {
+                        currentPage-- // Revert on failure
+                    }
                 }
 
             _isLoadingMore.value = false

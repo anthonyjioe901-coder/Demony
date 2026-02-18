@@ -50,7 +50,11 @@ function renderProjects(container, api) {
     '.category-pill:hover { border-color: var(--primary-color); }' +
     '.category-pill.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }' +
     '#project-search:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }';
-  document.head.appendChild(style);
+  // Avoid duplicate style tags on re-render
+  if (!document.getElementById('projects-page-style')) {
+    style.id = 'projects-page-style';
+    document.head.appendChild(style);
+  }
   
   loadProjects(api, true); // Load with categories
   
@@ -140,10 +144,6 @@ function loadProjects(api, loadCategories) {
         // Get investment terms
         var profitFrequency = project.profit_distribution_frequency || 'monthly';
         var profitSharing = project.profit_sharing_ratio || { investor: 80, platform: 20 };
-        // Override old 60/40 ratios with new 80/20 standard
-        if (profitSharing.investor === 60) {
-          profitSharing = { investor: 80, platform: 20 };
-        }
         var riskLevel = project.risk_level || 'medium';
         var investorCount = project.investor_count || 0;
         var durationMonths = project.lock_in_period_months || project.duration || 12;
@@ -276,10 +276,6 @@ function showInvestModal(projectId, api) {
     // Ensure lockInPeriod is a number
     var lockInPeriod = parseInt(project.lock_in_period_months) || parseInt(project.duration) || 12;
     var profitSharing = project.profit_sharing_ratio || { investor: 80, platform: 20 };
-    // Override old 60/40 ratios with new 80/20 standard
-    if (profitSharing.investor === 60) {
-      profitSharing = { investor: 80, platform: 20 };
-    }
     var riskLevel = project.risk_level || 'medium';
     var minInvestment = project.min_investment || 20;
     

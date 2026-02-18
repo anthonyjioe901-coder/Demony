@@ -6,21 +6,8 @@ var ObjectId = require('mongodb').ObjectId;
 var emailService = require('../services/email');
 var notificationService = require('../services/notifications.js');
 var TYPES = notificationService.NOTIFICATION_TYPES;
+var { toObjectId, buildUserIdFilter } = require('../utils/objectId');
 var router = express.Router();
-
-function toObjectId(value) {
-  if (!value) return null;
-  if (value instanceof ObjectId) return value;
-  if (ObjectId.isValid(value)) return new ObjectId(value);
-  return null;
-}
-
-function buildUserIdFilter(userId) {
-  var filters = [{ userId: userId }];
-  var asObjectId = toObjectId(userId);
-  if (asObjectId) filters.push({ userId: asObjectId });
-  return { $or: filters };
-}
 
 // Import referral completion function
 var referralModule = require('./referrals');
@@ -107,9 +94,10 @@ router.post('/', authenticateToken, async function(req, res) {
     var lockInEndDate = new Date();
     lockInEndDate.setMonth(lockInEndDate.getMonth() + lockInPeriodMonths);
     
-    // Calculate ownership percentage based on actual total funding (not goal)
-    var totalFunding = (project.raisedAmount || project.currentFunding || 0) + amount;
-    var ownershipPercent = totalFunding > 0 ? (amount / totalFunding) * 100 : 100;
+    // HIGH-03: Calculate ownership dynamically at query time instead of storing.
+    // Old approach stored ownershipPercent at investment time, but it becomes stale
+    // as other investors join. Now we compute it post-transaction from actual totals.
+    var ownershipPercent = 0; // Placeholder — recalculated on read
     
     // Create investment with enhanced tracking
     var investment = {
@@ -545,12 +533,22 @@ router.get('/my', authenticateToken, async function(req, res) {
       earningsMap[invId] = (earningsMap[invId] || 0) + dist.amount;
     });
     
+    // HIGH-03: Calculate dynamic ownership percentage per project
+    // Group investments by projectId to get total funding per project
+    var projectTotals = {};
+    investments.forEach(function(inv) {
+      if (!projectTotals[inv.projectId]) projectTotals[inv.projectId] = 0;
+      projectTotals[inv.projectId] += inv.amount;
+    });
+    
     investments = investments.map(function(inv) {
       var invId = inv._id.toString();
+      var projectTotal = projectTotals[inv.projectId] || inv.amount;
       return { 
         ...inv, 
         id: invId,
-        earnings: earningsMap[invId] || 0 // Actual earnings from profit distributions
+        earnings: earningsMap[invId] || 0,
+        ownershipPercent: projectTotal > 0 ? (inv.amount / projectTotal) * 100 : 0
       };
     });
     

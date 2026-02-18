@@ -9,6 +9,7 @@ var router = express.Router();
 var PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 var notificationService = require('../services/notifications.js');
 var TYPES = notificationService.NOTIFICATION_TYPES;
+var { idempotencyCheck } = require('../middleware/idempotency.js');
 
 // SEC-06: Warn on startup if Paystack secret is missing
 if (!PAYSTACK_SECRET) {
@@ -16,13 +17,6 @@ if (!PAYSTACK_SECRET) {
   if (process.env.NODE_ENV === 'production') {
     console.error('FATAL: PAYSTACK_SECRET_KEY must be set in production!');
   }
-}
-
-function toObjectId(value) {
-  if (!value) return null;
-  if (value instanceof ObjectId) return value;
-  if (ObjectId.isValid(value)) return new ObjectId(value);
-  return null;
 }
 
 // Helper to make Paystack API calls
@@ -138,7 +132,8 @@ router.get('/transactions', async function(req, res) {
 // ==================== DEPOSITS (PAYSTACK) ====================
 
 // Initialize deposit - creates Paystack payment link
-router.post('/deposit/initialize', async function(req, res) {
+// SYS-01: Idempotency key prevents duplicate payment initializations
+router.post('/deposit/initialize', idempotencyCheck, async function(req, res) {
   try {
     var amount = parseFloat(req.body.amount);
     
@@ -246,15 +241,17 @@ router.get('/deposit/verify/:reference', async function(req, res) {
       return res.status(400).json({ error: 'Payment amount mismatch' });
     }
     
-    // Atomically mark as success if still pending
-    var updateResult = await database.collection('transactions').updateOne(
+    // CRIT-02: Atomically claim the pending transaction using findOneAndUpdate.
+    // This is a single atomic operation — if two requests race, only ONE will
+    // find and update the document (the other gets null). Prevents double-credit.
+    var claimed = await database.collection('transactions').findOneAndUpdate(
       { reference: reference, status: 'pending' },
-      { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date(), paidAmount: amount } }
+      { $set: { status: 'success', verifiedAt: new Date(), updatedAt: new Date(), paidAmount: amount } },
+      { returnDocument: 'after' }
     );
     
-    // CRITICAL: Only credit wallet if we actually changed the status (modifiedCount, not matchedCount)
-    // This prevents double-credit from concurrent verify requests
-    if (updateResult.modifiedCount === 0) {
+    // If null, another request already claimed it
+    if (!claimed || !claimed.value) {
       return res.json({ message: 'Already verified', status: 'success' });
     }
     
@@ -297,7 +294,8 @@ router.get('/deposit/verify/:reference', async function(req, res) {
 // ==================== WITHDRAWALS ====================
 
 // Request withdrawal
-router.post('/withdraw', async function(req, res) {
+// SYS-01: Idempotency key prevents duplicate withdrawal requests
+router.post('/withdraw', idempotencyCheck, async function(req, res) {
   try {
     var amount = parseFloat(req.body.amount);
     var method = req.body.method || 'bank';
@@ -321,6 +319,10 @@ router.post('/withdraw', async function(req, res) {
     if (method === 'bank') {
       if (!bankCode || !accountNumber || !accountName) {
         return res.status(400).json({ error: 'Bank details required' });
+      }
+      // HIGH-10: Validate input lengths
+      if (typeof accountName !== 'string' || accountName.trim().length < 2 || accountName.trim().length > 100) {
+        return res.status(400).json({ error: 'Account name must be 2-100 characters' });
       }
       // Validate account number format
       if (typeof accountNumber !== 'string' || !/^[0-9]{6,20}$/.test(accountNumber.replace(/[\s-]/g, ''))) {
@@ -367,22 +369,12 @@ router.post('/withdraw', async function(req, res) {
     
     var reference = 'WDR_' + req.user.userId + '_' + Date.now();
     
-    // ATOMIC deduction: Only deduct if balance is still sufficient
-    // This prevents race conditions where two concurrent withdrawals both pass the check
-    var deductResult = await database.collection('users').updateOne(
-      { _id: new ObjectId(req.user.userId), walletBalance: { $gte: amount } },
-      { 
-        $inc: { walletBalance: -amount },
-        $set: { updatedAt: new Date() }
-      }
-    );
+    // CRIT-03: Wrap entire withdrawal in a MongoDB transaction.
+    // All 3 steps (deduct balance, insert withdrawal, insert transaction) must
+    // succeed together or all roll back — no partial state.
+    var client = db.getClient();
+    var session = client.startSession();
     
-    if (deductResult.modifiedCount === 0) {
-      return res.status(400).json({ error: 'Insufficient balance (concurrent transaction detected)' });
-    }
-    
-    // Create withdrawal request (pending admin approval) - write to BOTH collections
-    // for backward compatibility (frontend reads from 'withdrawals', wallet flow uses 'transactions')
     var withdrawalDoc = {
       userId: req.user.userId,
       amount: amount,
@@ -401,20 +393,44 @@ router.post('/withdraw', async function(req, res) {
       updatedAt: new Date()
     };
     
-    await database.collection('withdrawals').insertOne(withdrawalDoc);
-    
-    // Also record in transactions for audit trail
-    await database.collection('transactions').insertOne({
-      userId: req.user.userId,
-      type: 'withdrawal',
-      amount: -amount,
-      status: 'pending_approval',
-      reference: reference,
-      payoutMethod: method,
-      payoutDetails: withdrawalDoc.accountDetails,
-      description: 'Withdrawal request',
-      createdAt: new Date()
-    });
+    try {
+      await session.withTransaction(async function() {
+        // Step 1: ATOMIC deduction: Only deduct if balance is still sufficient
+        var deductResult = await database.collection('users').updateOne(
+          { _id: new ObjectId(req.user.userId), walletBalance: { $gte: amount } },
+          { 
+            $inc: { walletBalance: -amount },
+            $set: { updatedAt: new Date() }
+          },
+          { session: session }
+        );
+        
+        if (deductResult.modifiedCount === 0) {
+          throw new Error('Insufficient balance (concurrent transaction detected)');
+        }
+        
+        // Step 2: Create withdrawal request
+        await database.collection('withdrawals').insertOne(withdrawalDoc, { session: session });
+        
+        // Step 3: Record in transactions for audit trail
+        await database.collection('transactions').insertOne({
+          userId: req.user.userId,
+          type: 'withdrawal',
+          amount: -amount,
+          status: 'pending_approval',
+          reference: reference,
+          payoutMethod: method,
+          payoutDetails: withdrawalDoc.accountDetails,
+          description: 'Withdrawal request',
+          createdAt: new Date()
+        }, { session: session });
+      });
+    } catch (txErr) {
+      console.error('Withdrawal transaction failed (rolled back):', txErr.message);
+      return res.status(400).json({ error: txErr.message || 'Withdrawal failed. No funds were deducted.' });
+    } finally {
+      await session.endSession();
+    }
     
     res.json({
       message: 'Withdrawal request submitted',

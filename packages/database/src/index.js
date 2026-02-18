@@ -5,7 +5,7 @@ dotenv.config();
 
 var client = null;
 var db = null;
-var isConnecting = false;
+var connectPromise = null; // HIGH-08: Replace busy-wait with shared promise
 
 // MongoDB connection options for production reliability
 var connectionOptions = {
@@ -20,13 +20,9 @@ var connectionOptions = {
 };
 
 async function connect() {
-  // Prevent multiple simultaneous connection attempts
-  if (isConnecting) {
-    // Wait for existing connection attempt
-    while (isConnecting) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    if (db) return db;
+  // HIGH-08: If a connection attempt is in progress, await it instead of busy-waiting
+  if (connectPromise) {
+    return connectPromise;
   }
 
   // If we have a client, check if it's still connected
@@ -50,36 +46,40 @@ async function connect() {
   
   isConnecting = true;
   
-  try {
-    client = new MongoClient(uri, connectionOptions);
-    await client.connect();
-    db = client.db('demony');
-    
-    // Monitor connection events
-    client.on('close', function() {
-      console.log('MongoDB connection closed');
+  connectPromise = (async function() {
+    try {
+      client = new MongoClient(uri, connectionOptions);
+      await client.connect();
+      db = client.db('demony');
+      
+      // Monitor connection events
+      client.on('close', function() {
+        console.log('MongoDB connection closed');
+        db = null;
+      });
+      
+      client.on('error', function(err) {
+        console.error('MongoDB connection error:', err.message);
+        db = null;
+      });
+      
+      client.on('reconnect', function() {
+        console.log('MongoDB reconnected');
+      });
+      
+      console.log('Connected to MongoDB');
+      return db;
+    } catch (err) {
+      console.error('Failed to connect to MongoDB:', err.message);
+      client = null;
       db = null;
-    });
-    
-    client.on('error', function(err) {
-      console.error('MongoDB connection error:', err.message);
-      db = null;
-    });
-    
-    client.on('reconnect', function() {
-      console.log('MongoDB reconnected');
-    });
-    
-    console.log('Connected to MongoDB');
-    return db;
-  } catch (err) {
-    console.error('Failed to connect to MongoDB:', err.message);
-    client = null;
-    db = null;
-    throw err;
-  } finally {
-    isConnecting = false;
-  }
+      throw err;
+    } finally {
+      connectPromise = null;
+    }
+  })();
+  
+  return connectPromise;
 }
 
 async function getDb() {

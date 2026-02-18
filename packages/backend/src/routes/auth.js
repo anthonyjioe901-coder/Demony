@@ -11,6 +11,10 @@ var ObjectId = require('mongodb').ObjectId;
 
 var JWT_SECRET = require('../config/jwt').JWT_SECRET;
 
+// CRIT-04: Short-lived access tokens (15 min) + long-lived refresh tokens (7 days)
+var ACCESS_TOKEN_EXPIRY = '15m';
+var REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+
 // MED-10: Simple brute force protection for login attempts
 var loginAttempts = {};
 var MAX_LOGIN_ATTEMPTS = 5;
@@ -217,8 +221,22 @@ router.post('/signup', async function(req, res) {
     var token = jwt.sign(
       { id: newUser.id, email: newUser.email, role: role, tokenVersion: 0 },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
+
+    // Generate refresh token
+    var refreshToken = crypto.randomBytes(40).toString('hex');
+    try {
+      var database2 = await db.getDb();
+      await database2.collection('refresh_tokens').insertOne({
+        userId: newUser.id,
+        token: refreshToken,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS),
+        createdAt: new Date()
+      });
+    } catch (rtErr) {
+      console.error('Failed to store refresh token:', rtErr.message);
+    }
 
     // Create verification token and send email
     try {
@@ -244,7 +262,7 @@ router.post('/signup', async function(req, res) {
       console.error('Failed to send welcome email:', err);
     });
     
-    res.json({ message: 'User created successfully', token: token, user: newUser });
+    res.json({ message: 'User created successfully', token: token, refreshToken: refreshToken, user: newUser });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -359,6 +377,11 @@ router.post('/login', async function(req, res) {
           tokenToSend = existing.token;
           console.log('📧 Using existing verification token for:', user.email);
         } else {
+          // MED-10: Invalidate all old unused tokens before creating new one
+          await database.collection('email_verifications').updateMany(
+            { userId: user._id.toString(), used: false },
+            { $set: { used: true, invalidatedAt: new Date() } }
+          );
           tokenToSend = crypto.randomBytes(32).toString('hex');
           await database.collection('email_verifications').insertOne({
             userId: user._id.toString(),
@@ -392,8 +415,22 @@ router.post('/login', async function(req, res) {
     var token = jwt.sign(
       { id: user._id.toString(), email: user.email, role: user.role || 'investor', tokenVersion: user.tokenVersion || 0 },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
+    
+    // Generate refresh token
+    var refreshToken = crypto.randomBytes(40).toString('hex');
+    try {
+      var rtDatabase = await db.getDb();
+      await rtDatabase.collection('refresh_tokens').insertOne({
+        userId: user._id.toString(),
+        token: refreshToken,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS),
+        createdAt: new Date()
+      });
+    } catch (rtErr) {
+      console.error('Failed to store refresh token:', rtErr.message);
+    }
     
     // Check if existing user needs to add phone number
     var needsPhone = !user.phone;
@@ -401,6 +438,7 @@ router.post('/login', async function(req, res) {
     res.json({
       message: 'Login successful',
       token: token,
+      refreshToken: refreshToken,
       user: {
         id: user._id.toString(),
         name: user.name,
@@ -568,9 +606,25 @@ router.put('/notification-preferences', authenticateToken, async function(req, r
 });
 
 // Delete account (soft delete by deactivating)
+// HIGH-12: Require password re-authentication for destructive action
 router.delete('/delete-account', authenticateToken, async function(req, res) {
   try {
+    var password = req.body.password;
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required to delete your account' });
+    }
+    
     var database = await db.getDb();
+    var user = await database.collection('users').findOne({ _id: new ObjectId(req.user.id) });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    var passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Incorrect password' });
+    }
+    
     var result = await database.collection('users').updateOne(
       { _id: new ObjectId(req.user.id) },
       { $set: { isActive: false, deletedAt: new Date(), updatedAt: new Date() } }
@@ -673,7 +727,7 @@ router.post('/change-password', authenticateToken, async function(req, res) {
     var newToken = jwt.sign(
       { id: updatedUser._id.toString(), email: updatedUser.email, role: updatedUser.role || 'investor', tokenVersion: updatedUser.tokenVersion || 0 },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
     
     res.json({ message: 'Password changed successfully', token: newToken });
@@ -681,6 +735,200 @@ router.post('/change-password', authenticateToken, async function(req, res) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// ==================== PASSWORD RESET ====================
+
+// Request password reset (forgot password)
+router.post('/forgot-password', async function(req, res) {
+  var email = req.body.email;
+  
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  
+  email = email.trim().toLowerCase();
+  
+  try {
+    var database = await db.getDb();
+    var user = await database.collection('users').findOne({ email: email });
+    
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return res.json({ message: 'If an account exists with this email, a reset link has been sent.' });
+    }
+    
+    // Rate limit: max 3 reset requests per hour
+    var oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    var recentResets = await database.collection('password_resets').countDocuments({
+      userId: user._id.toString(),
+      createdAt: { $gte: oneHourAgo }
+    });
+    
+    if (recentResets >= 3) {
+      return res.json({ message: 'If an account exists with this email, a reset link has been sent.' });
+    }
+    
+    // Generate reset token
+    var resetToken = crypto.randomBytes(32).toString('hex');
+    var appUrl = getAppUrl();
+    
+    // Store reset token with 1-hour expiry
+    await database.collection('password_resets').insertOne({
+      userId: user._id.toString(),
+      token: resetToken,
+      used: false,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      createdAt: new Date()
+    });
+    
+    // Send reset email
+    var resetUrl = appUrl + '/#reset-password?token=' + resetToken;
+    emailService.sendPasswordResetEmail(user, resetUrl).catch(function(err) {
+      console.error('Failed to send password reset email:', err);
+    });
+    
+    res.json({ message: 'If an account exists with this email, a reset link has been sent.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Reset password with token
+router.post('/reset-password', async function(req, res) {
+  var token = req.body.token;
+  var newPassword = req.body.newPassword;
+  
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: 'Token and new password are required' });
+  }
+  
+  var passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    return res.status(400).json({ error: passwordError });
+  }
+  
+  try {
+    var database = await db.getDb();
+    
+    // Find valid, unused reset token
+    var resetRecord = await database.collection('password_resets').findOne({
+      token: token,
+      used: false,
+      expiresAt: { $gt: new Date() }
+    });
+    
+    if (!resetRecord) {
+      return res.status(400).json({ error: 'Invalid or expired reset link. Please request a new one.' });
+    }
+    
+    // Hash new password
+    var hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update password and increment tokenVersion to invalidate all existing tokens
+    await database.collection('users').updateOne(
+      { _id: new ObjectId(resetRecord.userId) },
+      { 
+        $set: { password: hashedPassword, updatedAt: new Date() },
+        $inc: { tokenVersion: 1 }
+      }
+    );
+    
+    // Mark token as used
+    await database.collection('password_resets').updateOne(
+      { _id: resetRecord._id },
+      { $set: { used: true, usedAt: new Date() } }
+    );
+    
+    // Invalidate all other reset tokens for this user
+    await database.collection('password_resets').updateMany(
+      { userId: resetRecord.userId, _id: { $ne: resetRecord._id }, used: false },
+      { $set: { used: true, usedAt: new Date() } }
+    );
+    
+    res.json({ message: 'Password reset successfully. Please login with your new password.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ==================== REFRESH TOKEN ====================
+
+// Exchange a valid refresh token for a new access token
+router.post('/refresh-token', async function(req, res) {
+  var refreshToken = req.body.refreshToken;
+  
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(400).json({ error: 'Refresh token is required' });
+  }
+  
+  try {
+    var database = await db.getDb();
+    
+    // Find the refresh token
+    var tokenRecord = await database.collection('refresh_tokens').findOne({
+      token: refreshToken,
+      expiresAt: { $gt: new Date() }
+    });
+    
+    if (!tokenRecord) {
+      return res.status(401).json({ error: 'Invalid or expired refresh token. Please login again.' });
+    }
+    
+    // Find the user
+    var user = await database.collection('users').findOne({ _id: new ObjectId(tokenRecord.userId) });
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    if (user.isActive === false) {
+      return res.status(403).json({ error: 'Account is suspended' });
+    }
+    
+    // Issue new access token
+    var newAccessToken = jwt.sign(
+      { id: user._id.toString(), email: user.email, role: user.role || 'investor', tokenVersion: user.tokenVersion || 0 },
+      JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
+    );
+    
+    // Rotate refresh token (invalidate old, issue new) for security
+    var newRefreshToken = crypto.randomBytes(40).toString('hex');
+    await database.collection('refresh_tokens').deleteOne({ _id: tokenRecord._id });
+    await database.collection('refresh_tokens').insertOne({
+      userId: user._id.toString(),
+      token: newRefreshToken,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS),
+      createdAt: new Date()
+    });
+    
+    res.json({
+      token: newAccessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (err) {
+    console.error('Refresh token error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Logout - invalidate refresh token
+router.post('/logout', async function(req, res) {
+  var refreshToken = req.body.refreshToken;
+  
+  if (refreshToken) {
+    try {
+      var database = await db.getDb();
+      await database.collection('refresh_tokens').deleteOne({ token: refreshToken });
+    } catch (err) {
+      console.error('Logout cleanup error:', err.message);
+    }
+  }
+  
+  res.json({ message: 'Logged out successfully' });
 });
 
 // Submit KYC documents

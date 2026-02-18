@@ -1,7 +1,11 @@
 package com.demony.invest.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NamedNavArgument
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -104,8 +108,8 @@ fun DemonyNavHost(
             )
         }
         
-        // Main App Screens
-        composable(Screen.Home.route) {
+        // HIGH-15: Auth-guarded main app screens
+        authenticatedComposable(Screen.Home.route, isAuthenticated, navController) {
             HomeScreen(
                 onNavigateToProjects = { navController.navigate(Screen.Projects.route) },
                 onNavigateToProject = { projectId ->
@@ -115,7 +119,7 @@ fun DemonyNavHost(
             )
         }
         
-        composable(Screen.Projects.route) {
+        authenticatedComposable(Screen.Projects.route, isAuthenticated, navController) {
             ProjectsScreen(
                 onNavigateToProject = { projectId ->
                     navController.navigate(Screen.ProjectDetail.createRoute(projectId))
@@ -124,11 +128,13 @@ fun DemonyNavHost(
             )
         }
         
-        composable(
+        authenticatedComposable(
             route = Screen.ProjectDetail.route,
+            isAuthenticated = isAuthenticated,
+            navController = navController,
             arguments = listOf(navArgument("projectId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val projectId = backStackEntry.arguments?.getString("projectId") ?: return@composable
+            val projectId = backStackEntry.arguments?.getString("projectId") ?: return@authenticatedComposable
             ProjectDetailScreen(
                 projectId = projectId,
                 onNavigateBack = { navController.navigateUp() },
@@ -136,32 +142,55 @@ fun DemonyNavHost(
             )
         }
         
-        composable(Screen.Investments.route) {
+        authenticatedComposable(Screen.Investments.route, isAuthenticated, navController) {
             InvestmentsScreen(navController = navController)
         }
         
-        composable(Screen.Wallet.route) {
+        authenticatedComposable(Screen.Wallet.route, isAuthenticated, navController) {
             WalletScreen(navController = navController)
         }
         
-        composable(Screen.Portfolio.route) {
+        authenticatedComposable(Screen.Portfolio.route, isAuthenticated, navController) {
             PortfolioScreen(navController = navController)
         }
         
-        composable(Screen.Profile.route) {
+        authenticatedComposable(Screen.Profile.route, isAuthenticated, navController) {
             ProfileScreen(navController = navController)
         }
         
-        composable(Screen.Settings.route) {
+        authenticatedComposable(Screen.Settings.route, isAuthenticated, navController) {
             SettingsScreen(navController = navController)
         }
         
-        composable(Screen.Referrals.route) {
+        authenticatedComposable(Screen.Referrals.route, isAuthenticated, navController) {
             ReferralsScreen(navController = navController)
         }
         
-        composable(Screen.Support.route) {
+        authenticatedComposable(Screen.Support.route, isAuthenticated, navController) {
             SupportScreen(navController = navController)
+        }
+    }
+}
+
+/**
+ * HIGH-15: Auth guard helper - redirects unauthenticated users to Login
+ */
+fun NavGraphBuilder.authenticatedComposable(
+    route: String,
+    isAuthenticated: Boolean,
+    navController: NavHostController,
+    arguments: List<NamedNavArgument> = emptyList(),
+    content: @Composable (NavBackStackEntry) -> Unit
+) {
+    composable(route, arguments) { backStackEntry ->
+        if (isAuthenticated) {
+            content(backStackEntry)
+        } else {
+            LaunchedEffect(Unit) {
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
         }
     }
 }

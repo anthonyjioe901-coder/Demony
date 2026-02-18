@@ -95,7 +95,7 @@ fun ProjectDetailScreen(
                                     type = "text/plain"
                                     putExtra(
                                         Intent.EXTRA_TEXT,
-                                        "Check out this investment opportunity on Demony: ${proj.name}\n\nhttps://demony.com/#projects/${proj.id}"
+                                        "Check out this investment opportunity on Demony: ${proj.name}\n\nhttps://demony.app/#projects/${proj.id}"
                                     )
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, "Share Project"))
@@ -578,7 +578,14 @@ fun ProjectDetailScreen(
                         onClick = {
                             val amount = investAmount.toDoubleOrNull()
                             if (amount != null && amount >= currentProject.minInvestment) {
-                                investmentsViewModel.invest(projectId, amount)
+                                investmentsViewModel.invest(
+                                    projectId = projectId,
+                                    amount = amount,
+                                    termsAccepted = termsAccepted,
+                                    riskAcknowledged = riskAcknowledged,
+                                    lossAcknowledged = lossAcknowledged,
+                                    lockInAcknowledged = lockInAcknowledged
+                                )
                             }
                         },
                         enabled = !isInvesting && 

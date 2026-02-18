@@ -66,7 +66,14 @@ class InvestmentsViewModel @Inject constructor(
         }
     }
 
-    fun invest(projectId: String, amount: Double) {
+    fun invest(
+        projectId: String,
+        amount: Double,
+        termsAccepted: Boolean,
+        riskAcknowledged: Boolean,
+        lossAcknowledged: Boolean,
+        lockInAcknowledged: Boolean
+    ) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -75,10 +82,10 @@ class InvestmentsViewModel @Inject constructor(
                 InvestRequest(
                     projectId = projectId,
                     amount = amount,
-                    termsAccepted = true,
-                    riskAcknowledged = true,
-                    lossAcknowledged = true,
-                    lockInAcknowledged = true
+                    termsAccepted = termsAccepted,
+                    riskAcknowledged = riskAcknowledged,
+                    lossAcknowledged = lossAcknowledged,
+                    lockInAcknowledged = lockInAcknowledged
                 )
             )
                 .onSuccess {

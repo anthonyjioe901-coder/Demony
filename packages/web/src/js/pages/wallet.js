@@ -67,6 +67,8 @@ function renderWallet(container, api) {
   var reference = urlParams.get('reference') || urlParams.get('trxref');
   
   if (status === 'success' && reference) {
+    // Clean URL immediately to prevent infinite retry loop on page refresh
+    window.history.replaceState({}, '', window.location.pathname + '#wallet');
     verifyPayment(api, reference);
   }
   
@@ -403,9 +405,6 @@ function verifyPayment(api, reference) {
     .catch(function(err) {
       console.error('Verification error:', err);
     });
-  
-  // Clean URL
-  window.history.replaceState({}, '', window.location.pathname + window.location.hash);
 }
 
 export { renderWallet };

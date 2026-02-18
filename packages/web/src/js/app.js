@@ -15,6 +15,7 @@ import { renderSupport } from './pages/support.js';
 import { renderSettings } from './pages/settings.js';
 import { renderReferrals } from './pages/referrals.js';
 import { initNotifications, destroyNotifications } from './notifications.js';
+import { showNotification } from './utils.js';
 
 // Initialize API client
 const api = new Api();
@@ -57,6 +58,8 @@ router.addRoute('privacy', function(container) { renderPrivacy(container); });
 router.addRoute('risk', function(container) { renderRiskDisclosure(container); });
 // Support
 router.addRoute('support', function(container) { renderSupport(container, api); });
+// Password reset
+router.addRoute('reset-password', function(container) { renderResetPassword(container, api); });
 
 // Expose app globally
 window.DemonyApp = {
@@ -402,6 +405,7 @@ function showAuthModal(type) {
         '</div>' +
         roleSelect +
         businessFields +
+        (type === 'login' ? '<div style="text-align: right; margin-top: -0.5rem; margin-bottom: 0.5rem;"><a href="#" id="forgot-password-link" style="font-size: 0.85rem; color: var(--primary-color);">Forgot Password?</a></div>' : '') +
         '<div class="form-actions" style="margin-top: 1.5rem;">' +
           '<button type="button" class="btn btn-outline" id="close-modal">Cancel</button>' +
           '<button type="submit" class="btn btn-primary">' + submitText + '</button>' +
@@ -411,6 +415,18 @@ function showAuthModal(type) {
     '</div>';
   
   document.body.appendChild(modal);
+  
+  // Forgot password link
+  if (type === 'login') {
+    var forgotLink = document.getElementById('forgot-password-link');
+    if (forgotLink) {
+      forgotLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        modal.remove();
+        showForgotPasswordModal();
+      });
+    }
+  }
   
   // Toggle business fields visibility
   if (type === 'signup') {
@@ -529,6 +545,126 @@ function showAuthModal(type) {
         }
       );
     }
+  });
+}
+
+// Forgot Password Modal
+function showForgotPasswordModal() {
+  var modal = document.createElement('div');
+  modal.className = 'modal active';
+  modal.innerHTML = 
+    '<div class="modal-content" style="max-width: 400px;">' +
+      '<div style="text-align: center; margin-bottom: 1.5rem;">' +
+        '<span style="font-size: 2.5rem;">🔑</span>' +
+        '<h2 style="margin-top: 0.5rem;">Forgot Password?</h2>' +
+        '<p style="color: var(--text-muted); font-size: 0.9rem;">Enter your email and we\'ll send you a reset link.</p>' +
+      '</div>' +
+      '<form id="forgot-form">' +
+        '<div class="form-group">' +
+          '<label for="forgot-email">Email Address</label>' +
+          '<input type="email" id="forgot-email" required placeholder="you@example.com">' +
+        '</div>' +
+        '<div class="form-actions" style="margin-top: 1.5rem;">' +
+          '<button type="button" class="btn btn-outline" id="forgot-cancel">Cancel</button>' +
+          '<button type="submit" class="btn btn-primary" id="forgot-submit">Send Reset Link</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+  
+  document.body.appendChild(modal);
+  
+  modal.querySelector('#forgot-cancel').addEventListener('click', function() { modal.remove(); });
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+  
+  modal.querySelector('#forgot-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = modal.querySelector('#forgot-submit');
+    var email = modal.querySelector('#forgot-email').value;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    
+    api.forgotPassword(email)
+      .then(function() {
+        modal.remove();
+        showNotification('If an account exists with this email, a password reset link has been sent. Check your inbox and spam folder.', 'success');
+      })
+      .catch(function(err) {
+        showNotification(err.message || 'Failed to send reset link. Try again.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Send Reset Link';
+      });
+  });
+}
+
+// Reset Password Page (accessed via #reset-password?token=xxx)
+function renderResetPassword(container, apiRef) {
+  var hash = window.location.hash || '';
+  var queryIndex = hash.indexOf('?');
+  var params = queryIndex !== -1 ? new URLSearchParams(hash.slice(queryIndex + 1)) : new URLSearchParams();
+  var token = params.get('token');
+  
+  if (!token) {
+    container.innerHTML = 
+      '<section style="max-width: 400px; margin: 3rem auto; text-align: center;">' +
+        '<h2>Invalid Reset Link</h2>' +
+        '<p style="color: var(--text-muted);">This password reset link is invalid or has expired.</p>' +
+        '<button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.location.hash=\'home\'">Go Home</button>' +
+      '</section>';
+    return;
+  }
+  
+  container.innerHTML = 
+    '<section style="max-width: 400px; margin: 3rem auto;">' +
+      '<div style="text-align: center; margin-bottom: 1.5rem;">' +
+        '<span style="font-size: 2.5rem;">🔒</span>' +
+        '<h2 style="margin-top: 0.5rem;">Set New Password</h2>' +
+        '<p style="color: var(--text-muted); font-size: 0.9rem;">Enter your new password below.</p>' +
+      '</div>' +
+      '<form id="reset-form">' +
+        '<div class="form-group">' +
+          '<label for="new-password">New Password</label>' +
+          '<input type="password" id="new-password" required minlength="8" placeholder="Min 8 chars, uppercase, lowercase, number">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label for="confirm-password">Confirm Password</label>' +
+          '<input type="password" id="confirm-password" required minlength="8" placeholder="Repeat password">' +
+        '</div>' +
+        '<button type="submit" class="btn btn-primary" id="reset-submit" style="width: 100%;">Reset Password</button>' +
+      '</form>' +
+    '</section>';
+  
+  document.getElementById('reset-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var newPass = document.getElementById('new-password').value;
+    var confirmPass = document.getElementById('confirm-password').value;
+    var btn = document.getElementById('reset-submit');
+    
+    if (newPass !== confirmPass) {
+      showNotification('Passwords do not match.', 'error');
+      return;
+    }
+    
+    btn.disabled = true;
+    btn.textContent = 'Resetting...';
+    
+    apiRef.resetPassword(token, newPass)
+      .then(function() {
+        container.innerHTML = 
+          '<section style="max-width: 400px; margin: 3rem auto; text-align: center;">' +
+            '<span style="font-size: 3rem;">✅</span>' +
+            '<h2 style="margin-top: 1rem;">Password Reset!</h2>' +
+            '<p style="color: var(--text-muted);">Your password has been changed. Please log in with your new password.</p>' +
+            '<button class="btn btn-primary" style="margin-top: 1rem;" id="reset-login-btn">Login</button>' +
+          '</section>';
+        document.getElementById('reset-login-btn').addEventListener('click', function() {
+          showAuthModal('login');
+        });
+      })
+      .catch(function(err) {
+        showNotification(err.message || 'Failed to reset password. The link may have expired.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Reset Password';
+      });
   });
 }
 
@@ -686,42 +822,8 @@ window.addEventListener('hashchange', updateActiveNavLink);
 updateActiveNavLink();
 
 // Check for email verification status in URL
-function showNotification(message, type) {
-  // type: 'success', 'error', 'info', 'warning'
-  var colors = {
-    'success': { bg: '#10b981', icon: '✅' },
-    'error': { bg: '#ef4444', icon: '❌' },
-    'info': { bg: '#3b82f6', icon: 'ℹ️' },
-    'warning': { bg: '#f59e0b', icon: '⚠️' }
-  };
-  
-  var color = colors[type] || colors['info'];
-  
-  var notification = document.createElement('div');
-  notification.style.cssText = 'position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 10000; padding: 1.25rem 2rem; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); max-width: 600px; width: 90%; text-align: center; font-weight: 600; font-size: 1rem; line-height: 1.5; animation: slideDown 0.3s ease-out;';
-  notification.style.backgroundColor = color.bg;
-  notification.style.color = 'white';
-  notification.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;"><span style="font-size: 1.5rem;">' + color.icon + '</span><span>' + message + '</span></div>';
-  
-  // Add animation
-  var style = document.createElement('style');
-  style.textContent = '@keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }';
-  document.head.appendChild(style);
-  
-  document.body.appendChild(notification);
-  
-  // Auto-remove after 7 seconds
-  setTimeout(function() {
-    notification.style.opacity = '0';
-    notification.style.transition = 'opacity 0.5s';
-    setTimeout(function() { 
-      notification.remove(); 
-      style.remove();
-    }, 500);
-  }, 7000);
-  
-  return notification;
-}
+// MED-11: showNotification is now in utils.js — expose globally for page scripts
+window.showNotification = showNotification;
 
 // Referral code handling
 var pendingReferralCode = null;

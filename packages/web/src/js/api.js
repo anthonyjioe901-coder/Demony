@@ -2,7 +2,9 @@
 function Api(baseUrl) {
   this.baseUrl = baseUrl || import.meta.env.VITE_API_URL || 'https://demony-api.onrender.com/api';
   this.token = localStorage.getItem('demony_token') || null;
+  this.refreshToken = localStorage.getItem('demony_refresh_token') || null;
   this.user = JSON.parse(localStorage.getItem('demony_user') || 'null');
+  this._refreshPromise = null; // Deduplicates concurrent refresh attempts
 }
 
 Api.prototype.request = function(endpoint, options) {
@@ -22,12 +24,31 @@ Api.prototype.request = function(endpoint, options) {
     headers: headers,
     body: options.body ? JSON.stringify(options.body) : undefined
   }).then(function(response) {
+    // On 401 (token expired), try to refresh automatically
+    if (response.status === 401 && self.refreshToken && endpoint.indexOf('/auth/') === -1) {
+      return self._doRefresh().then(function(success) {
+        if (success) {
+          // Retry the original request with new token
+          var retryHeaders = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + self.token };
+          return fetch(self.baseUrl + endpoint, {
+            method: options.method || 'GET',
+            headers: retryHeaders,
+            body: options.body ? JSON.stringify(options.body) : undefined
+          }).then(function(retryResp) {
+            if (!retryResp.ok) {
+              return retryResp.json().then(function(err) { throw new Error(err.error || 'Request failed'); });
+            }
+            return retryResp.json();
+          });
+        } else {
+          self._clearAuth();
+          throw new Error('Session expired. Please login again.');
+        }
+      });
+    }
     // Handle auth errors - but not for login/signup endpoints
     if ((response.status === 401 || response.status === 403) && endpoint.indexOf('/auth/login') === -1 && endpoint.indexOf('/auth/signup') === -1) {
-      localStorage.removeItem('demony_token');
-      localStorage.removeItem('demony_user');
-      self.token = null;
-      self.user = null;
+      self._clearAuth();
       throw new Error('Authentication required');
     }
     if (!response.ok) {
@@ -43,6 +64,42 @@ Api.prototype.request = function(endpoint, options) {
   });
 };
 
+// Refresh access token using refresh token (deduplicates concurrent calls)
+Api.prototype._doRefresh = function() {
+  var self = this;
+  if (self._refreshPromise) return self._refreshPromise;
+  
+  self._refreshPromise = fetch(self.baseUrl + '/auth/refresh-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken: self.refreshToken })
+  }).then(function(resp) {
+    self._refreshPromise = null;
+    if (!resp.ok) return false;
+    return resp.json().then(function(data) {
+      self.token = data.token;
+      self.refreshToken = data.refreshToken;
+      localStorage.setItem('demony_token', data.token);
+      localStorage.setItem('demony_refresh_token', data.refreshToken);
+      return true;
+    });
+  }).catch(function() {
+    self._refreshPromise = null;
+    return false;
+  });
+  
+  return self._refreshPromise;
+};
+
+Api.prototype._clearAuth = function() {
+  this.token = null;
+  this.refreshToken = null;
+  this.user = null;
+  localStorage.removeItem('demony_token');
+  localStorage.removeItem('demony_refresh_token');
+  localStorage.removeItem('demony_user');
+};
+
 Api.prototype.login = function(credentials) {
   var self = this;
   return this.request('/auth/login', {
@@ -50,8 +107,10 @@ Api.prototype.login = function(credentials) {
     body: credentials
   }).then(function(result) {
     self.token = result.token;
+    self.refreshToken = result.refreshToken || null;
     self.user = result.user;
     localStorage.setItem('demony_token', result.token);
+    if (result.refreshToken) localStorage.setItem('demony_refresh_token', result.refreshToken);
     localStorage.setItem('demony_user', JSON.stringify(result.user));
     return result;
   });
@@ -64,18 +123,41 @@ Api.prototype.signup = function(userData) {
     body: userData
   }).then(function(result) {
     self.token = result.token;
+    self.refreshToken = result.refreshToken || null;
     self.user = result.user;
     localStorage.setItem('demony_token', result.token);
+    if (result.refreshToken) localStorage.setItem('demony_refresh_token', result.refreshToken);
     localStorage.setItem('demony_user', JSON.stringify(result.user));
     return result;
   });
 };
 
 Api.prototype.logout = function() {
-  this.token = null;
-  this.user = null;
-  localStorage.removeItem('demony_token');
-  localStorage.removeItem('demony_user');
+  var self = this;
+  // Notify server to invalidate refresh token
+  if (self.refreshToken) {
+    fetch(self.baseUrl + '/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: self.refreshToken })
+    }).catch(function() {});
+  }
+  self._clearAuth();
+};
+
+// Password reset
+Api.prototype.forgotPassword = function(email) {
+  return this.request('/auth/forgot-password', {
+    method: 'POST',
+    body: { email: email }
+  });
+};
+
+Api.prototype.resetPassword = function(token, newPassword) {
+  return this.request('/auth/reset-password', {
+    method: 'POST',
+    body: { token: token, newPassword: newPassword }
+  });
 };
 
 // User profile

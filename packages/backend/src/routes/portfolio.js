@@ -4,14 +4,7 @@ var db = require('../../../database/src/index');
 var authenticateToken = require('../middleware/auth');
 var router = express.Router();
 var ObjectId = require('mongodb').ObjectId;
-
-function buildUserIdFilter(userId) {
-  var filters = [{ userId: userId }];
-  if (ObjectId.isValid(userId)) {
-    filters.push({ userId: new ObjectId(userId) });
-  }
-  return { $or: filters };
-}
+var { buildUserIdFilter } = require('../utils/objectId');
 
 // Get portfolio summary
 router.get('/', authenticateToken, async function(req, res) {

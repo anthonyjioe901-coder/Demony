@@ -3,7 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
-    kotlin("plugin.serialization") version "1.9.20"
 }
 
 android {
@@ -31,7 +30,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug") // Replace with release signing
+            signingConfig = signingConfigs.getByName("debug") // TODO: Replace with release keystore before Play Store submission
         }
         debug {
             isMinifyEnabled = false
@@ -92,14 +91,8 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // JSON Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    // JSON - Gson (Retrofit converter)
     implementation("com.google.code.gson:gson:2.10.1")
-
-    // Room Database
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
 
     // Dependency Injection - Hilt
     implementation("com.google.dagger:hilt-android:2.48")

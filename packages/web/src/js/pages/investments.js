@@ -152,7 +152,7 @@ function loadInvestments(api) {
       });
     })
     .catch(function(err) {
-      investmentsList.innerHTML = '<div style="color: #ef4444;">Error loading investments: ' + err.message + '</div>';
+      investmentsList.innerHTML = '<div style="color: #ef4444;">Error loading investments: ' + escapeHtml(err.message) + '</div>';
     });
 }
 
@@ -191,9 +191,9 @@ function showProjectDetailsModal(investmentId, api) {
       content.innerHTML = 
         // Project Info Card
         '<div style="background: linear-gradient(135deg, #dbeafe, #bfdbfe); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
-          '<h3 style="margin: 0 0 0.5rem 0; color: #1e40af;">' + p.name + '</h3>' +
-          '<span class="badge" style="background: rgba(30, 64, 175, 0.2); color: #1e40af;">' + p.category + '</span>' +
-          '<span class="badge" style="background: rgba(30, 64, 175, 0.2); color: #1e40af; margin-left: 0.5rem;">' + p.status + '</span>' +
+          '<h3 style="margin: 0 0 0.5rem 0; color: #1e40af;">' + escapeHtml(p.name) + '</h3>' +
+          '<span class="badge" style="background: rgba(30, 64, 175, 0.2); color: #1e40af;">' + escapeHtml(p.category) + '</span>' +
+          '<span class="badge" style="background: rgba(30, 64, 175, 0.2); color: #1e40af; margin-left: 0.5rem;">' + escapeHtml(p.status) + '</span>' +
         '</div>' +
         
         // Your Investment Summary
@@ -211,8 +211,8 @@ function showProjectDetailsModal(investmentId, api) {
         '<div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">' +
           '<h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem;">📜 Investment Terms</h4>' +
           '<div style="display: grid; gap: 0.5rem; font-size: 0.85rem;">' +
-            '<div style="display: flex; justify-content: space-between;"><span>Target Return:</span><strong>' + (p.targetReturn || '10-15%') + '</strong></div>' +
-            '<div style="display: flex; justify-content: space-between;"><span>Risk Level:</span><strong style="color: ' + riskColor + ';">' + (p.riskLevel || 'medium').toUpperCase() + '</strong></div>' +
+            '<div style="display: flex; justify-content: space-between;"><span>Target Return:</span><strong>' + escapeHtml(p.targetReturn || '10-15%') + '</strong></div>' +
+            '<div style="display: flex; justify-content: space-between;"><span>Risk Level:</span><strong style="color: ' + riskColor + ';">' + escapeHtml((p.riskLevel || 'medium').toUpperCase()) + '</strong></div>' +
             '<div style="display: flex; justify-content: space-between;"><span>Your Profit Share:</span><strong>' + profitSharing.investor + '%</strong></div>' +
             '<div style="display: flex; justify-content: space-between;"><span>Platform Fee:</span><strong>' + profitSharing.platform + '%</strong></div>' +
             '<div style="display: flex; justify-content: space-between;"><span>Lock-in Period:</span><strong>' + p.lockInPeriodMonths + ' months</strong></div>' +
@@ -243,10 +243,10 @@ function showProjectDetailsModal(investmentId, api) {
                   var typeBg = { 'info': '#dbeafe', 'profit': '#d1fae5', 'milestone': '#fef3c7', 'warning': '#fef2f2' }[u.type] || '#dbeafe';
                   return '<div style="background: ' + typeBg + '; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem;">' +
                     '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">' +
-                      '<strong style="font-size: 0.85rem;">' + typeIcon + ' ' + u.title + '</strong>' +
+                      '<strong style="font-size: 0.85rem;">' + typeIcon + ' ' + escapeHtml(u.title) + '</strong>' +
                       '<span style="font-size: 0.75rem; color: var(--text-muted);">' + new Date(u.createdAt).toLocaleDateString() + '</span>' +
                     '</div>' +
-                    '<p style="margin: 0; font-size: 0.8rem;">' + u.message + '</p>' +
+                    '<p style="margin: 0; font-size: 0.8rem;">' + escapeHtml(u.message) + '</p>' +
                   '</div>';
                 }).join('') +
               '</div>'
@@ -260,7 +260,7 @@ function showProjectDetailsModal(investmentId, api) {
     })
     .catch(function(err) {
       document.getElementById('project-details-content').innerHTML = 
-        '<div style="text-align: center; padding: 2rem; color: #ef4444;">Error loading project details: ' + err.message + '</div>';
+        '<div style="text-align: center; padding: 2rem; color: #ef4444;">Error loading project details: ' + escapeHtml(err.message) + '</div>';
     });
 }
 
@@ -312,7 +312,7 @@ function showProfitHistoryModal(investmentId, api) {
       content.innerHTML = 
         // Summary
         '<div style="background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; text-align: center;">' +
-          '<div style="font-size: 0.85rem; color: #065f46;">Total Earnings from ' + data.projectName + '</div>' +
+          '<div style="font-size: 0.85rem; color: #065f46;">Total Earnings from ' + escapeHtml(data.projectName) + '</div>' +
           '<div style="font-size: 1.75rem; font-weight: 700; color: #047857;">GH₵' + data.totalEarned.toLocaleString() + '</div>' +
           '<div style="font-size: 0.8rem; color: #065f46;">' + data.distributionCount + ' distribution(s)</div>' +
         '</div>' +
@@ -323,7 +323,7 @@ function showProfitHistoryModal(investmentId, api) {
             return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border-color);">' +
               '<div>' +
                 '<div style="font-weight: 500;">GH₵' + d.amount.toFixed(2) + '</div>' +
-                '<div style="font-size: 0.75rem; color: var(--text-muted);">' + (d.description || 'Profit distribution') + '</div>' +
+                '<div style="font-size: 0.75rem; color: var(--text-muted);">' + escapeHtml(d.description || 'Profit distribution') + '</div>' +
               '</div>' +
               '<div style="text-align: right;">' +
                 '<div style="font-size: 0.85rem; color: var(--secondary-color);">' + (d.sharePercent * 100).toFixed(2) + '% share</div>' +
@@ -335,7 +335,7 @@ function showProfitHistoryModal(investmentId, api) {
     })
     .catch(function(err) {
       document.getElementById('profit-history-content').innerHTML = 
-        '<div style="text-align: center; padding: 2rem; color: #ef4444;">Error loading profit history: ' + err.message + '</div>';
+        '<div style="text-align: center; padding: 2rem; color: #ef4444;">Error loading profit history: ' + escapeHtml(err.message) + '</div>';
     });
 }
 

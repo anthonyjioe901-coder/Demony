@@ -1,13 +1,15 @@
-// In-memory rate limiter - no external dependencies
-// Tracks request counts per IP within sliding time windows
+// Rate limiter with MongoDB persistence for multi-instance safety
+// Falls back to in-memory if DB is not available
 
-var rateLimitStores = {};
+var db = require('../../../database/src/index');
 
-// Clean up expired entries every 5 minutes
+var inMemoryStores = {};
+
+// Clean up expired in-memory entries every 5 minutes
 setInterval(function() {
   var now = Date.now();
-  Object.keys(rateLimitStores).forEach(function(storeName) {
-    var store = rateLimitStores[storeName];
+  Object.keys(inMemoryStores).forEach(function(storeName) {
+    var store = inMemoryStores[storeName];
     Object.keys(store).forEach(function(key) {
       if (store[key].resetAt < now) {
         delete store[key];
@@ -17,7 +19,7 @@ setInterval(function() {
 }, 5 * 60 * 1000);
 
 /**
- * Create a rate limiter middleware
+ * Create a rate limiter middleware with MongoDB persistence
  * @param {Object} options
  * @param {string} options.name - Unique name for this limiter's store
  * @param {number} options.windowMs - Time window in milliseconds
@@ -27,42 +29,73 @@ setInterval(function() {
  */
 function createRateLimiter(options) {
   var name = options.name || 'default';
-  var windowMs = options.windowMs || 15 * 60 * 1000; // 15 minutes default
+  var windowMs = options.windowMs || 15 * 60 * 1000;
   var maxRequests = options.maxRequests || 100;
   var message = options.message || 'Too many requests, please try again later.';
   var keyGenerator = options.keyGenerator || function(req) {
     return req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
   };
 
-  if (!rateLimitStores[name]) {
-    rateLimitStores[name] = {};
+  if (!inMemoryStores[name]) {
+    inMemoryStores[name] = {};
   }
-  var store = rateLimitStores[name];
+  var memStore = inMemoryStores[name];
 
-  return function rateLimiter(req, res, next) {
+  return async function rateLimiter(req, res, next) {
     var key = keyGenerator(req);
     var now = Date.now();
 
-    if (!store[key] || store[key].resetAt < now) {
-      store[key] = {
-        count: 1,
-        resetAt: now + windowMs
-      };
+    // Try MongoDB first, fall back to in-memory
+    try {
+      var database = await db.getDb();
+      var collection = database.collection('rate_limits');
+      var docId = name + ':' + key;
+      
+      var record = await collection.findOne({ _id: docId });
+      
+      if (!record || record.resetAt < now) {
+        // Window expired or first request — start new window
+        await collection.updateOne(
+          { _id: docId },
+          { $set: { count: 1, resetAt: now + windowMs, updatedAt: new Date() } },
+          { upsert: true }
+        );
+        return next();
+      }
+      
+      // Increment count atomically
+      var updated = await collection.findOneAndUpdate(
+        { _id: docId },
+        { $inc: { count: 1 }, $set: { updatedAt: new Date() } },
+        { returnDocument: 'after' }
+      );
+      
+      var currentCount = updated && updated.value ? updated.value.count : record.count + 1;
+      
+      if (currentCount > maxRequests) {
+        var retryAfter = Math.ceil((record.resetAt - now) / 1000);
+        res.set('Retry-After', String(retryAfter));
+        return res.status(429).json({ error: message, retryAfterSeconds: retryAfter });
+      }
+      
       return next();
+    } catch (dbErr) {
+      // Fallback to in-memory if DB is unavailable
+      if (!memStore[key] || memStore[key].resetAt < now) {
+        memStore[key] = { count: 1, resetAt: now + windowMs };
+        return next();
+      }
+
+      memStore[key].count++;
+
+      if (memStore[key].count > maxRequests) {
+        var retryAfter = Math.ceil((memStore[key].resetAt - now) / 1000);
+        res.set('Retry-After', String(retryAfter));
+        return res.status(429).json({ error: message, retryAfterSeconds: retryAfter });
+      }
+
+      next();
     }
-
-    store[key].count++;
-
-    if (store[key].count > maxRequests) {
-      var retryAfter = Math.ceil((store[key].resetAt - now) / 1000);
-      res.set('Retry-After', String(retryAfter));
-      return res.status(429).json({ 
-        error: message,
-        retryAfterSeconds: retryAfter
-      });
-    }
-
-    next();
   };
 }
 

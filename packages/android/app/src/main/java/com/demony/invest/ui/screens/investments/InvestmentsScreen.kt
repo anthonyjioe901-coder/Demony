@@ -21,8 +21,11 @@ import com.demony.invest.data.models.Investment
 import com.demony.invest.ui.components.BottomNavigationBar
 import com.demony.invest.ui.navigation.Screen
 import com.demony.invest.ui.viewmodels.InvestmentsViewModel
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -270,20 +273,19 @@ private fun SummaryItem(
 @Composable
 private fun InvestmentCard(investment: Investment, navController: NavController) {
     // Determine lock-in status
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
     val isLocked = try {
         val endDate = investment.lockInEndDate?.let {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(it)
+            LocalDateTime.parse(it, formatter).atZone(ZoneId.systemDefault()).toInstant()
         }
-        endDate == null || endDate.after(Date())
+        endDate == null || endDate.isAfter(Instant.now())
     } catch (e: Exception) { true }
-    
+
     val daysRemaining = try {
         investment.lockInEndDate?.let {
-            val endDate = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(it)
-            if (endDate != null) {
-                val diff = endDate.time - System.currentTimeMillis()
-                if (diff > 0) (diff / (1000 * 60 * 60 * 24)).toInt() else 0
-            } else null
+            val endDate = LocalDateTime.parse(it, formatter).atZone(ZoneId.systemDefault()).toInstant()
+            val days = ChronoUnit.DAYS.between(Instant.now(), endDate)
+            if (days > 0) days.toInt() else 0
         }
     } catch (e: Exception) { null }
     
