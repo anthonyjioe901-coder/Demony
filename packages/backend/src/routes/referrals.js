@@ -421,10 +421,10 @@ async function completeReferral(refereeId, investmentAmount) {
             '<p>Best,<br>The Demony Team</p>';
         }
         
-        await emailService.sendEmail({
-          to: referrer.email,
+        await emailService.sendEmail('referralNotification', referrer.email, {
+          userName: referrer.name || 'Investor',
           subject: emailSubject,
-          html: emailBody
+          bodyHtml: emailBody
         });
       }
     } catch (emailErr) {

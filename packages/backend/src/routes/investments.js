@@ -504,6 +504,25 @@ router.get('/verify/:reference', authenticateToken, async function(req, res) {
         ownershipPercent: investment.ownershipPercent.toFixed(2)
       }
     });
+
+    // HIGH-06: Send investment confirmation notification + email (non-blocking)
+    notificationService.createNotification(investment.userId, TYPES.INVESTMENT_CONFIRMED, {
+      title: 'Investment Confirmed',
+      message: 'Your GH₵' + investment.amount.toFixed(2) + ' investment in ' + investment.projectName + ' is now active!',
+      link: '#/investments',
+      metadata: { amount: investment.amount, projectName: investment.projectName }
+    }).catch(function() {});
+
+    // Send investment email
+    database.collection('users').findOne({ _id: toObjectId(investment.userId) })
+      .then(function(user) {
+        if (user && user.email) {
+          emailService.sendInvestmentEmail(user, investment, project).catch(function(err) {
+            console.error('Failed to send investment verify email:', err);
+          });
+        }
+      })
+      .catch(function() {});
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -533,22 +552,26 @@ router.get('/my', authenticateToken, async function(req, res) {
       earningsMap[invId] = (earningsMap[invId] || 0) + dist.amount;
     });
     
-    // HIGH-03: Calculate dynamic ownership percentage per project
-    // Group investments by projectId to get total funding per project
-    var projectTotals = {};
-    investments.forEach(function(inv) {
-      if (!projectTotals[inv.projectId]) projectTotals[inv.projectId] = 0;
-      projectTotals[inv.projectId] += inv.amount;
-    });
+    // HIGH-07 FIX: Calculate dynamic ownership percentage using project's actual currentFunding
+    // (not just this user's total per project, which incorrectly showed 100% for single investors)
+    var projectIds = [...new Set(investments.map(function(inv) { return inv.projectId; }).filter(Boolean))];
+    var fundingMap = {};
+    if (projectIds.length > 0) {
+      var projects = await database.collection('projects')
+        .find({ _id: { $in: projectIds.map(function(pid) { return new ObjectId(pid); }) } })
+        .project({ currentFunding: 1 })
+        .toArray();
+      projects.forEach(function(p) { fundingMap[p._id.toString()] = p.currentFunding || 0; });
+    }
     
     investments = investments.map(function(inv) {
       var invId = inv._id.toString();
-      var projectTotal = projectTotals[inv.projectId] || inv.amount;
+      var projectFunding = fundingMap[inv.projectId] || inv.amount;
       return { 
         ...inv, 
         id: invId,
         earnings: earningsMap[invId] || 0,
-        ownershipPercent: projectTotal > 0 ? (inv.amount / projectTotal) * 100 : 0
+        ownershipPercent: projectFunding > 0 ? (inv.amount / projectFunding) * 100 : 0
       };
     });
     

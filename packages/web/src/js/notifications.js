@@ -5,10 +5,23 @@ var _api = null;
 var _isOpen = false;
 var _notifications = [];
 var _unreadCount = 0;
+var _outsideClickHandler = null;
+var _initialized = false;
 
 // Initialize notification system
 function initNotifications(api) {
+  // Prevent duplicate initialization (updateAuthState can be called multiple times)
+  if (_initialized && _api === api) {
+    return;
+  }
+  
+  // Clean up any previous instance first
+  if (_initialized) {
+    destroyNotifications();
+  }
+  
   _api = api;
+  _initialized = true;
   
   if (!api.token) return;
   
@@ -33,6 +46,11 @@ function destroyNotifications() {
   if (_api) {
     _api.disconnectNotificationStream();
   }
+  // Remove outside click handler to prevent leak
+  if (_outsideClickHandler) {
+    document.removeEventListener('click', _outsideClickHandler);
+    _outsideClickHandler = null;
+  }
   var bell = document.getElementById('notification-bell');
   if (bell) bell.remove();
   var panel = document.getElementById('notification-panel');
@@ -40,6 +58,8 @@ function destroyNotifications() {
   _notifications = [];
   _unreadCount = 0;
   _isOpen = false;
+  _initialized = false;
+  _api = null;
 }
 
 // Create notification bell in the navbar
@@ -78,12 +98,16 @@ function createNotificationBell() {
     togglePanel();
   });
   
-  // Close panel on outside click
-  document.addEventListener('click', function(e) {
+  // Close panel on outside click (use stored ref to prevent leak)
+  if (_outsideClickHandler) {
+    document.removeEventListener('click', _outsideClickHandler);
+  }
+  _outsideClickHandler = function(e) {
     if (_isOpen && !e.target.closest('#notification-panel') && !e.target.closest('#notification-bell')) {
       closePanel();
     }
-  });
+  };
+  document.addEventListener('click', _outsideClickHandler);
   
   // Add styles
   addNotificationStyles();

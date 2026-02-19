@@ -289,32 +289,7 @@ router.get('/users/:id', async function(req, res) {
   }
 });
 
-// Manually verify user email (admin override)
-router.post('/users/:id/verify-email', async function(req, res) {
-  try {
-    var database = await db.getDb();
-    
-    var result = await database.collection('users').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { 
-        $set: { 
-          isVerified: true,
-          updatedAt: new Date()
-        }
-      }
-    );
-    
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    console.log('✅ Admin verified email for user:', req.params.id);
-    res.json({ message: 'User email verified successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+// HIGH-12: Duplicate verify-email route removed (see consolidated version below in VERIFY USER EMAIL section)
 
 // Verify/Reject KYC
 router.post('/users/:id/kyc', async function(req, res) {
@@ -871,57 +846,51 @@ router.post('/projects/:id/distribute-profits', async function(req, res) {
     
     // Distribute investor profit pool proportionally
     var distributions = [];
-    
-    // Build distributions array and wallet updates in parallel (was sequential per-investor)
-    var walletUpdates = [];
-    for (var i = 0; i < investments.length; i++) {
-      var inv = investments[i];
-      var sharePercent = inv.amount / totalInvested;
-      var profitShare = investorProfitPool * sharePercent; // Share of INVESTOR pool, not gross
-      
-      // Queue wallet update for parallel execution
-      walletUpdates.push(
-        database.collection('users').updateOne(
-          { _id: new ObjectId(inv.userId) },
+
+    // CRIT-04: Wrap all financial mutations in a MongoDB transaction
+    var mongoClient = db.getClient();
+    var session = mongoClient.startSession();
+    try {
+      await session.withTransaction(async function() {
+        for (var i = 0; i < investments.length; i++) {
+          var inv = investments[i];
+          var sharePercent = inv.amount / totalInvested;
+          var profitShare = investorProfitPool * sharePercent; // Share of INVESTOR pool, not gross
+
+          await database.collection('users').updateOne(
+            { _id: new ObjectId(inv.userId) },
+            { $inc: { walletBalance: profitShare, totalEarnings: profitShare } },
+            { session: session }
+          );
+
+          distributions.push({
+            userId: inv.userId,
+            projectId: req.params.id,
+            investmentId: inv._id.toString(),
+            amount: profitShare,
+            sharePercent: sharePercent,
+            grossProfit: grossProfitAmount,
+            investorSharePercent: profitSharingRatio.investor,
+            description: description,
+            createdAt: new Date()
+          });
+        }
+
+        await database.collection('profit_distributions').insertMany(distributions, { session: session });
+
+        // Update project total distributed
+        await database.collection('projects').updateOne(
+          { _id: new ObjectId(req.params.id) },
           {
-            $inc: {
-              walletBalance: profitShare,
-              totalEarnings: profitShare
-            }
-          }
-        )
-      );
-      
-      // Record distribution
-      var distribution = {
-        userId: inv.userId,
-        projectId: req.params.id,
-        investmentId: inv._id.toString(),
-        amount: profitShare,
-        sharePercent: sharePercent,
-        grossProfit: grossProfitAmount,
-        investorSharePercent: profitSharingRatio.investor,
-        description: description,
-        createdAt: new Date()
-      };
-      
-      distributions.push(distribution);
+            $inc: { totalProfitDistributed: investorProfitPool },
+            $set: { lastDistributionAt: new Date() }
+          },
+          { session: session }
+        );
+      });
+    } finally {
+      await session.endSession();
     }
-    
-    // Execute all wallet credits + distribution insert in parallel
-    await Promise.all([
-      Promise.all(walletUpdates),
-      database.collection('profit_distributions').insertMany(distributions)
-    ]);
-    
-    // Update project total distributed (track investor portion actually paid out)
-    await database.collection('projects').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      {
-        $inc: { totalProfitDistributed: investorProfitPool },
-        $set: { lastDistributionAt: new Date() }
-      }
-    );
     
     // Send profit distribution emails to all investors (async batch)
     var emailPromises = [];
@@ -1110,66 +1079,77 @@ router.post('/projects/:id/complete', async function(req, res) {
     var totalPrincipalReturned = 0;
     var investorCount = investments.length;
     
-    // Process each investment
-    for (var i = 0; i < investments.length; i++) {
-      var inv = investments[i];
-      
-      // Mark investment as completed
-      await database.collection('investments').updateOne(
-        { _id: inv._id },
-        {
-          $set: {
-            status: 'completed',
-            completedAt: new Date(),
-            completionNote: completionNote,
-            principalReturned: returnPrincipal,
-            updatedAt: new Date()
+    // CRIT-05: Wrap all financial mutations in a MongoDB transaction
+    var mongoClient = db.getClient();
+    var session = mongoClient.startSession();
+    try {
+      await session.withTransaction(async function() {
+        for (var i = 0; i < investments.length; i++) {
+          var inv = investments[i];
+          
+          // Mark investment as completed
+          await database.collection('investments').updateOne(
+            { _id: inv._id },
+            {
+              $set: {
+                status: 'completed',
+                completedAt: new Date(),
+                completionNote: completionNote,
+                principalReturned: returnPrincipal,
+                updatedAt: new Date()
+              }
+            },
+            { session: session }
+          );
+          
+          // Return principal to wallet if requested
+          if (returnPrincipal) {
+            var userObjectId = toObjectId(inv.userId);
+            if (userObjectId) {
+              await database.collection('users').updateOne(
+                { _id: userObjectId },
+                {
+                  $inc: { walletBalance: inv.amount },
+                  $set: { updatedAt: new Date() }
+                },
+                { session: session }
+              );
+              totalPrincipalReturned += inv.amount;
+              
+              // Record transaction
+              await database.collection('transactions').insertOne({
+                userId: inv.userId,
+                type: 'principal_return',
+                amount: inv.amount,
+                status: 'success',
+                reference: 'PRIN_' + inv._id.toString() + '_' + Date.now(),
+                description: 'Principal returned from ' + project.name,
+                projectId: req.params.id,
+                investmentId: inv._id.toString(),
+                createdAt: new Date()
+              }, { session: session });
+            }
           }
         }
-      );
-      
-      // Return principal to wallet if requested
-      if (returnPrincipal) {
-        var userObjectId = toObjectId(inv.userId);
-        if (userObjectId) {
-          await database.collection('users').updateOne(
-            { _id: userObjectId },
-            {
-              $inc: { walletBalance: inv.amount },
-              $set: { updatedAt: new Date() }
+        
+        // Mark project as completed
+        await database.collection('projects').updateOne(
+          { _id: new ObjectId(req.params.id) },
+          {
+            $set: {
+              status: 'completed',
+              completedAt: new Date(),
+              completionNote: completionNote,
+              principalReturned: returnPrincipal,
+              updatedAt: new Date()
             }
-          );
-          totalPrincipalReturned += inv.amount;
-          
-          // Record transaction
-          await database.collection('transactions').insertOne({
-            userId: inv.userId,
-            type: 'principal_return',
-            amount: inv.amount,
-            status: 'success',
-            reference: 'PRIN_' + inv._id.toString() + '_' + Date.now(),
-            description: 'Principal returned from ' + project.name,
-            projectId: req.params.id,
-            investmentId: inv._id.toString(),
-            createdAt: new Date()
-          });
-        }
-      }
+          },
+          { session: session }
+        );
+      });
+    } finally {
+      await session.endSession();
     }
-    
-    // Mark project as completed
-    await database.collection('projects').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      {
-        $set: {
-          status: 'completed',
-          completedAt: new Date(),
-          completionNote: completionNote,
-          principalReturned: returnPrincipal,
-          updatedAt: new Date()
-        }
-      }
-    );
     
     // Send completion emails to investors (async)
     investments.forEach(function(inv) {
@@ -1184,6 +1164,19 @@ router.post('/projects/:id/complete', async function(req, res) {
         .catch(function(err) {
           console.error('Failed to get user for completion email:', err);
         });
+    });
+
+    // HIGH-13: Send completion notifications to all investors (non-blocking)
+    investments.forEach(function(inv) {
+      var msg = returnPrincipal
+        ? 'Project "' + project.name + '" completed! GH₵' + inv.amount.toFixed(2) + ' principal returned to your wallet.'
+        : 'Project "' + project.name + '" has been completed.';
+      notificationService.createNotification(inv.userId, TYPES.PROJECT_COMPLETED || 'PROJECT_COMPLETED', {
+        title: 'Project Completed',
+        message: msg,
+        link: '#/investments',
+        metadata: { projectName: project.name, principalReturned: returnPrincipal, amount: inv.amount }
+      }).catch(function() {});
     });
     
     res.json({
@@ -1226,65 +1219,76 @@ router.post('/projects/:id/cancel', async function(req, res) {
     var totalRefunded = 0;
     var investorCount = investments.length;
     
-    // Refund each investment
-    for (var i = 0; i < investments.length; i++) {
-      var inv = investments[i];
-      
-      // Mark investment as cancelled
-      await database.collection('investments').updateOne(
-        { _id: inv._id },
-        {
-          $set: {
-            status: 'cancelled',
-            cancelledAt: new Date(),
-            cancellationReason: cancellationReason,
-            refunded: true,
-            updatedAt: new Date()
+    // CRIT-05: Wrap all financial mutations in a MongoDB transaction
+    var mongoClient = db.getClient();
+    var session = mongoClient.startSession();
+    try {
+      await session.withTransaction(async function() {
+        for (var i = 0; i < investments.length; i++) {
+          var inv = investments[i];
+          
+          // Mark investment as cancelled
+          await database.collection('investments').updateOne(
+            { _id: inv._id },
+            {
+              $set: {
+                status: 'cancelled',
+                cancelledAt: new Date(),
+                cancellationReason: cancellationReason,
+                refunded: true,
+                updatedAt: new Date()
+              }
+            },
+            { session: session }
+          );
+          
+          // Refund to wallet
+          var userObjectId = toObjectId(inv.userId);
+          if (userObjectId) {
+            await database.collection('users').updateOne(
+              { _id: userObjectId },
+              {
+                $inc: { walletBalance: inv.amount, totalInvested: -inv.amount },
+                $set: { updatedAt: new Date() }
+              },
+              { session: session }
+            );
+            totalRefunded += inv.amount;
+            
+            // Record refund transaction
+            await database.collection('transactions').insertOne({
+              userId: inv.userId,
+              type: 'refund',
+              amount: inv.amount,
+              status: 'success',
+              reference: 'REF_' + inv._id.toString() + '_' + Date.now(),
+              description: 'Refund from cancelled project: ' + project.name,
+              projectId: req.params.id,
+              investmentId: inv._id.toString(),
+              createdAt: new Date()
+            }, { session: session });
           }
         }
-      );
-      
-      // Refund to wallet
-      var userObjectId = toObjectId(inv.userId);
-      if (userObjectId) {
-        await database.collection('users').updateOne(
-          { _id: userObjectId },
-          {
-            $inc: { walletBalance: inv.amount, totalInvested: -inv.amount },
-            $set: { updatedAt: new Date() }
-          }
-        );
-        totalRefunded += inv.amount;
         
-        // Record refund transaction
-        await database.collection('transactions').insertOne({
-          userId: inv.userId,
-          type: 'refund',
-          amount: inv.amount,
-          status: 'success',
-          reference: 'REF_' + inv._id.toString() + '_' + Date.now(),
-          description: 'Refund from cancelled project: ' + project.name,
-          projectId: req.params.id,
-          investmentId: inv._id.toString(),
-          createdAt: new Date()
-        });
-      }
+        // Mark project as cancelled
+        await database.collection('projects').updateOne(
+          { _id: new ObjectId(req.params.id) },
+          {
+            $set: {
+              status: 'cancelled',
+              cancelledAt: new Date(),
+              cancellationReason: cancellationReason,
+              currentFunding: 0,
+              investorCount: 0,
+              updatedAt: new Date()
+            }
+          },
+          { session: session }
+        );
+      });
+    } finally {
+      await session.endSession();
     }
-    
-    // Mark project as cancelled
-    await database.collection('projects').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      {
-        $set: {
-          status: 'cancelled',
-          cancelledAt: new Date(),
-          cancellationReason: cancellationReason,
-          currentFunding: 0,
-          investorCount: 0,
-          updatedAt: new Date()
-        }
-      }
-    );
     
     // Send cancellation emails (async)
     investments.forEach(function(inv) {
@@ -1299,6 +1303,16 @@ router.post('/projects/:id/cancel', async function(req, res) {
         .catch(function(err) {
           console.error('Failed to get user for cancellation email:', err);
         });
+    });
+
+    // HIGH-13: Send cancellation notifications to all investors (non-blocking)
+    investments.forEach(function(inv) {
+      notificationService.createNotification(inv.userId, TYPES.PROJECT_CANCELLED || 'PROJECT_CANCELLED', {
+        title: 'Project Cancelled',
+        message: 'Project "' + project.name + '" has been cancelled. GH₵' + inv.amount.toFixed(2) + ' has been refunded to your wallet.',
+        link: '#/wallet',
+        metadata: { projectName: project.name, refundAmount: inv.amount }
+      }).catch(function() {});
     });
     
     res.json({
@@ -1995,10 +2009,12 @@ router.post('/email/broadcast', async function(req, res) {
     var sentCount = 0;
     for (var user of users) {
       try {
-        if (emailService.sendEmail) {
-          await emailService.sendEmail(user.email, subject, message);
-          sentCount++;
-        }
+        await emailService.sendEmail('broadcast', user.email, {
+          userName: user.name || 'Investor',
+          subject: subject,
+          message: message
+        });
+        sentCount++;
       } catch (e) {
         console.error('Failed to send to', user.email, e.message);
       }
@@ -2127,6 +2143,19 @@ router.post('/support/tickets/:id/resolve', async function(req, res) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
     
+    // Notify ticket owner (non-blocking)
+    var resolvedTicket = await database.collection('support_tickets').findOne(
+      { $or: [{ _id: toObjectId(ticketId) }, { ticketId: ticketId }] }
+    );
+    if (resolvedTicket && resolvedTicket.userId) {
+      notificationService.createNotification(resolvedTicket.userId, TYPES.SUPPORT_TICKET_RESOLVED, {
+        title: 'Ticket Resolved',
+        message: 'Your support ticket ' + (resolvedTicket.ticketId || ticketId) + ' has been resolved.',
+        link: '#/support',
+        metadata: { ticketId: resolvedTicket.ticketId || ticketId }
+      }).catch(function() {});
+    }
+    
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -2144,6 +2173,7 @@ router.post('/support/tickets/:id/reply', async function(req, res) {
       message: message,
       adminId: req.user.userId,
       adminName: req.user.name || req.user.email,
+      isStaff: true,
       createdAt: new Date()
     };
     
@@ -2157,6 +2187,34 @@ router.post('/support/tickets/:id/reply', async function(req, res) {
     
     if (result.matchedCount === 0) {
       return res.status(404).json({ error: 'Ticket not found' });
+    }
+    
+    // Notify ticket owner of reply (non-blocking)
+    var repliedTicket = await database.collection('support_tickets').findOne(
+      { $or: [{ _id: toObjectId(ticketId) }, { ticketId: ticketId }] }
+    );
+    if (repliedTicket && repliedTicket.userId) {
+      notificationService.createNotification(repliedTicket.userId, TYPES.SUPPORT_TICKET_REPLIED, {
+        title: 'Support Reply',
+        message: 'Our team replied to your ticket ' + (repliedTicket.ticketId || ticketId) + '.',
+        link: '#/support',
+        metadata: { ticketId: repliedTicket.ticketId || ticketId }
+      }).catch(function() {});
+      
+      // Send email notification (non-blocking)
+      if (repliedTicket.email) {
+        var ticketUser = repliedTicket.userId ? await database.collection('users').findOne(
+          { _id: toObjectId(repliedTicket.userId) }, { projection: { name: 1 } }
+        ) : null;
+        emailService.sendEmail('supportTicketReply', repliedTicket.email, {
+          userName: (ticketUser && ticketUser.name) || repliedTicket.email.split('@')[0],
+          ticketId: repliedTicket.ticketId || ticketId,
+          replyMessage: message,
+          appUrl: process.env.APP_URL
+        }).catch(function(err) {
+          console.error('Failed to send ticket reply email:', err);
+        });
+      }
     }
     
     res.json({ success: true });
@@ -2180,7 +2238,7 @@ router.get('/referrals', async function(req, res) {
       {
         $addFields: {
           referrerObjId: { $cond: { if: { $regexMatch: { input: { $toString: '$referrerId' }, regex: /^[0-9a-fA-F]{24}$/ } }, then: { $toObjectId: '$referrerId' }, else: null } },
-          referredObjId: { $cond: { if: { $regexMatch: { input: { $toString: '$referredId' }, regex: /^[0-9a-fA-F]{24}$/ } }, then: { $toObjectId: '$referredId' }, else: null } }
+          referredObjId: { $cond: { if: { $regexMatch: { input: { $toString: '$refereeId' }, regex: /^[0-9a-fA-F]{24}$/ } }, then: { $toObjectId: '$refereeId' }, else: null } }
         }
       },
       {

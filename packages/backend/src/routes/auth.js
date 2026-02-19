@@ -262,6 +262,14 @@ router.post('/signup', async function(req, res) {
       console.error('Failed to send welcome email:', err);
     });
     
+    // Send welcome in-app notification (async)
+    var notificationService = require('../services/notifications.js');
+    notificationService.createNotification(newUser.id, notificationService.NOTIFICATION_TYPES.WELCOME, {
+      title: 'Welcome to Demony!',
+      message: 'Your account is ready. Complete your profile and start investing!',
+      link: '#/projects'
+    }).catch(function() {});
+    
     res.json({ message: 'User created successfully', token: token, refreshToken: refreshToken, user: newUser });
   } catch (err) {
     console.error(err);
@@ -537,14 +545,19 @@ router.put('/update-profile', authenticateToken, async function(req, res) {
     // Optional business name update (only for business owners with business object)
     var businessNameTrimmed = typeof businessName === 'string' ? businessName.trim() : '';
     if (businessNameTrimmed.length > 0 && (existing.role || '') === 'business_owner') {
-      updateDoc.$set['business.name'] = businessNameTrimmed;
-      // Ensure business object exists
-      updateDoc.$set.business = existing.business || {
-        name: businessNameTrimmed,
-        registrationNumber: (existing.business && existing.business.registrationNumber) || '',
-        verified: false,
-        documents: []
-      };
+      // CRIT-03 FIX: Avoid conflicting $set paths (business + business.name)
+      if (existing.business) {
+        // Business object exists, just update the name sub-field
+        updateDoc.$set['business.name'] = businessNameTrimmed;
+      } else {
+        // Business object doesn't exist, create the whole object
+        updateDoc.$set.business = {
+          name: businessNameTrimmed,
+          registrationNumber: '',
+          verified: false,
+          documents: []
+        };
+      }
     }
 
     await database.collection('users').updateOne(

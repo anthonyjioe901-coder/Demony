@@ -31,6 +31,7 @@ class NotificationsViewModel @Inject constructor(
 
     init {
         loadNotifications()
+        startPolling()
     }
 
     fun loadNotifications() {

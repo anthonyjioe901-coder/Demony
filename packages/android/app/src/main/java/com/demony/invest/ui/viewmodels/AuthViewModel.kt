@@ -113,10 +113,10 @@ class AuthViewModel @Inject constructor(
                     _currentUser.value = user
                 }
                 .onFailure { exception ->
-                    // Only logout on auth errors (401/403), not network issues
+                    // CRIT-4: Fixed - check ApiException (from safeApiCall) instead of retrofit2.HttpException
                     when (exception) {
-                        is retrofit2.HttpException -> {
-                            if (exception.code() == 401 || exception.code() == 403) {
+                        is com.demony.invest.data.api.ApiException -> {
+                            if (exception.statusCode == 401 || exception.statusCode == 403) {
                                 logout()
                             }
                         }

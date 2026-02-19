@@ -88,7 +88,7 @@ function showNotification(message, type) {
   notification.style.cssText = 'position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 10000; padding: 1.25rem 2rem; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); max-width: 600px; width: 90%; text-align: center; font-weight: 600; font-size: 1rem; line-height: 1.5; animation: slideDown 0.3s ease-out;';
   notification.style.backgroundColor = color.bg;
   notification.style.color = 'white';
-  notification.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;"><span style="font-size: 1.5rem;">' + color.icon + '</span><span>' + message + '</span></div>';
+  notification.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;"><span style="font-size: 1.5rem;">' + color.icon + '</span><span>' + escapeHtml(message) + '</span></div>';
   document.body.appendChild(notification);
   setTimeout(function() {
     notification.style.opacity = '0';

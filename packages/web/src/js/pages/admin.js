@@ -381,13 +381,13 @@ function loadRecentActivity(adminApi) {
             '<div class="table-user">' +
               '<div class="table-avatar">' + initials + '</div>' +
               '<div class="table-user-info">' +
-                '<div class="table-user-name">' + userName + '</div>' +
+                '<div class="table-user-name">' + escapeHtml(userName) + '</div>' +
               '</div>' +
             '</div>' +
           '</td>' +
-          '<td>' + (inv.projectName || 'N/A') + '</td>' +
+          '<td>' + escapeHtml(inv.projectName || 'N/A') + '</td>' +
           '<td><strong>GH₵' + (inv.amount || 0).toLocaleString() + '</strong></td>' +
-          '<td><span class="badge ' + statusClass + '">' + (inv.status || 'unknown') + '</span></td>' +
+          '<td><span class="badge ' + statusClass + '">' + escapeHtml(inv.status || 'unknown') + '</span></td>' +
           '<td>' + new Date(inv.createdAt).toLocaleDateString() + '</td>' +
         '</tr>';
     });
@@ -609,16 +609,16 @@ function loadInvestmentsTable() {
             '<div class="table-user">' +
               '<div class="table-avatar">' + initials + '</div>' +
               '<div class="table-user-info">' +
-                '<div class="table-user-name">' + userName + '</div>' +
+                '<div class="table-user-name">' + escapeHtml(userName) + '</div>' +
               '</div>' +
             '</div>' +
           '</td>' +
-          '<td>' + (inv.projectName || 'N/A') + '</td>' +
+          '<td>' + escapeHtml(inv.projectName || 'N/A') + '</td>' +
           '<td><strong>GH₵' + (inv.amount || 0).toLocaleString() + '</strong></td>' +
-          '<td><span class="badge ' + statusClass + '">' + inv.status + '</span></td>' +
+          '<td><span class="badge ' + statusClass + '">' + escapeHtml(inv.status) + '</span></td>' +
           '<td>' + new Date(inv.createdAt).toLocaleDateString() + '</td>' +
           '<td>' +
-            (canWithdraw ? '<button class="btn btn-sm btn-warning" onclick="showWithdrawInvestmentModal(\'' + (inv._id || inv.id) + '\', ' + inv.amount + ', \'' + (inv.projectName || 'Project').replace(/'/g, "\\'") + '\', \'' + userName.replace(/'/g, "\\'") + '\')">End</button>' : '-') +
+            (canWithdraw ? '<button class="btn btn-sm btn-warning" onclick="showWithdrawInvestmentModal(\'' + escapeAttr(inv._id || inv.id) + '\', ' + inv.amount + ', \'' + escapeAttr(inv.projectName || 'Project') + '\', \'' + escapeAttr(userName) + '\')">End</button>' : '-') +
           '</td>' +
         '</tr>';
     });
@@ -696,9 +696,9 @@ function loadWithdrawalsTable() {
         '<tr>' +
           '<td><strong>' + escapeHtml(userName) + '</strong></td>' +
           '<td><strong style="color: var(--secondary-color);">GH₵' + (w.amount || 0).toLocaleString() + '</strong></td>' +
-          '<td>' + (w.method || 'Mobile Money') + '</td>' +
-          '<td>' + (w.accountNumber || w.momoNumber || 'N/A') + ' (' + (w.provider || 'MTN') + ')</td>' +
-          '<td><span class="badge ' + (isPending ? 'badge-warning' : w.status === 'completed' ? 'badge-success' : 'badge-error') + '">' + w.status + '</span></td>' +
+          '<td>' + escapeHtml(w.method || 'Mobile Money') + '</td>' +
+          '<td>' + escapeHtml((w.accountNumber || w.momoNumber || 'N/A') + ' (' + (w.provider || 'MTN') + ')') + '</td>' +
+          '<td><span class="badge ' + (isPending ? 'badge-warning' : w.status === 'completed' ? 'badge-success' : 'badge-error') + '">' + escapeHtml(w.status) + '</span></td>' +
           '<td>' + new Date(w.createdAt).toLocaleDateString() + '</td>' +
           '<td>' +
             (isPending ? 
@@ -763,8 +763,8 @@ function loadKycPage(adminApi, api) {
           '<td>' + escapeHtml(user.email) + '</td>' +
           '<td>' + (user.kyc.submittedAt ? new Date(user.kyc.submittedAt).toLocaleDateString() : 'N/A') + '</td>' +
           '<td>' +
-            (user.kyc.idDocument ? '<a href="' + user.kyc.idDocument + '" target="_blank" class="btn btn-sm btn-outline">ID Doc</a> ' : '') +
-            (user.kyc.selfie ? '<a href="' + user.kyc.selfie + '" target="_blank" class="btn btn-sm btn-outline">Selfie</a>' : '') +
+            (user.kyc.idDocument ? '<a href="' + escapeAttr(user.kyc.idDocument) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline">ID Doc</a> ' : '') +
+            (user.kyc.selfie ? '<a href="' + escapeAttr(user.kyc.selfie) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline">Selfie</a>' : '') +
           '</td>' +
           '<td>' +
             '<button class="btn btn-sm btn-success" onclick="approveKyc(\'' + user.id + '\')">✓ Approve</button> ' +
@@ -878,8 +878,8 @@ function renderProjectsGrid(projects) {
           '</div>' +
           '<div class="project-actions">' +
             '<button class="btn btn-sm btn-outline" onclick="showEditProjectModal(\'' + (p._id || p.id) + '\')">Edit</button>' +
-            '<button class="btn btn-sm btn-outline" onclick="showDistributeProfitModal(\'' + (p._id || p.id) + '\', \'' + (p.name || 'Project').replace(/'/g, "\\'") + '\')">Distribute</button>' +
-            (p.status === 'active' ? '<button class="btn btn-sm btn-warning" onclick="showCompleteProjectModal(\'' + (p._id || p.id) + '\', \'' + (p.name || 'Project').replace(/'/g, "\\'") + '\')">End</button>' : '') +
+            '<button class="btn btn-sm btn-outline" onclick="showDistributeProfitModal(\'' + escapeAttr(p._id || p.id) + '\', \'' + escapeAttr(p.name || 'Project') + '\')">Distribute</button>' +
+            (p.status === 'active' ? '<button class="btn btn-sm btn-warning" onclick="showCompleteProjectModal(\'' + escapeAttr(p._id || p.id) + '\', \'' + escapeAttr(p.name || 'Project') + '\')">End</button>' : '') +
           '</div>' +
         '</div>' +
       '</div>';
@@ -1171,7 +1171,7 @@ function renderTransactionsTable(transactions) {
   
   transactions.forEach(function(t) {
     var typeClass = t.type === 'deposit' || t.type === 'investment' ? 'badge-success' : 'badge-warning';
-    html += '<tr><td><span class="badge ' + typeClass + '">' + t.type + '</span></td><td>' + (t.userId || 'N/A') + '</td><td>GH₵' + (t.amount || 0).toLocaleString() + '</td><td>' + (t.status || 'N/A') + '</td><td>' + new Date(t.createdAt).toLocaleString() + '</td></tr>';
+    html += '<tr><td><span class="badge ' + typeClass + '">' + escapeHtml(t.type) + '</span></td><td>' + escapeHtml(t.userId || 'N/A') + '</td><td>GH₵' + (t.amount || 0).toLocaleString() + '</td><td>' + escapeHtml(t.status || 'N/A') + '</td><td>' + new Date(t.createdAt).toLocaleString() + '</td></tr>';
   });
   
   html += '</tbody></table>';
@@ -1238,7 +1238,7 @@ function showCreditWalletModal(userId, userName) {
   modal.innerHTML = 
     '<div class="modal-content" style="max-width: 400px;">' +
       '<h2>💳 Credit User Wallet</h2>' +
-      (userName ? '<p style="color: var(--text-muted);">User: <strong>' + userName + '</strong></p>' : '') +
+      (userName ? '<p style="color: var(--text-muted);">User: <strong>' + escapeHtml(userName) + '</strong></p>' : '') +
       '<form id="credit-wallet-form">' +
         (!userId ? '<div class="form-group"><label>User Email</label><input type="email" id="credit-user-email" required placeholder="user@example.com"></div>' : '<input type="hidden" id="credit-user-id" value="' + userId + '">') +
         '<div class="form-group"><label>Amount (GH₵)</label><input type="number" id="credit-amount" required min="1" step="0.01" placeholder="100"></div>' +
@@ -1338,8 +1338,8 @@ function showWithdrawInvestmentModal(investmentId, amount, projectName, userName
   modal.innerHTML = 
     '<div class="modal-content" style="max-width: 450px;">' +
       '<h2>💸 End Investment</h2>' +
-      '<p>User: <strong>' + userName + '</strong></p>' +
-      '<p>Project: <strong>' + projectName + '</strong></p>' +
+      '<p>User: <strong>' + escapeHtml(userName) + '</strong></p>' +
+      '<p>Project: <strong>' + escapeHtml(projectName) + '</strong></p>' +
       '<p>Amount: <strong>GH₵' + amount.toLocaleString() + '</strong></p>' +
       '<form id="withdraw-inv-form">' +
         '<div class="form-group"><label>Reason</label><input type="text" id="withdraw-reason" required value="User requested withdrawal"></div>' +
@@ -1414,7 +1414,7 @@ function showCompleteProjectModal(projectId, projectName) {
   modal.innerHTML = 
     '<div class="modal-content" style="max-width: 450px;">' +
       '<h2>✅ Complete Project</h2>' +
-      '<p>Project: <strong>' + projectName + '</strong></p>' +
+      '<p>Project: <strong>' + escapeHtml(projectName) + '</strong></p>' +
       '<div style="background: #d1fae5; padding: 1rem; border-radius: 8px; margin: 1rem 0;">' +
         '<p style="margin:0;"><strong>This will:</strong></p>' +
         '<ul style="margin: 0.5rem 0 0 1rem; padding: 0;"><li>Mark project as completed</li><li>Return all principals to investors</li><li>Send completion emails</li></ul>' +
@@ -1791,7 +1791,7 @@ function showDistributeProfitModal(projectId, projectName) {
   modal.innerHTML = 
     '<div class="modal-content" style="max-width: 450px;">' +
       '<h2>💰 Distribute Profits</h2>' +
-      '<p>Project: <strong>' + projectName + '</strong></p>' +
+      '<p>Project: <strong>' + escapeHtml(projectName) + '</strong></p>' +
       '<form id="distribute-form">' +
         '<div class="form-group"><label>Profit Amount (GH₵)</label><input type="number" id="profit-amount" required min="1" step="0.01" placeholder="5000"></div>' +
         '<div class="form-group"><label>Description</label><input type="text" id="profit-desc" placeholder="Monthly profit distribution"></div>' +

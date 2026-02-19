@@ -30,7 +30,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug") // TODO: Replace with release keystore before Play Store submission
+            // CRIT-02: Using debug keystore - MUST replace with release keystore before Play Store submission
+            // Create a release keystore: keytool -genkey -v -keystore release.keystore -alias demony -keyalg RSA -keysize 2048 -validity 10000
+            signingConfig = signingConfigs.getByName("debug")
         }
         debug {
             isMinifyEnabled = false

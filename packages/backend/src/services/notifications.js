@@ -82,6 +82,7 @@ var NOTIFICATION_TYPES = {
   INVESTMENT_MATURED: 'investment_matured',
   PROJECT_UPDATE: 'project_update',
   PROJECT_COMPLETED: 'project_completed',
+  PROJECT_CANCELLED: 'project_cancelled',
   
   // KYC
   KYC_SUBMITTED: 'kyc_submitted',
@@ -175,6 +176,15 @@ async function notifyMultipleUsers(userIds, type, data) {
       sendToUser(n.userId, { event: 'notification', notification: n });
       return n;
     });
+    
+    // Send updated unread counts to each user via SSE
+    var uniqueUserIds = [...new Set(userIds)];
+    for (var uid of uniqueUserIds) {
+      try {
+        var count = await database.collection('notifications').countDocuments({ userId: uid, read: false });
+        sendToUser(uid, { event: 'unread_count', count: count });
+      } catch (e) { /* ignore */ }
+    }
     
     return inserted;
   } catch (err) {
@@ -271,6 +281,7 @@ function getDefaultTitle(type) {
     investment_matured: 'Investment Matured',
     project_update: 'Project Update',
     project_completed: 'Project Completed',
+    project_cancelled: 'Project Cancelled',
     kyc_submitted: 'KYC Submitted',
     kyc_approved: 'KYC Approved',
     kyc_rejected: 'KYC Needs Attention',
@@ -298,6 +309,7 @@ function getDefaultIcon(type) {
     investment_matured: '🎉',
     project_update: '📋',
     project_completed: '🏁',
+    project_cancelled: '🚫',
     kyc_submitted: '📄',
     kyc_approved: '✅',
     kyc_rejected: '⚠️',

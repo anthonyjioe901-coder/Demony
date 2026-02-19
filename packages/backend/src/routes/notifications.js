@@ -2,6 +2,7 @@
 var express = require('express');
 var authenticateToken = require('../middleware/auth.js');
 var notificationService = require('../services/notifications.js');
+var { ObjectId } = require('mongodb');
 var router = express.Router();
 
 // ==================== SSE Stream ====================
@@ -82,6 +83,11 @@ router.put('/:id/read', authenticateToken, async function(req, res) {
   try {
     var userId = req.user.id || req.user.userId;
     var notificationId = req.params.id; // 'all' or specific ID
+    
+    // Validate ObjectId format (unless 'all')
+    if (notificationId !== 'all' && !ObjectId.isValid(notificationId)) {
+      return res.status(400).json({ error: 'Invalid notification ID' });
+    }
     
     var result = await notificationService.markAsRead(userId, notificationId);
     

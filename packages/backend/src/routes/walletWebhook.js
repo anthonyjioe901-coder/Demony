@@ -6,6 +6,9 @@ var db = require('../../database/src/index');
 var ObjectId = require('mongodb').ObjectId;
 var { toObjectId } = require('../utils/objectId');
 var router = express.Router();
+var notificationService = require('../services/notifications.js');
+var TYPES = notificationService.NOTIFICATION_TYPES;
+var emailService = require('../services/email.js');
 
 // Use express.raw() to get the unparsed body for HMAC verification
 router.post('/', express.raw({ type: 'application/json' }), async function(req, res) {
@@ -67,6 +70,20 @@ router.post('/', express.raw({ type: 'application/json' }), async function(req, 
                   $set: { updatedAt: new Date() }
                 }
               );
+              
+              // Send notification (non-blocking)
+              notificationService.createNotification(transaction.userId, TYPES.DEPOSIT_SUCCESS, {
+                title: 'Deposit Successful',
+                message: 'GH\u20B5' + amount.toLocaleString() + ' has been added to your wallet.',
+                link: '#/wallet',
+                metadata: { amount: amount, reference: reference }
+              }).catch(function() {});
+              
+              // Send deposit email (non-blocking)
+              var webhookUser = await database.collection('users').findOne({ _id: webhookUserId }, { projection: { email: 1, name: 1, walletBalance: 1 } });
+              if (webhookUser && webhookUser.email) {
+                emailService.sendDepositEmail(webhookUser, amount, webhookUser.walletBalance || 0).catch(function() {});
+              }
             }
           } else {
             console.log('[Webhook] Transaction already processed, skipping wallet credit:', reference);

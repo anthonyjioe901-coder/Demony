@@ -19,7 +19,7 @@ function authenticateToken(req, res, next) {
       var database = await db.getDb();
       var user = await database.collection('users').findOne(
         { _id: new ObjectId(userId) },
-        { projection: { isActive: 1, tokenVersion: 1 } }
+        { projection: { isActive: 1, tokenVersion: 1, name: 1, fullName: 1 } }
       );
 
       if (!user) return res.status(401).json({ error: 'User not found' });
@@ -44,7 +44,8 @@ function authenticateToken(req, res, next) {
       userId: userId,
       id: userId,
       email: decoded.email,
-      role: decoded.role
+      role: decoded.role,
+      name: (user && (user.name || user.fullName)) || decoded.email
     };
     next();
   });

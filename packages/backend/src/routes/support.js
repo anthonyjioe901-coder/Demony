@@ -35,8 +35,8 @@ router.post('/tickets', async function(req, res) {
     }
     
     // Validate types and lengths
-    if (typeof subject !== 'string' || subject.trim().length < 3 || subject.trim().length > 200) {
-      return res.status(400).json({ error: 'Subject must be 3-200 characters' });
+    if (typeof subject !== 'string' || subject.trim().length < 3 || subject.trim().length > 100) {
+      return res.status(400).json({ error: 'Subject must be 3-100 characters' });
     }
     if (typeof message !== 'string' || message.trim().length < 10 || message.trim().length > 5000) {
       return res.status(400).json({ error: 'Message must be 10-5000 characters' });
@@ -86,7 +86,7 @@ router.post('/tickets', async function(req, res) {
     try {
       await emailService.sendEmail('supportTicketConfirmation', email, {
         ticketId: ticketId,
-        subject: subject,
+        subject: ticket.subject,
         category: category,
         priority: priority,
         userName: user ? user.name : email.split('@')[0],
@@ -105,7 +105,7 @@ router.post('/tickets', async function(req, res) {
         category: category,
         priority: priority,
         message: message.substring(0, 500),
-        email: email,
+        userEmail: email,
         phone: phone,
         userName: user ? user.name : 'Guest',
         appUrl: process.env.APP_URL

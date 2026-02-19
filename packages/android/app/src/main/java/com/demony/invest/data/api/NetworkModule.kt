@@ -74,13 +74,15 @@ object NetworkModule {
             .writeTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false) // Prevent double-spend on POST requests
 
-        // CRIT-12: Certificate pinning for production builds only
-        if (!BuildConfig.DEBUG) {
-            val certificatePinner = CertificatePinner.Builder()
-                .add("demony-api.onrender.com", "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=") // TODO: Replace with actual server certificate pin
-                .build()
-            builder.certificatePinner(certificatePinner)
-        }
+        // CRIT-01: Certificate pinning DISABLED — placeholder hash was blocking all production HTTPS.
+        // To re-enable, replace with real certificate pin obtained via:
+        //   openssl s_client -connect demony-api.onrender.com:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
+        // if (!BuildConfig.DEBUG) {
+        //     val certificatePinner = CertificatePinner.Builder()
+        //         .add("demony-api.onrender.com", "sha256/YOUR_REAL_PIN_HERE=")
+        //         .build()
+        //     builder.certificatePinner(certificatePinner)
+        // }
 
         return builder.build()
     }

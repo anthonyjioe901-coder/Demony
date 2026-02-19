@@ -102,9 +102,12 @@ class TokenManager @Inject constructor(
         return securePrefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
     }
 
-    // Clear all data (logout)
+    // HIGH-5: Only clear auth data on logout, preserve user settings (dark mode, biometric, notifications)
     fun clearAll() {
-        securePrefs.edit().clear().apply()
+        securePrefs.edit()
+            .remove(KEY_TOKEN)
+            .remove(KEY_USER)
+            .apply()
     }
 
     // Check if user is logged in

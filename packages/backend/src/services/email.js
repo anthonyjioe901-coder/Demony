@@ -1185,6 +1185,124 @@ var templates = {
       `,
       text: `Investment Withdrawn: ${data.projectName}\n\nHi ${data.userName},\n\nYour investment in "${data.projectName}" has been withdrawn.\n\nOriginal Investment: GH₵${data.principalAmount}\n${hasPenalty ? `Penalty: -GH₵${data.penaltyAmount}\n` : ''}Refunded: GH₵${data.refundAmount}\n\nReason: ${data.reason}\n\nYour funds are now available in your wallet.`
     };
+  },
+
+  // Broadcast email from admin
+  broadcast: function(data) {
+    return {
+      subject: data.subject || 'Message from Demony',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>💎 Demony</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.userName || 'Investor'},</p>
+              <div>${data.message}</div>
+            </div>
+            <div class="footer">
+              <p>&copy; ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: 'Hi ' + (data.userName || 'Investor') + ',\n\n' + (data.message || '') + '\n\n- Demony Team'
+    };
+  },
+
+  // Referral notification email
+  referralNotification: function(data) {
+    return {
+      subject: data.subject || 'Referral Update from Demony',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #10b981, #059669); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🎁 Referral Update</h1>
+            </div>
+            <div class="content">
+              ${data.bodyHtml || '<p>' + (data.message || '') + '</p>'}
+            </div>
+            <div class="footer">
+              <p>&copy; ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: data.subject + '\n\n' + (data.message || 'You have a referral update.') + '\n\n- Demony Team'
+    };
+  },
+
+  // Support ticket reply notification
+  supportTicketReply: function(data) {
+    return {
+      subject: '💬 Reply to your support ticket ' + (data.ticketId || ''),
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 30px; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .reply-box { background: #f0f0ff; border-left: 4px solid #6366f1; padding: 15px; border-radius: 8px; margin: 15px 0; }
+            .cta-btn { display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+            .footer { background: #1e293b; color: #94a3b8; padding: 25px; text-align: center; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Support Reply</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.userName || 'there'},</p>
+              <p>Our support team has replied to your ticket <strong>${data.ticketId}</strong>:</p>
+              <div class="reply-box">
+                ${data.replyMessage}
+              </div>
+              <p style="text-align: center;">
+                <a href="${data.appUrl || 'https://demony.com'}/#support" class="cta-btn">View Ticket</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p>&copy; ${new Date().getFullYear()} Demony. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: 'Hi ' + (data.userName || 'there') + ',\n\nOur support team replied to ticket ' + (data.ticketId || '') + ':\n\n' + (data.replyMessage || '') + '\n\nView your ticket at ' + (data.appUrl || 'https://demony.com') + '/#support'
+    };
   }
 };
 
@@ -1234,12 +1352,19 @@ async function sendEmail(templateName, recipientEmail, data) {
   } catch (err) {
     console.error('❌ Failed to send email via Brevo:', err && err.message);
 
-    // If API key is invalid or unauthorized, disable sending to avoid repeated failures
+    // If API key is invalid or unauthorized, disable sending temporarily to avoid repeated failures
     if (err && err.message && (err.message.toLowerCase().includes('unauthorized') || err.message.toLowerCase().includes('invalid'))) {
-      console.error('🚫 Email disabled due to Brevo auth failure.');
-      console.error('   Check BREVO_API_KEY in your environment.');
+      console.error('🚫 Email disabled temporarily due to Brevo auth failure.');
+      console.error('   Check BREVO_API_KEY in your environment. Will retry in 5 minutes.');
       emailDisabled = true;
       brevoClient = null;
+      
+      // Re-enable after 5 minutes to retry
+      setTimeout(function() {
+        emailDisabled = false;
+        brevoClient = null;
+        console.log('ℹ️ Email re-enabled after cooldown. Will retry on next send.');
+      }, 5 * 60 * 1000);
     }
 
     return { success: false, error: err && err.message };

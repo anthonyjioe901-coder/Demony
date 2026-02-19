@@ -10,6 +10,7 @@ var router = express.Router();
 var PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 var notificationService = require('../services/notifications.js');
 var TYPES = notificationService.NOTIFICATION_TYPES;
+var emailService = require('../services/email.js');
 var { idempotencyCheck } = require('../middleware/idempotency.js');
 
 // SEC-06: Warn on startup if Paystack secret is missing
@@ -280,8 +281,14 @@ router.get('/deposit/verify/:reference', async function(req, res) {
       message: 'GH₵' + amount.toLocaleString() + ' has been added to your wallet.',
       link: '#/wallet',
       metadata: { amount: amount, reference: reference }
-    }).catch(function() {});
-  } catch (err) {
+    }).catch(function() {});    
+    // Send deposit confirmation email (non-blocking)
+    var depositUser = userObjectId ? await database.collection('users').findOne({ _id: userObjectId }, { projection: { email: 1, name: 1, walletBalance: 1 } }) : null;
+    if (depositUser && depositUser.email) {
+      emailService.sendDepositEmail(depositUser, amount, depositUser.walletBalance || 0).catch(function(err) {
+        console.error('Failed to send deposit email:', err);
+      });
+    }  } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -328,9 +335,6 @@ router.post('/withdraw', idempotencyCheck, async function(req, res) {
       // Validate account number format
       if (typeof accountNumber !== 'string' || !/^[0-9]{6,20}$/.test(accountNumber.replace(/[\s-]/g, ''))) {
         return res.status(400).json({ error: 'Invalid account number format' });
-      }
-      if (typeof accountName !== 'string' || accountName.trim().length < 2 || accountName.trim().length > 200) {
-        return res.status(400).json({ error: 'Account name must be 2-200 characters' });
       }
     } else if (method === 'momo') {
       if (!momoNetwork || !momoNumber) {
@@ -438,6 +442,22 @@ router.post('/withdraw', idempotencyCheck, async function(req, res) {
       reference: reference,
       status: 'pending_approval'
     });
+    
+    // Send withdrawal pending notification (non-blocking)
+    notificationService.createNotification(req.user.userId, TYPES.WITHDRAWAL_PENDING, {
+      title: 'Withdrawal Submitted',
+      message: 'Your withdrawal of GH\u20B5' + amount.toLocaleString() + ' is pending approval.',
+      link: '#/wallet',
+      metadata: { amount: amount, reference: reference }
+    }).catch(function() {});
+    
+    // Send withdrawal requested email (non-blocking)
+    var wdUser = await database.collection('users').findOne({ _id: new ObjectId(req.user.userId) }, { projection: { email: 1, name: 1 } });
+    if (wdUser && wdUser.email) {
+      emailService.sendWithdrawalRequestedEmail(wdUser, { amount: amount, method: method, reference: reference }).catch(function(err) {
+        console.error('Failed to send withdrawal email:', err);
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

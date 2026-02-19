@@ -366,7 +366,8 @@ class DemonyRepository @Inject constructor(
                         tokenManager.clearAll()
                     }
                     
-                    Result.failure(Exception(errorMessage))
+                    // CRIT-3/4: Use ApiException to preserve HTTP status code so callers can react
+                    Result.failure(com.demony.invest.data.api.ApiException(response.code(), errorMessage))
                 }
             } catch (e: UnknownHostException) {
                 Result.failure(Exception("No Internet Connection. Please check your network and try again."))

@@ -86,7 +86,11 @@ app.use(helmet({
 var walletWebhookRouter = require('./routes/walletWebhook.js');
 app.use('/api/wallet/webhook', walletWebhookRouter);
 
-app.use(express.json({ limit: '1mb' })); // MED-02: Reduced default limit (upload route has its own higher limit)
+// Global JSON parser with 1mb limit, but skip /api/upload (needs 10mb for image uploads)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/upload')) return next();
+  express.json({ limit: '1mb' })(req, res, next);
+});
 
 // NoSQL injection protection - strips $ operators from user input
 app.use(noSqlSanitize);
